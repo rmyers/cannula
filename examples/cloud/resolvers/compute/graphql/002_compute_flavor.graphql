@@ -1,0 +1,19 @@
+type ComputeFlavor {
+  id: ID!
+  region: String
+  name: String
+  ram: Int
+  "Amount of RAM formatted like '16 GB'"
+  human: String
+  vcpus: Int
+  disk: Int
+}
+
+extend type Query {
+  computeFlavor(id: String, region: String): ComputeFlavor
+  computeFlavors(region: String): [ComputeFlavor]
+}
+
+extend type ComputeServer {
+  flavor: ComputeFlavor
+}

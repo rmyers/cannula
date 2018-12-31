@@ -1,0 +1,27 @@
+type ComputeServer {
+  id: String!
+  name: String!
+  created: String
+  updated: String
+  hostId: String
+  region: String
+  status: String
+}
+
+extend type Query {
+  computeServers(region: String): [ComputeServer]
+  computeServer(region: String, id: ID): ComputeServer
+}
+
+extend type Mutation {
+  createComputeServer(
+    region: String!,
+    name: String!,
+    flavor: ID!,
+    image: ID!,
+    networks: [ID]
+  ): ComputeServer
+
+  "TODO: figure out what to return"
+  deleteComputeServer(region: String, id: ID): ComputeServer
+}
