@@ -6,7 +6,7 @@ import time
 import bottle
 import cannula
 import requests
-from cannula.datasource.rest import RESTDataSource, FutureSession
+from cannula.datasource.rest import HTTPDataSource, FutureSession
 from cannula.helpers import get_root_path
 from requests_futures.sessions import FuturesSession
 

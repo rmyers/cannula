@@ -2,15 +2,16 @@ import asyncio
 import functools
 import inspect
 import logging
+import os
 import threading
-import time
 import types
 import typing
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 
 import requests
 
-LOG = logging.getLogger('cannula.datasource.rest')
+LOG = logging.getLogger('cannula.datasource.http')
+MAX_WORKERS = int(os.getenv('CANNULA_HTTP_MAX_WORKERS', 4))
 
 
 class DataSourceError(Exception):
@@ -20,7 +21,7 @@ class DataSourceError(Exception):
 class FutureSession(requests.Session):
     """Wrap requests session to allow requests to be async"""
 
-    def __init__(self, max_workers=4, *args, **kwargs):
+    def __init__(self, max_workers=MAX_WORKERS, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.executor = ThreadPoolExecutor(max_workers=max_workers)
 
@@ -68,7 +69,7 @@ class Request(typing.NamedTuple):
     headers: typing.Dict = {}
 
 
-class RESTDataSource:
+class HTTPDataSource:
 
     # The base url of this resource
     base_url: str = None

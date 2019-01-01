@@ -21,7 +21,7 @@ ACCOUNTS = dict()
 TENANTS = dict()
 USERS = dict()
 SERVER_IDS = ["server3", "server2", "server1"]
-ADVJECTIVES = [
+ADJECTIVES = [
   'imminent',
   'perfect',
   'organic',
@@ -67,7 +67,7 @@ NOUNS = [
 
 def name():
     """Generate a random name"""
-    return f'{random.choice(ADVJECTIVES)} {random.choice(NOUNS)}'
+    return f'{random.choice(ADJECTIVES)} {random.choice(NOUNS)}'
 
 
 def get_id():
