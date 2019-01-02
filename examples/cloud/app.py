@@ -1,14 +1,11 @@
-import json
 import logging
 import os
-import time
 
 import bottle
 import cannula
-import requests
-from cannula.datasource.rest import HTTPDataSource, FutureSession
+from cannula.datasource.http import FutureSession
 from cannula.helpers import get_root_path
-from requests_futures.sessions import FuturesSession
+from graphql import parse
 
 from session import User
 from resolvers.compute import compute_resolver
@@ -35,29 +32,32 @@ class CustomContext(cannula.Context):
     user = User(catalog, 'fake-token', 'jimmy', '1234')
 
 
-@bottle.route('/')
-def main():
-    optional_query = """{
-        servers: computeServers(region: "ORD") {
+MAIN_QUERY = parse("""
+    query main ($region: String!) {
+        servers: computeServers(region: $region) {
             name
             flavor {
                 name
                 ram
             }
         }
-        flavors: computeFlavors(region: "ORD") {
-            name
-            ram
-        }
-        images: computeImages(region: "ORD") {
+        images: computeImages(region: $region) {
             name
             minRam
         }
+        flavors: computeFlavors(region: $region) {
+            name
+            ram
+        }
     }
-    """
+""")
+
+
+@bottle.route('/')
+def main():
     if bottle.request.params.get('xhr'):
-        log.info('here?')
-        results = api.call_sync(optional_query)
+        results = api.call_sync(MAIN_QUERY, variables={'region': 'ORD'})
+        log.info(results.errors)
         return results.data
 
     return bottle.template('index')

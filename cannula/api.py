@@ -3,12 +3,22 @@ import asyncio
 import collections
 import copy
 import logging
+import inspect
 import os
 import random
 import typing
 import uuid
 
-from graphql import build_schema, extend_schema, parse, graphql, GraphQLSchema
+from graphql import (
+    build_schema,
+    execute,
+    ExecutionResult,
+    extend_schema,
+    parse,
+    GraphQLSchema,
+    validate_schema,
+    validate,
+)
 
 from cannula.helpers import get_root_path
 
@@ -16,7 +26,8 @@ LOG = logging.getLogger(__name__)
 
 # This is the root query that we provide, since the Query type cannot be
 # completely empty we need to provide something that we can extend with
-# the schema you are extending.
+# the schema you are extending. We also define cacheControl directive for
+# overriding field or objects cache policy.
 ROOT_QUERY = """
   type Query {
     _empty: String
@@ -24,11 +35,21 @@ ROOT_QUERY = """
   type Mutation {
     _empty: String
   }
+  enum CacheControlScope {
+    PUBLIC
+    PRIVATE
+  }
+  directive @cacheControl(
+    maxAge: Int
+    scope: CacheControlScope
+  ) on FIELD_DEFINITION | OBJECT | INTERFACE
 """
 
+# TODO(rmyers): Find a better place for this.
 DEFAULT_MOCKS = {
-    'String': lambda: random.choice(['flippy', 'flappy', 'slippy', 'slappy', 'homer']),
+    'String': lambda: random.choice(['flippy', 'flappy', 'slippy', 'slappy']),
     'Int': lambda: random.randint(4, 999),
+    'Float': lambda: random.randint(5, 999) * random.random(),
     'Boolean': lambda: random.choice([True, False]),
     'ID': lambda: str(uuid.uuid4())
 }
@@ -152,12 +173,7 @@ class API(Resolver):
         self._mock_objects.update(mock_objects)
         self._subresolvers = []
         self._graphql_schema = self.find_graphql_schema()
-
-    @property
-    def schema(self) -> GraphQLSchema:
-        if not hasattr(self, '_full_schema'):
-            self._full_schema = self._build_schema()
-        return self._full_schema
+        self.schema = self._build_schema()
 
     def _build_schema(self) -> GraphQLSchema:
         schema = build_schema(ROOT_QUERY)
@@ -168,6 +184,10 @@ class API(Resolver):
 
         if not _extended:
             raise AttributeError('No valid schema found')
+
+        schema_validation_errors = validate_schema(schema)
+        if schema_validation_errors:
+            raise Exception(f'Invalid schema: {schema_validation_errors}')
 
         return schema
 
@@ -197,8 +217,14 @@ class API(Resolver):
         self._graphql_schema += resolver.find_graphql_schema()
         self.registry.update(resolver.registry)
         self.datasources.update(resolver.datasources)
+        self.schema = self._build_schema()
 
-    async def call(self, query: str, request: typing.Any = None) -> typing.Awaitable:
+    async def call(
+        self,
+        document: GraphQLSchema,
+        request: typing.Any = None,
+        variables: typing.Dict[str, typing.Any] = None
+    )-> ExecutionResult:
         """Preform a query against the schema.
 
         This is meant to be called in an asyncio.loop, if you are using a
@@ -208,17 +234,30 @@ class API(Resolver):
         if self._mocks:
             field_resolver = self.mock_resolver
 
-        context = self.get_context(None)
-        return await graphql(
-            self.schema,
-            query,
-            context_value=context,
-            field_resolver=field_resolver,
-        )
+        validation_errors = validate(self.schema, document)
+        if validation_errors:
+            return ExecutionResult(data=None, errors=validation_errors)
 
-    def call_sync(self, query: str, request: typing.Any = None):
+        context = self.get_context(None)
+        result = execute(
+            schema=self.schema,
+            document=document,
+            context_value=context,
+            variable_values=variables,
+            field_resolver=field_resolver
+        )
+        if inspect.isawaitable(result):
+            return await result
+        return result
+
+    def call_sync(
+        self,
+        document: GraphQLSchema,
+        request: typing.Any = None,
+        variables: typing.Dict[str, typing.Any] = None
+    )-> ExecutionResult:
         loop = asyncio.get_event_loop()
-        return loop.run_until_complete(self.call(query, request))
+        return loop.run_until_complete(self.call(document, request, variables))
 
     async def mock_resolver(self, resource, info, **kwargs):
         from graphql.type.definition import GraphQLList
@@ -254,16 +293,14 @@ class API(Resolver):
         return resolve_fields(info.return_type)
 
     async def field_resolver(self, resource, info, **kwargs):
-        type_name = info.parent_type.name  # GQL schema type (ie Query, User)
-        field_name = info.field_name  # The attribute being resolved (ie name, last)
+        type_name = info.parent_type.name  # schema type (Query, Mutation)
+        field_name = info.field_name  # The attribute being resolved
         try:
             # First check if there is a customer resolver in the registry
-            # (ie Query:hello, User:last)
             custom_resolver = self.registry[type_name][field_name]
             return await custom_resolver(resource, info, **kwargs)
         except KeyError:
             # If there is not a custom resolver check the resource for attributes
             # that match the field_name. The resource argument will be the result
-            # of the Query type resolution. In our example that is the result of
-            # the `hello` function which is an instance of the User class.
+            # of the Query type resolution.
             return getattr(resource, field_name, None)
