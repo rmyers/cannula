@@ -275,6 +275,8 @@ class API(Resolver):
                 return [resolve_fields(schema_type.of_type) for x in range(count)]
 
             schema_type = str(schema_type)
+            if schema_type.endswith('!'):
+                schema_type = schema_type[:-1]
 
             if schema_type in self._mock_objects.keys():
                 mock = self._mock_objects.get(schema_type)
