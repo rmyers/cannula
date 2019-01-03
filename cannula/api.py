@@ -173,17 +173,18 @@ class API(Resolver):
         self._mock_objects.update(mock_objects)
         self._subresolvers = []
         self._graphql_schema = self.find_graphql_schema()
-        self.schema = self._build_schema()
+
+    @property
+    def schema(self):
+        if not hasattr(self, '_full_schema'):
+            self._full_schema = self._build_schema()
+        return self._full_schema
 
     def _build_schema(self) -> GraphQLSchema:
         schema = build_schema(ROOT_QUERY)
-        _extended = False
-        for extention in self._graphql_schema:
-            _extended = True
-            schema = extend_schema(schema, parse(extention))
 
-        if not _extended:
-            raise AttributeError('No valid schema found')
+        for extention in self._graphql_schema:
+            schema = extend_schema(schema, parse(extention))
 
         schema_validation_errors = validate_schema(schema)
         if schema_validation_errors:
@@ -217,7 +218,6 @@ class API(Resolver):
         self._graphql_schema += resolver.find_graphql_schema()
         self.registry.update(resolver.registry)
         self.datasources.update(resolver.datasources)
-        self.schema = self._build_schema()
 
     async def call(
         self,

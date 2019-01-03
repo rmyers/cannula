@@ -1,9 +1,9 @@
-type ComputeImage {
+type ComputeImage @cacheControl(maxAge: 50) {
   id: ID!
   status: String
-  name: String
+  name: String @cacheControl(maxAge: 50)
   minDisk: String
-  minRam: String
+  minRam: String  @cacheControl(maxAge: 50)
   architecture: String
 }
 

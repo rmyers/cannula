@@ -1,5 +1,5 @@
 type ComputeServer {
-  id: String!
+  id: ID!
   name: String!
   created: String
   updated: String

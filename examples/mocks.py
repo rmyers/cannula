@@ -1,10 +1,23 @@
-import asyncio
-import typing
-import sys
+"""
+Automatic Mocks Example
+-----------------------
+
+This shows off how the automatic mocking works. All you need to do is specify
+`mocks=True` and optionally `mock_objects` to the API.
+
+Run this program multiple times to see how the data is randomly generated:
+
+    $ PYTHONPATH=../ python3 mocks.py
+
+You can change the `schema` or `sample_query` as well to see how the data
+automatically changes too.
+"""
+
+from graphql.language import parse
 
 import cannula
 
-my_schema = """
+schema = """
   type Veggy {
     name: String
     id: ID
@@ -27,10 +40,7 @@ my_schema = """
   }
 """
 
-api = cannula.API(__name__, schema=my_schema, mocks=True)
-
-
-sample_query = """{
+sample_query = parse("""{
   mockity(input: "ignored") {
     text
     number
@@ -46,6 +56,19 @@ sample_query = """{
     }
   }
 }
-"""
+""")
 
-print(api.call_sync(sample_query, None))
+default = cannula.API(__name__, schema=schema, mocks=True)
+
+
+print(f'\nDEFAULT:\n{default.call_sync(sample_query)}')
+
+
+custom_mocks = {
+  'String': 'This will be used for all Strings',
+  'Int': 42,
+}
+
+custom = cannula.API(__name__, schema=schema, mocks=True, mock_objects=custom_mocks)
+
+print(f'\nCUSTOM:\n{custom.call_sync(sample_query)}')

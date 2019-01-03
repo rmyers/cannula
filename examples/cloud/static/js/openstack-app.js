@@ -47,13 +47,12 @@ class OpenstackApp extends LitElement {
       // in order for the response to update our properties.
       setInterval(this._fetchData.bind(this), pollingInterval);
     }
-    //this._fetchData()
+    this._fetchData()
   }
 
   render() {
     const { servers, flavors, images, loaded } = this;
     if (!loaded) {
-      console.log('never!')
       return html`<p>Loading...</p>`
     }
     return html`

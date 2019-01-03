@@ -2,7 +2,7 @@
 import cannula
 
 
-class OpenStackBase(cannula.datasource.rest.HTTPDataSource):
+class OpenStackBase(cannula.datasource.http.HTTPDataSource):
 
     # The name of the service in the catalog for the logged in user.
     catalog_name = None
