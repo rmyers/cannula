@@ -1,0 +1,31 @@
+.main {
+  width: 100%;
+  margin: 0;
+}
+
+/* Prevent parent float collapsed problem */
+.content:after, .main:after {
+  display: table;
+  clear: both;
+  content: '';
+}
+
+.sidebar {
+  padding-right: 20px;
+}
+
+.content {
+  float: left;
+}
+
+@media (min-width: 700px) {
+  .content {
+    width: 66.66%;
+  }
+}
+
+@media (min-width: 700px) {
+  .sidebar {
+    width: 33.33%;
+  }
+}

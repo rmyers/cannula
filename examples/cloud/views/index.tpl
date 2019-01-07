@@ -2,6 +2,7 @@
 <html>
   <head>
     <title>Frankly</title>
+    <link rel="stylesheet" href="/static/css/normalize.css"></link>
   </head>
   <body>
 

@@ -19,6 +19,7 @@ api = cannula.API(__name__, schema="""
 class Message(typing.NamedTuple):
     text: str
 
+
 # The query resolver takes a source and info objects and any arguments
 # defined by the schema. Here we only accept a single argument `who`.
 @api.resolver('Query')

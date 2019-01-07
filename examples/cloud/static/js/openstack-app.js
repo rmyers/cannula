@@ -1,5 +1,10 @@
 import {LitElement, html} from 'https://unpkg.com/@polymer/lit-element@0.6.3/lit-element.js?module';
 
+import { AppStyles } from './style.js';
+import './compute/server-list-compact.js';
+import './compute/flavor-list.js';
+import './compute/image-list.js';
+
 
 class OpenstackApp extends LitElement {
   static get properties() {
@@ -56,12 +61,19 @@ class OpenstackApp extends LitElement {
       return html`<p>Loading...</p>`
     }
     return html`
-        <ul>
-          ${flavors.map((item) => {
-              return html`<li>${item.name}</li>`;
-            })
-          }
-        </ul>
+      ${AppStyles}
+      <div class="main">
+        <div class="row">
+          <div class="sidebar">
+            <p>boo</p>
+          </div>
+          <div class="content">
+            <flavor-list .flavors=${flavors}></flavor-list>
+            <image-list .images=${images}></image-list>
+            <server-list-compact .servers=${servers}></server-list-compact>
+          </div>
+        </div>
+      </div>
       `;
   }
 }
