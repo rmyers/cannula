@@ -209,6 +209,10 @@ class API(Resolver):
             setattr(context, name, datasource(context_copy))
         return context
 
+    def _merge_registry(self, registry: dict):
+        for type_name, value in registry.items():
+            self.registry[type_name].update(value)
+
     def register_resolver(self, resolver: Resolver) -> None:
         """Register a sub-resolver.
 
@@ -216,7 +220,7 @@ class API(Resolver):
         sub-resolver.
         """
         self._graphql_schema += resolver.find_graphql_schema()
-        self.registry.update(resolver.registry)
+        self._merge_registry(resolver.registry)
         self.datasources.update(resolver.datasources)
 
     async def call(

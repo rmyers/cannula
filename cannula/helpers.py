@@ -1,17 +1,14 @@
-"""
-Simple Helpers for finding a root path.
-
-Inspired by [flask](https://github.com/pallets/flask/blob/master/flask/helpers.py)
-"""
-
 import os
 import pkgutil
 import sys
 
 
 def get_root_path(import_name):
-    """Returns the path to a package or cwd if that cannot be found."""
-    # Module already imported and has a file attribute.  Use that first.
+    """Returns the path to a package or cwd if that cannot be found.
+
+    Inspired by [flask](https://github.com/pallets/flask/blob/master/flask/helpers.py)
+    """
+    # Module already imported and has a file attribute. Use that first.
     mod = sys.modules.get(import_name)
     if mod is not None and hasattr(mod, '__file__'):
         return os.path.dirname(os.path.abspath(mod.__file__))
