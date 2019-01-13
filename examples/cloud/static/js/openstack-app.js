@@ -1,10 +1,9 @@
 import {LitElement, html} from 'https://unpkg.com/@polymer/lit-element@0.6.3/lit-element.js?module';
 
-import { AppStyles } from './style.js';
 import './compute/server-list-compact.js';
 import './compute/flavor-list.js';
 import './compute/image-list.js';
-
+import './app-navigation.js';
 
 class OpenstackApp extends LitElement {
   static get properties() {
@@ -12,6 +11,7 @@ class OpenstackApp extends LitElement {
       flavors: { type: Array },
       images: { type: Array },
       servers: { type: Array },
+      nav: { type: Array },
       loaded: { type: Boolean },
       pollingInterval: { type: Number }
     }
@@ -22,6 +22,7 @@ class OpenstackApp extends LitElement {
     this.servers = [];
     this.flavors = [];
     this.images = [];
+    this.nav = [];
     this.loaded = false;
     this.pollingInterval = 5000;
   }
@@ -40,6 +41,7 @@ class OpenstackApp extends LitElement {
           this.servers = response.servers;
           this.images = response.images;
           this.flavors = response.flavors;
+          this.nav = response.nav;
           console.log('here');
         });
     }
@@ -55,26 +57,33 @@ class OpenstackApp extends LitElement {
     this._fetchData()
   }
 
+  createRenderRoot() {
+    return this;
+  }
+
   render() {
-    const { servers, flavors, images, loaded } = this;
+    const { servers, flavors, images, nav, loaded } = this;
     if (!loaded) {
       return html`<p>Loading...</p>`
     }
     return html`
-      ${AppStyles}
-      <div class="main">
-        <div class="row">
-          <div class="sidebar">
-            <p>boo</p>
-          </div>
-          <div class="content">
-            <flavor-list .flavors=${flavors}></flavor-list>
-            <image-list .images=${images}></image-list>
-            <server-list-compact .servers=${servers}></server-list-compact>
-          </div>
-        </div>
-      </div>
-      `;
+    <div class="wrapper">
+    <h1 class="header">Dashboard</h1>
+    <app-navigation .navItems=${nav}></app-navigation>
+    <article>
+      <flavor-list .flavors=${flavors}></flavor-list>
+      <image-list .images=${images}></image-list>
+      <server-list-compact .servers=${servers}></server-list-compact>
+    </article>
+    <aside>
+      This is an aside…
+    </aside>
+
+    <footer>
+      Copyright (c) 2019 Cannula Team
+    </footer>
+    </div>
+    `;
   }
 }
 

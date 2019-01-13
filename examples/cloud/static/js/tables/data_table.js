@@ -42,7 +42,7 @@ export class DataTable extends LitElement {
 
   _getBody() {
     const { data, columns } = this;
-    if (!data) {
+    if (!data || data.length === 0) {
       return this._showEmpty();
     }
     return html`

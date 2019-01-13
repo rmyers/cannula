@@ -17,6 +17,9 @@ class User(typing.NamedTuple):
     username: str
     session_id: str
 
+    def has_role(self, role):
+        return True
+
 
 def get_user(session_id: str) -> User:
     return SESSION.get(session_id)

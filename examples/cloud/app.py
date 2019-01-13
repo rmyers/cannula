@@ -10,6 +10,7 @@ from graphql import parse
 from session import User
 from resolvers.compute import compute_resolver
 from resolvers.identity import identity_resolver
+from resolvers.navigation import navigation_resolver
 
 PORT = os.getenv('PORT', '8081')
 BASE = get_root_path(__name__)
@@ -19,7 +20,8 @@ logging.basicConfig(level=logging.DEBUG)
 
 log = logging.getLogger()
 
-api = cannula.API(__name__, session=FutureSession(), mocks=True)
+api = cannula.API(__name__, session=FutureSession(), mocks=False)
+api.register_resolver(navigation_resolver)
 api.register_resolver(compute_resolver)
 api.register_resolver(identity_resolver)
 
@@ -53,6 +55,18 @@ MAIN_QUERY = parse("""
             name
             id
             ram
+        }
+        nav: getNavigation(active: "dashboard") {
+            title
+            items {
+                active
+                icon
+                url
+                name
+                className
+                enabled
+                disabledMessage
+            }
         }
     }
 """)
