@@ -21,6 +21,7 @@ from graphql import (
 )
 
 from cannula.helpers import get_root_path
+from cannula.context import Context
 
 LOG = logging.getLogger(__name__)
 
@@ -53,11 +54,6 @@ DEFAULT_MOCKS = {
     'Boolean': lambda: random.choice([True, False]),
     'ID': lambda: str(uuid.uuid4())
 }
-
-
-class Context:
-    def __init__(self, request):
-        self.request = request
 
 
 class Resolver:
@@ -160,14 +156,12 @@ class API(Resolver):
         self,
         *args,
         context: Context = Context,
-        session: typing.Any = None,
         mocks: bool = False,
         mock_objects: typing.Dict = {},
         **kwargs,
     )-> typing.Any:
         super().__init__(*args, **kwargs)
         self._context = context
-        self._session = session
         self._mocks = mocks
         self._mock_objects = DEFAULT_MOCKS
         self._mock_objects.update(mock_objects)
@@ -199,7 +193,6 @@ class API(Resolver):
 
     def get_context(self, request):
         context = self._context(request)
-        context.session = self._session
         # Initialize the datasources with a copy of the context without
         # any of the datasource attributes set. It may work just fine but
         # if you change the order the code may stop working. So discourage
@@ -242,7 +235,7 @@ class API(Resolver):
         if validation_errors:
             return ExecutionResult(data=None, errors=validation_errors)
 
-        context = self.get_context(None)
+        context = self.get_context(request)
         result = execute(
             schema=self.schema,
             document=document,

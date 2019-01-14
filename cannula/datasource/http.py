@@ -10,6 +10,8 @@ from concurrent.futures import ThreadPoolExecutor
 
 import requests
 
+from cannula.context import Context
+
 LOG = logging.getLogger('cannula.datasource.http')
 MAX_WORKERS = int(os.getenv('CANNULA_HTTP_MAX_WORKERS', 4))
 
@@ -62,6 +64,10 @@ def cacheable(f):
     return wrapped
 
 
+class HTTPContext(Context):
+    http_session = FutureSession()
+
+
 class Request(typing.NamedTuple):
     url: str
     method: str
@@ -87,6 +93,11 @@ class HTTPDataSource:
     def __init__(self, context):
         self.context = context
         self.memoized_requests = {}
+        self.assert_has_http_session(context)
+
+    def assert_has_http_session(self, context: Context) -> None:
+        if not hasattr(context, 'http_session'):
+            raise AttributeError('Context missing http_session did you subclass HTTPContext?')
 
     def will_send_request(self, request: Request) -> Request:
         """Hook for subclasses to modify the request before it is sent.
@@ -160,7 +171,7 @@ class HTTPDataSource:
         @cacheable
         async def process_request():
             try:
-                future = self.context.session.request(
+                future = self.context.http_session.request(
                     request.method,
                     request.url,
                     data=request.body,
