@@ -34,10 +34,11 @@ type Identity {
   catalog: [CatalogEntry]
   project: IdentityProject
   user: IdentityUser
+  authToken: String
 }
 
 extend type Mutation {
-  login(username: String, password: String): Identity
+  login(username: String!, password: String!): Identity
 }
 
 extend type Query {

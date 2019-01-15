@@ -49,6 +49,7 @@ footer {
     "sidebar content sidebar2"
     "footer  footer  footer";
     max-width: 100%;
+    min-height: 100vh;
   }
 }
 

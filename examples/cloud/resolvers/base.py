@@ -24,16 +24,16 @@ class OpenStackBase(cannula.datasource.http.HTTPDataSource):
         if path.startswith('/'):
             path = path[1:]
 
-        service = self.context.user.catalog.get(self.catalog_name, {})
-        service_url = service.get(region)
+        service = self.context.user.get_service_url(self.catalog_name, region)
 
-        if service_url is None:
+        if service is None:
             raise AttributeError(f'No service url found for {region}')
 
-        if service_url.endswith('/'):
-            return f'{service_url}{path}'
-        return f'{service_url}/{path}'
+        if service.endswith('/'):
+            return f'{service}{path}'
+        return f'{service}/{path}'
 
     def will_send_request(self, request):
-        request.headers.update({'X-Auth-Token': self.context.user.auth_token})
+        if hasattr(self.context, 'user'):
+            request.headers.update({'X-Auth-Token': self.context.user.auth_token})
         return request

@@ -1,3 +1,4 @@
+import logging
 import random
 import uuid
 from datetime import datetime
@@ -8,10 +9,14 @@ from bottle import response
 from bottle import route
 from bottle import run
 
+logging.basicConfig(level=logging.DEBUG)
+
+LOG = logging.getLogger('mock-openstack')
+
 
 HOST = "openstack"
 PORT = "8080"
-MIMIC_URL = "http://openstack:{port}".format(port=PORT)
+MIMIC_URL = f"http://{HOST}:{PORT}"
 COMPUTE_URL = f"{MIMIC_URL}/nova/v2.1/{{project_id}}"
 NEUTRON_URL = f"{MIMIC_URL}/neutron"
 CINDER_URL = f"{MIMIC_URL}/cinder/v2/{{project_id}}"
@@ -75,6 +80,13 @@ def get_id():
     return str(uuid.uuid4())
 
 
+def get_ip():
+    """Generate a random ip"""
+    def bit():
+        return random.randint(0, 255)
+    return f'{bit()}.{bit()}.{bit()}.{bit()}'
+
+
 def catalog(project_id):
     compute_url = COMPUTE_URL.format(project_id=project_id)
     neutron_url = NEUTRON_URL.format(project_id=project_id)
@@ -85,15 +97,15 @@ def catalog(project_id):
                 {
                     "url": compute_url,
                     "interface": "public",
-                    "region": "RegionOne",
-                    "region_id": "RegionOne",
+                    "region": "us-east",
+                    "region_id": "us-east",
                     "id": "41e9e3c05091494d83e471a9bf06f3ac"
                 },
                 {
                     "url": compute_url,
-                    "interface": "admin",
-                    "region": "RegionOne",
-                    "region_id": "RegionOne",
+                    "interface": "public",
+                    "region": "us-west",
+                    "region_id": "us-west",
                     "id": "4ad8904c486c407b9ebbc379c58ea432"
                 }
             ],
@@ -105,16 +117,16 @@ def catalog(project_id):
             "endpoints": [
                 {
                     "url": neutron_url,
-                    "interface": "admin",
-                    "region": "RegionOne",
-                    "region_id": "RegionOne",
+                    "interface": "public",
+                    "region": "us-east",
+                    "region_id": "us-east",
                     "id": "c5a338861d2b4a609be30fdbf189b5c7"
                 },
                 {
                     "url": neutron_url,
                     "interface": "public",
-                    "region": "RegionOne",
-                    "region_id": "RegionOne",
+                    "region": "us-west",
+                    "region_id": "us-west",
                     "id": "dd3877984b2e4d49a951aa376c7580b2"
                 }
             ],
@@ -126,16 +138,16 @@ def catalog(project_id):
             "endpoints": [
                 {
                     "url": cinder_url,
-                    "interface": "admin",
-                    "region": "RegionOne",
-                    "region_id": "RegionOne",
+                    "interface": "public",
+                    "region": "us-east",
+                    "region_id": "us-east",
                     "id": "8861d2c5a33b4a609be30fdbf189b5c7"
                 },
                 {
                     "url": cinder_url,
                     "interface": "public",
-                    "region": "RegionOne",
-                    "region_id": "RegionOne",
+                    "region": "us-west",
+                    "region_id": "us-west",
                     "id": "2e4d49a9dd3877984b51aa376c7580b2"
                 }
             ],
@@ -192,6 +204,7 @@ def v3_catalog():
 
 @route('/v3/auth/tokens', method='POST')
 def v3_auth_tokens():
+    LOG.info('Identity Log Request')
     user = request.json['auth']['identity']['password']['user']['name']
     project_id = USERS.get(user)
     if project_id is None:
@@ -224,7 +237,7 @@ def v3_auth_tokens():
                     "id": "default",
                     "name": "Default"
                 },
-                "id": "c95c5f5773864aacb5c09498a4e4ad0c",
+                "id": get_id(),
                 "name": user
             },
             "audit_ids": [
@@ -421,14 +434,14 @@ def subnet_list():
                 "dns_nameservers": [],
                 "allocation_pools": [
                     {
-                        "start": "10.0.0.2",
-                        "end": "10.0.0.254"
+                        "start": get_ip(),
+                        "end": get_ip()
                     }
                 ],
                 "host_routes": [],
                 "ip_version": 4,
-                "gateway_ip": "10.0.0.1",
-                "cidr": "10.0.0.0/24",
+                "gateway_ip": get_ip(),
+                "cidr": f"{get_ip()}/24",
                 "id": "abc",
                 "created_at": "2016-10-10T14:35:34Z",
                 "description": "",
@@ -456,8 +469,8 @@ def server_create(project_id):
         "hostId": "8e1376bbeee19c6fb07e29eb7876ac26ac81905200a10d3dfac6840c",
         "OS-EXT-SRV-ATTR:host": "saturn-rpc",
         "addresses": {
-            "private-net": [{"OS-EXT-IPS-MAC:mac_addr": "fa:16:3e:58:ad:d4", "version": 4, "addr": "10.0.0.77", "OS-EXT-IPS:type": "fixed"}],
-            "external-net": [{"OS-EXT-IPS-MAC:mac_addr": "fa:16:3e:b0:a3:13", "version": 4, "addr": "192.168.1.229", "OS-EXT-IPS:type": "fixed"}]},
+            "private-net": [{"OS-EXT-IPS-MAC:mac_addr": "fa:16:3e:58:ad:d4", "version": 4, "addr": get_ip(), "OS-EXT-IPS:type": "fixed"}],
+            "external-net": [{"OS-EXT-IPS-MAC:mac_addr": "fa:16:3e:b0:a3:13", "version": 4, "addr": get_ip(), "OS-EXT-IPS:type": "fixed"}]},
         "key_name": None,
         "image": {
             "id": image_id
@@ -478,7 +491,7 @@ def server_create(project_id):
         "tenant_id": project_id,
         "OS-DCF:diskConfig": "MANUAL",
         "os-extended-volumes:volumes_attached": [],
-        "accessIPv4": "",
+        "accessIPv4": get_ip(),
         "accessIPv6": "",
         "progress": 0,
         "OS-EXT-STS:power_state": 1,
@@ -596,4 +609,5 @@ def root():
     }
 
 
+LOG.info(f'starting mock openstack server on {PORT}')
 run(host='0.0.0.0', port=PORT, debug=True, reloader=True)
