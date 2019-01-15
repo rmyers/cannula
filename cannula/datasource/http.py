@@ -131,12 +131,12 @@ class HTTPDataSource:
     def did_receive_error(self, error: Exception, request: Request):
         raise error
 
-    async def did_receive_response(self, response: requests.Response, request: Request)-> None:
+    async def did_receive_response(
+        self,
+        response: requests.Response,
+        request: Request
+    )-> typing.Any:
         response.raise_for_status()
-        # if callable(response.text):
-        #     import json
-        #     body = await response.text(encoding='utf-8')
-        #     return json.loads(body, object_hook=lambda d: types.SimpleNamespace(**d))
         return response.json(object_hook=lambda d: types.SimpleNamespace(**d))
 
     async def get(self, path: str) -> typing.Awaitable:
@@ -174,10 +174,9 @@ class HTTPDataSource:
                 future = self.context.http_session.request(
                     request.method,
                     request.url,
-                    data=request.body,
+                    json=request.body,
                     headers=request.headers,
                     timeout=self.timeout,
-                    # ssl=False,
                 )
                 await asyncio.sleep(0.005)
                 if inspect.isawaitable(future):
@@ -191,9 +190,6 @@ class HTTPDataSource:
             else:
                 return await self.did_receive_response(response, request)
 
-        # await asyncio.sleep(0.01)
-        # return await process_request()
-
         if request.method == 'GET':
             promise = self.memoized_requests.get(cache_key)
             if promise is not None:
@@ -202,7 +198,7 @@ class HTTPDataSource:
 
             self.memoized_requests[cache_key] = process_request()
             LOG.debug(f'I have been cached as {cache_key}')
-            # await asyncio.sleep(0.01)
+
             return await self.memoized_requests[cache_key]
         else:
             self.memoized_requests.pop(cache_key, None)
