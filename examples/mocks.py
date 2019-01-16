@@ -31,6 +31,7 @@ schema = """
   type Message {
     text: String
     number: Int
+    float: Float
     isOn: Boolean
     id: ID
     brocoli: Brocoli
@@ -44,6 +45,7 @@ sample_query = parse("""{
   mockity(input: "ignored") {
     text
     number
+    float
     isOn
     id
     brocoli {

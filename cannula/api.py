@@ -52,7 +52,9 @@ DEFAULT_MOCKS = {
     'Int': lambda: random.randint(4, 999),
     'Float': lambda: random.randint(5, 999) * random.random(),
     'Boolean': lambda: random.choice([True, False]),
-    'ID': lambda: str(uuid.uuid4())
+    'ID': lambda: str(uuid.uuid4()),
+    # The default number of mock items to return when results are a list.
+    '__list_length': lambda: random.randint(3, 6),
 }
 
 
@@ -268,7 +270,10 @@ class API(Resolver):
 
             # Special case for list types return a random length list of type.
             if isinstance(schema_type, GraphQLList):
-                count = random.randint(2, 10)
+                mock = self._mock_objects.get('__list_length')
+                count = mock
+                if callable(mock):
+                    count = mock()
                 return [resolve_fields(schema_type.of_type) for x in range(count)]
 
             schema_type = str(schema_type)
