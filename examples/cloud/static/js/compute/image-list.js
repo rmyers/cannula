@@ -12,20 +12,22 @@ const columns = [
 class ImageList extends LitElement {
   static get properties() {
     return {
-      images: { type: Array }
+      images: { type: Array },
+      errors: { type: Array }
     }
   }
 
   constructor() {
     super();
     this.images = [];
+    this.errors = [];
   }
 
   render() {
-    const { images } = this;
+    const { images, errors } = this;
     return html`
       <h2>Images</h2>
-      <data-table .data=${images} .columns=${columns}></data-table>
+      <data-table .data=${images} .columns=${columns} .errors=${errors}></data-table>
     `;
   }
 }

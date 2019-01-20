@@ -1,6 +1,13 @@
 import {LitElement, html} from 'https://unpkg.com/@polymer/lit-element@0.6.3/lit-element.js?module';
 
 const defaultEmptyOverlay = html`<div class="data-table-empty">No results</div>`;
+const defaultErrorOverlay = (errors) => {
+  return html`
+    <div class="data-table-error">
+      ${errors.map((error) => html`<p>${error.message}</p>`)}
+    </div>
+  `;
+}
 
 export class DataTable extends LitElement {
 
@@ -8,8 +15,10 @@ export class DataTable extends LitElement {
     super();
     this.columns = [];
     this.data = [];
+    this.errors = [];
     this.displayData = [];
     this.emptyOverlay = defaultEmptyOverlay;
+    this.errorOverlay = defaultErrorOverlay;
     this.className = 'data-table';
   }
 
@@ -17,6 +26,7 @@ export class DataTable extends LitElement {
     return {
       data: { type: Array },
       columns: { type: Array },
+      errors: { type: Array },
       emptyOverlay: { type: String }
     };
   }
@@ -40,8 +50,22 @@ export class DataTable extends LitElement {
     `;
   }
 
+  _showError() {
+    const { errorOverlay, errors } = this;
+    const numberOfColumns = this.columns.length;
+    return html`
+      <tr>
+        <td colspan="${numberOfColumns}">${errorOverlay(errors)}</td>
+      </tr>
+    `;
+  }
+
   _getBody() {
-    const { data, columns } = this;
+    const { data, columns, errors } = this;
+    if (errors && errors.length !== 0) {
+      return this._showError();
+    }
+
     if (!data || data.length === 0) {
       return this._showEmpty();
     }

@@ -132,12 +132,11 @@ def login(
     return True
 
 
-class CustomContext(HTTPContext):
+class OpenStackContext(HTTPContext):
 
     def handle_request(self, request):
         session_id = request.get_cookie(SESSION_COOKE_NAME)
-        if session_id:
-            self.user = get_user(session_id)
+        self.user = get_user(session_id)
 
         return request
 

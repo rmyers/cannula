@@ -12,20 +12,22 @@ const columns = [
 class FlavorList extends LitElement {
   static get properties() {
     return {
-      flavors: { type: Array }
+      flavors: { type: Array },
+      errors: { type: Array }
     }
   }
 
   constructor() {
     super();
     this.flavors = [];
+    this.errors = [];
   }
 
   render() {
-    const { flavors } = this;
+    const { flavors, errors } = this;
     return html`
       <h2>Flavors</h2>
-      <data-table .data=${flavors} .columns=${columns}></data-table>
+      <data-table .data=${flavors} .columns=${columns} .errors=${errors}></data-table>
     `;
   }
 }

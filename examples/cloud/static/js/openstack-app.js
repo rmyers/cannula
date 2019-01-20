@@ -12,6 +12,7 @@ class OpenstackApp extends LitElement {
       images: { type: Array },
       servers: { type: Array },
       nav: { type: Array },
+      errors: { type: Object },
       loaded: { type: Boolean },
       pollingInterval: { type: Number }
     }
@@ -23,6 +24,7 @@ class OpenstackApp extends LitElement {
     this.flavors = [];
     this.images = [];
     this.nav = [];
+    this.errors = {};
     this.loaded = false;
     this.pollingInterval = 5000;
   }
@@ -38,10 +40,12 @@ class OpenstackApp extends LitElement {
         .then((response) => response.json())
         .then((response) => {
           this.loaded = true;
-          this.servers = response.servers;
-          this.images = response.images;
-          this.flavors = response.flavors;
-          this.nav = response.nav;
+          this.data = response.data;
+          this.servers = response.data.servers;
+          this.images = response.data.images;
+          this.flavors = response.data.flavors;
+          this.nav = response.data.nav;
+          this.errors = response.errors;
           console.log('here');
         });
     }
@@ -62,18 +66,18 @@ class OpenstackApp extends LitElement {
   }
 
   render() {
-    const { servers, flavors, images, nav, loaded } = this;
+    const { data, errors, loaded } = this;
     if (!loaded) {
       return html`<p>Loading...</p>`
     }
     return html`
     <div class="wrapper">
     <h1 class="header">Dashboard</h1>
-    <app-navigation .navItems=${nav}></app-navigation>
+    <app-navigation .navItems=${data.nav} .errors=${errors.nav}></app-navigation>
     <article>
-      <flavor-list .flavors=${flavors}></flavor-list>
-      <image-list .images=${images}></image-list>
-      <server-list-compact .servers=${servers}></server-list-compact>
+      <flavor-list .flavors=${data.flavors} .errors=${errors.flavors}></flavor-list>
+      <image-list .images=${data.images} .errors=${errors.images}></image-list>
+      <server-list-compact .servers=${data.servers} .errors=${errors.servers}></server-list-compact>
     </article>
     <aside>
       This is an aside…

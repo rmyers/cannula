@@ -1,3 +1,4 @@
+import collections
 import logging
 import os
 
@@ -18,10 +19,34 @@ logging.basicConfig(level=logging.DEBUG)
 
 LOG = logging.getLogger('application')
 
-api = cannula.API(__name__, context=session.CustomContext, mocks=USE_MOCKS)
+api = cannula.API(__name__, context=session.OpenStackContext, mocks=USE_MOCKS)
 api.register_resolver(navigation_resolver)
 api.register_resolver(compute_resolver)
 api.register_resolver(identity_resolver)
+
+
+def format_errors(errors):
+    """Return a dict object of the errors.
+
+    If there is a path(s) in the error then return a dict with the path
+    as a key so that it is easier on the client side code to display the
+    error with the correct data.
+    """
+    if errors is None:
+        return {}
+
+    formatted_errors = collections.defaultdict(list)
+
+    for err in errors:
+        if err.path is not None:
+            for path in err.path:
+                formatted_errors[path].append(err.formatted)
+        else:
+            # All other errors are probably graphql errors such as
+            # an unknown query or unknown field on a type.
+            formatted_errors['errors'].append(err.formatted)
+
+    return formatted_errors
 
 
 DASHBOARD_QUERY = parse("""
@@ -62,18 +87,22 @@ DASHBOARD_QUERY = parse("""
 
 @bottle.route('/dashboard')
 def dashboard():
-    if not session.is_authenticated(bottle.request):
-        return bottle.redirect('/')
-
     if bottle.request.params.get('xhr'):
         results = api.call_sync(
             DASHBOARD_QUERY,
             variables={'region': 'us-east'},
             request=bottle.request
         )
-        if results.errors:
-            LOG.error(results.errors)
-        return results.data
+
+        resp = {
+            'errors': format_errors(results.errors),
+            'data': results.data or {}
+        }
+
+        return resp
+
+    if not session.is_authenticated(bottle.request):
+        return bottle.redirect('/')
 
     return bottle.template('index')
 

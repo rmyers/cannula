@@ -1,5 +1,9 @@
-
 import cannula
+
+
+class NotAuthenticated(Exception):
+    "User is not authenticated"
+    code = 401
 
 
 class OpenStackBase(cannula.datasource.http.HTTPDataSource):
@@ -10,12 +14,15 @@ class OpenStackBase(cannula.datasource.http.HTTPDataSource):
     def get_service_url(self, region: str, path: str):
         """Find the correct service url for region.
 
-        The Openstack services usually add the project id in the url of
+        The OpenStack services usually add the project id in the url of
         the service. So for each user you need to get the url from the
         service catalog.
         """
         if not hasattr(self.context, 'user'):
-            raise Exception('Missing auth_user did you login?')
+            raise Exception('You are not using OpenStackContext')
+
+        if not self.context.user.is_authenticated:
+            raise NotAuthenticated('User is not authenticated')
 
         if self.catalog_name is None:
             raise AttributeError('catalog_name not set')
@@ -34,6 +41,6 @@ class OpenStackBase(cannula.datasource.http.HTTPDataSource):
         return f'{service}/{path}'
 
     def will_send_request(self, request):
-        if hasattr(self.context, 'user'):
+        if hasattr(self.context, 'user') and self.context.user.auth_token:
             request.headers.update({'X-Auth-Token': self.context.user.auth_token})
         return request

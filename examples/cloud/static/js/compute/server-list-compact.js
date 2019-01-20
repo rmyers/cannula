@@ -13,20 +13,22 @@ const columns = [
 class ServerListCompact extends LitElement {
   static get properties() {
     return {
-      servers: { type: Array }
+      servers: { type: Array },
+      errors: { type: Array }
     }
   }
 
   constructor() {
     super();
     this.servers = [];
+    this.errors = [];
   }
 
   render() {
-    const { servers } = this;
+    const { servers, errors } = this;
     return html`
       <h2>Servers</h2>
-      <data-table .data=${servers} .columns=${columns}></data-table>
+      <data-table .data=${servers} .columns=${columns} .errors=${errors}></data-table>
     `;
   }
 }
