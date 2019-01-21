@@ -5,8 +5,8 @@ import '../tables/data_table.js';
 
 const columns = [
   new Column('id'),
-  new Column('name'),
-  new Column('ram'),
+  new Column('name', {sortable: true, sorted: true}),
+  new Column('ram', {sortable: true, align: 'right'}),
 ]
 
 class FlavorList extends LitElement {

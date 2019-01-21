@@ -9,11 +9,29 @@ const defaultCell = (data) => html`<div class="data-table-cell">${data}</div>`;
 
 /** Default options for the Column constructor. */
 const defaultOptions = {
-  attribute: undefined,
+  /** Default value when data is missing for this column */
   defaultValue: '',
+
+  /** Header text */
   header: undefined,
+
+  /** Class name to use instead of '${header}-column' */
   className: undefined,
-  cell: defaultCell
+
+  /** The function to render the cell for this column. */
+  cell: defaultCell,
+
+  /** The alignment of the cell (left|right|center) */
+  align: 'left',
+
+  /** Whether this column is sortable, and should display controls. */
+  sortable: false,
+
+  /** The direction this column is sorted. */
+  sortDirection: 'DESC',
+
+  /** Whether this column is the currently sorted. */
+  sorted: false
 }
 
 /**
@@ -41,6 +59,10 @@ export class Column {
     this.header = opts.header || attribute;
     this.className = opts.className || `${this.header}-column`;
     this.cell = opts.cell;
+    this.align = opts.align;
+    this.sortable = opts.sortable;
+    this.sortDirection = opts.sortDirection;
+    this.sorted = opts.sorted;
   }
 
   /**
@@ -65,5 +87,13 @@ export class Column {
   getCell(dataModel) {
     const data = this.getData(dataModel);
     return this.cell(data);
+  }
+
+  /**
+   * Toggle sort direction.
+   */
+  toggleSortDirection() {
+    this.sortDirection = (this.sortDirection === "DESC") ? "ASC" : "DESC";
+    this.sorted = true;
   }
 }

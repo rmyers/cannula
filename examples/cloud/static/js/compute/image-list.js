@@ -4,9 +4,9 @@ import { Column } from '../tables/column.js';
 import '../tables/data_table.js';
 
 const columns = [
-  new Column('id'),
-  new Column('name'),
-  new Column('minRam', { header: 'Min Ram'}),
+  new Column('id', {sortable: true}),
+  new Column('name', {sortable: true, sorted: true}),
+  new Column('minRam', { header: 'Min Ram', sortable: true, align: 'right'}),
 ]
 
 class ImageList extends LitElement {
