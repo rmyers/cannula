@@ -1,4 +1,4 @@
-import {LitElement, html} from 'https://unpkg.com/@polymer/lit-element@0.6.3/lit-element.js?module';
+import {LitElement, html} from 'https://unpkg.com/@polymer/lit-element@0.7.1/lit-element.js?module';
 
 import './compute/server-list-compact.js';
 import './compute/flavor-list.js';
@@ -68,24 +68,39 @@ class OpenstackApp extends LitElement {
   render() {
     const { data, errors, loaded } = this;
     if (!loaded) {
-      return html`<p>Loading...</p>`
+      return html`
+        <div id="stage" class="wrapper">
+          <app-navigation></app-navigation>
+          <main role="main" id="content">
+            <hx-panel>
+              <h1>Dashboard</h1>
+              <hx-busy></hx-busy>
+            </hx-panel>
+          </main>
+        </div>
+      `;
     }
     return html`
-    <div class="wrapper">
-    <h1 class="header">Dashboard</h1>
-    <app-navigation .navItems=${data.nav} .errors=${errors.nav}></app-navigation>
-    <article>
-      <flavor-list .flavors=${data.flavors} .errors=${errors.flavors}></flavor-list>
-      <image-list .images=${data.images} .errors=${errors.images}></image-list>
-      <server-list-compact .servers=${data.servers} .errors=${errors.servers}></server-list-compact>
-    </article>
-    <aside>
-      This is an aside…
-    </aside>
-
-    <footer>
-      Copyright (c) 2019 Cannula Team
-    </footer>
+    <div id="stage" class="wrapper">
+      <app-navigation .navItems=${data.nav} .errors=${errors.nav}></app-navigation>
+      <main role="main" id="content">
+        <hx-panel class="hxSpan-7-xs">
+          <hx-div scroll="both">
+            <hx-panelbody class="hxBox hxMd">
+              <h1>Dashboard</h1>
+              <server-list-compact .servers=${data.servers} .errors=${errors.servers}></server-list-compact>
+            </hx-panelbody>
+          </hx-div>
+        </hx-panel>
+        <hx-panel class="hxSpan-4-xs">
+          <hx-div scroll="both">
+            <hx-panelbody class="hxBox hxMd">
+              <flavor-list .flavors=${data.flavors} .errors=${errors.flavors}></flavor-list>
+              <image-list .images=${data.images} .errors=${errors.images}></image-list>
+            </hx-panelbody>
+          </hx-div>
+        </hx-panel>
+      </main>
     </div>
     `;
   }

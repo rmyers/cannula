@@ -1,4 +1,4 @@
-import { html } from 'https://unpkg.com/@polymer/lit-element@0.6.3/lit-element.js?module';
+import { html } from 'https://unpkg.com/@polymer/lit-element@0.7.1/lit-element.js?module';
 
 /**
  * Default cell template.
@@ -21,8 +21,8 @@ const defaultOptions = {
   /** The function to render the cell for this column. */
   cell: defaultCell,
 
-  /** The alignment of the cell (left|right|center) */
-  align: 'left',
+  /** The alignment class of the cell (hxRight) */
+  align: 'hxLeft',
 
   /** Whether this column is sortable, and should display controls. */
   sortable: false,
@@ -57,7 +57,6 @@ export class Column {
     this.attribute = attribute;
     this.defaultValue = opts.defaultValue;
     this.header = opts.header || attribute;
-    this.className = opts.className || `${this.header}-column`;
     this.cell = opts.cell;
     this.align = opts.align;
     this.sortable = opts.sortable;

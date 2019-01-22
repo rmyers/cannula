@@ -1,18 +1,20 @@
-import {LitElement, html} from 'https://unpkg.com/@polymer/lit-element@0.6.3/lit-element.js?module';
+import {LitElement, html} from 'https://unpkg.com/@polymer/lit-element@0.7.1/lit-element.js?module';
 
 const renderItem = (item) => {
   if (item.enabled) {
-    return html`<li><a href="${item.url}">${item.name}</a></li>`;
+    return html`<a href="${item.url}">${item.name}</a>`;
   }
-  return html`<li title="${item.disabledMessage}">${item.name}</li>`;
+  return html`<a href="#" title="${item.disabledMessage}" disabled>${item.name}</a>`;
 }
 
 const renderSection = (section) => {
   return html`
-    <h2>${section.title}</h2>
-    <ul>
+    <hx-disclosure aria-controls="${section.title}">
+      ${section.title}
+    </hx-disclosure>
+    <hx-reveal id="${section.title}" open>
       ${section.items.map(renderItem)}
-    </ul>
+    </hx-reveal>
   `;
 }
 
@@ -28,15 +30,14 @@ class AppNavigation extends LitElement {
     this.navItems = [];
   }
 
-  _renderSections() {
-    const { navItems } = this;
-
+  createRenderRoot() {
+    return this;
   }
 
   render() {
     const { navItems } = this;
     return html`
-      <nav id="nav">
+      <nav id="nav" class="hxNav main-navigation">
         ${navItems.map(renderSection)}
       </nav>
     `;

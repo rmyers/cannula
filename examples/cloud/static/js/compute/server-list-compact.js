@@ -1,4 +1,4 @@
-import {LitElement, html} from 'https://unpkg.com/@polymer/lit-element@0.6.3/lit-element.js?module';
+import {LitElement, html} from 'https://unpkg.com/@polymer/lit-element@0.7.1/lit-element.js?module';
 
 import { Column } from '../tables/column.js';
 import { flavorRam } from './helpers.js';
@@ -22,6 +22,10 @@ class ServerListCompact extends LitElement {
     super();
     this.servers = [];
     this.errors = [];
+  }
+
+  createRenderRoot() {
+    return this;
   }
 
   render() {

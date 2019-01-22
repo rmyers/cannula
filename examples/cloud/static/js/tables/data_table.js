@@ -1,4 +1,4 @@
-import {LitElement, html, svg} from 'https://unpkg.com/@polymer/lit-element@0.6.3/lit-element.js?module';
+import {LitElement, html} from 'https://unpkg.com/@polymer/lit-element@0.7.1/lit-element.js?module';
 
 /**
  * Default Empty Overlay
@@ -20,18 +20,6 @@ const defaultErrorOverlay = (errors) => {
     </div>
   `;
 };
-
-/**
- * Angle Down svg
- * Copied from fontawesome library https://fontawesome.com/license
- */
-const angleDown = svg`<svg aria-hidden="true" data-prefix="fas" data-icon="angle-down" class="svg-inline--fa fa-angle-down fa-w-10" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><path fill="currentColor" d="M143 352.3L7 216.3c-9.4-9.4-9.4-24.6 0-33.9l22.6-22.6c9.4-9.4 24.6-9.4 33.9 0l96.4 96.4 96.4-96.4c9.4-9.4 24.6-9.4 33.9 0l22.6 22.6c9.4 9.4 9.4 24.6 0 33.9l-136 136c-9.2 9.4-24.4 9.4-33.8 0z"></path></svg>`;
-
-/**
- * Angle Up
- * Copied from fontawesome library https://fontawesome.com/license
- */
-const angleUp = svg`<svg aria-hidden="true" data-prefix="fas" data-icon="angle-up" class="svg-inline--fa fa-angle-up fa-w-10" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><path fill="currentColor" d="M177 159.7l136 136c9.4 9.4 9.4 24.6 0 33.9l-22.6 22.6c-9.4 9.4-24.6 9.4-33.9 0L160 255.9l-96.4 96.4c-9.4 9.4-24.6 9.4-33.9 0L7 329.7c-9.4-9.4-9.4-24.6 0-33.9l136-136c9.4-9.5 24.6-9.5 34-.1z"></path></svg>`;
 
 /**
  * Default Sort Closure
@@ -73,14 +61,14 @@ const displayHeader = (sortIndexCallback) => {
    * @return {string|html}
    */
   return (column, index) => {
-    const { sortable, sortDirection, header, sorted } = column;
+    const { sortable, sortDirection, header, sorted, align } = column;
     let columnIndex = index;
     if (!sortable) {
       return html`<th>${column.header}</th>`;
     }
-    const icon = sortDirection === 'DESC' ? angleDown : angleUp;
-    const sortedClass = sorted ? 'sortable sorted' : 'sortable';
-    return html`<th class=${sortedClass} @click=${() => sortIndexCallback(columnIndex)}>${header} ${icon}</th>`;
+    const sortedIcon = sortDirection === 'DESC' ? 'sort-down' : 'sort-up';
+    const icon = sorted ? sortedIcon : 'sort';
+    return html`<th class="sortable ${align}" @click=${() => sortIndexCallback(columnIndex)}>${header} <hx-icon class="toggle-icon" type="${icon}"></hx-icon></th>`;
   };
 };
 
@@ -94,7 +82,7 @@ export class DataTable extends LitElement {
     this.displayData = [];
     this.emptyOverlay = defaultEmptyOverlay;
     this.errorOverlay = defaultErrorOverlay;
-    this.className = 'data-table';
+    this.className = 'hxHoverable';
     this.sortIndex = -1;
   }
 
@@ -104,7 +92,8 @@ export class DataTable extends LitElement {
       columns: { type: Array },
       errors: { type: Array },
       emptyOverlay: { type: String },
-      errorOverlay: { type: String }
+      errorOverlay: { type: String },
+      className: { type: String }
     };
   }
 
@@ -187,7 +176,7 @@ export class DataTable extends LitElement {
       ${sortedData.map((item) => {
         return html`
           <tr>
-            ${columns.map((column) => {return html`<td align="${column.align}">${column.getCell(item)}</td>`})}
+            ${columns.map((column) => {return html`<td class="${column.align}">${column.getCell(item)}</td>`})}
           </tr>
         `;
       })}
@@ -204,18 +193,13 @@ export class DataTable extends LitElement {
     });
   }
 
+  createRenderRoot() {
+    return this;
+  }
+
   render() {
     return html`
-      <style>
-        svg {height: 1em;}
-        th.sortable {cursor: pointer;}
-        th.sortable svg {color: #999;}
-        th.sorted svg {color: #444;}
-        th {text-transform: uppercase;}
-        table {width: 100%}
-        tr:hover {background-color: #f5f5f5;}
-      </style>
-      <table class="${this.className}">
+      <table class="hxTable ${this.className}">
         <thead>${this._getHeader()}</thead>
         <tbody>${this._getBody()}</tbody>
       </table>
