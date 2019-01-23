@@ -258,7 +258,7 @@ class API(Resolver):
         loop = asyncio.get_event_loop()
         return loop.run_until_complete(self.call(document, request, variables))
 
-    async def mock_resolver(self, resource, info, **kwargs):
+    async def mock_resolver(self, _resource, _info, **kwargs):
         from graphql.type.definition import GraphQLList
 
         def resolve_fields(schema_type):
@@ -288,13 +288,13 @@ class API(Resolver):
 
             return_value = type(schema_type, (object,), {})()
 
-            found = info.schema.get_type(schema_type)
+            found = _info.schema.get_type(schema_type)
             for name, field in found.fields.items():
                 setattr(return_value, name, resolve_fields(field.type))
 
             return return_value
 
-        return resolve_fields(info.return_type)
+        return resolve_fields(_info.return_type)
 
     async def field_resolver(self, _resource, _info, **kwargs):
         type_name = _info.parent_type.name  # schema type (Query, Mutation)
