@@ -8,6 +8,7 @@ from graphql import parse
 
 import session
 from resolvers.compute import compute_resolver
+from resolvers.dashboard import quota_resolver
 from resolvers.identity import identity_resolver
 from resolvers.navigation import navigation_resolver
 
@@ -20,9 +21,12 @@ logging.basicConfig(level=logging.DEBUG)
 LOG = logging.getLogger('application')
 
 api = cannula.API(__name__, context=session.OpenStackContext, mocks=USE_MOCKS)
+
+# Order matters for these applications you extend
 api.register_resolver(navigation_resolver)
 api.register_resolver(compute_resolver)
 api.register_resolver(identity_resolver)
+api.register_resolver(quota_resolver)
 
 
 def format_errors(errors):
@@ -51,6 +55,13 @@ def format_errors(errors):
 
 DASHBOARD_QUERY = parse("""
     query main ($region: String!) {
+        serverQuota: quotaChartData(resource: "ComputeServers") {
+            datasets {
+                data
+                backgroundColor
+            }
+            labels
+        }
         servers: computeServers(region: $region) {
             name
             id

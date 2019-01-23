@@ -18,6 +18,12 @@ class ComputeServers(OpenStackBase):
             server.region = region
         return resp.servers
 
+    async def fetchLimits(self):
+        LOG.info('Fetching Limits')
+        east_url = self.get_service_url('us-east', 'limits')
+        resp = await self.get(east_url)
+        return resp.servers
+
 
 @compute_resolver.resolver('Query')
 async def computeServers(source, info, region):

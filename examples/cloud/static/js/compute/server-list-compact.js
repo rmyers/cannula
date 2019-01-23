@@ -31,7 +31,6 @@ class ServerListCompact extends LitElement {
   render() {
     const { servers, errors } = this;
     return html`
-      <h2>Servers</h2>
       <data-table .data=${servers} .columns=${columns} .errors=${errors}></data-table>
     `;
   }

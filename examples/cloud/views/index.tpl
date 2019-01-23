@@ -13,6 +13,7 @@
   <a href="#content">Skip to main content</a>
 
   <header id="head">
+    <!-- TODO (user component) -->
   </header>
 
   <div id="app">
@@ -27,6 +28,9 @@
     </nav>
   </footer>
 
+    <!-- Used for the dashboard quota charts -->
+    <script src="https://unpkg.com/chart.js@2.7.3/dist/Chart.bundle.min.js"></script>
+    <!-- UI toolkit JS -->
     <script src="https://unpkg.com/helix-ui@0.14.0/dist/scripts/helix-ui.browser.min.js"></script>
     <script type="module" src="/static/js/openstack-app.js"></script>
   </body>

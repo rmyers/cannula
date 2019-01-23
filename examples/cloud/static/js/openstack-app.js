@@ -4,6 +4,7 @@ import './compute/server-list-compact.js';
 import './compute/flavor-list.js';
 import './compute/image-list.js';
 import './app-navigation.js';
+import './dashboard/chart.js';
 
 class OpenstackApp extends LitElement {
   static get properties() {
@@ -41,10 +42,6 @@ class OpenstackApp extends LitElement {
         .then((response) => {
           this.loaded = true;
           this.data = response.data;
-          this.servers = response.data.servers;
-          this.images = response.data.images;
-          this.flavors = response.data.flavors;
-          this.nav = response.data.nav;
           this.errors = response.errors;
           console.log('here');
         });
@@ -73,7 +70,7 @@ class OpenstackApp extends LitElement {
           <app-navigation></app-navigation>
           <main role="main" id="content">
             <hx-panel>
-              <h1>Dashboard</h1>
+              <h1>Resources</h1>
               <hx-busy></hx-busy>
             </hx-panel>
           </main>
@@ -84,10 +81,21 @@ class OpenstackApp extends LitElement {
     <div id="stage" class="wrapper">
       <app-navigation .navItems=${data.nav} .errors=${errors.nav}></app-navigation>
       <main role="main" id="content">
-        <hx-panel class="hxSpan-7-xs">
+        <hx-panel class="hxSpan-8-xs">
           <hx-div scroll="both">
             <hx-panelbody class="hxBox hxMd">
-              <h1>Dashboard</h1>
+              <h1>Resources</h1>
+              <div class="hxRow">
+                <div class="hxCol">
+                  <dashboard-chart .chartData=${data.serverQuota}></dashboard-chart>
+                </div>
+                <div class="hxCol">
+                  <dashboard-chart .chartData=${data.serverQuota}></dashboard-chart>
+                </div>
+                <div class="hxCol">
+                  <dashboard-chart .chartData=${data.serverQuota}></dashboard-chart>
+                </div>
+              </div>
               <server-list-compact .servers=${data.servers} .errors=${errors.servers}></server-list-compact>
             </hx-panelbody>
           </hx-div>

@@ -540,6 +540,16 @@ def availability_zone(project_id):
     }
 
 
+@route('/nova/v2.1/<project_id>/limits', method='GET')
+def server_quota_get(project_id):
+    return {
+        'servers': {
+            'used': len(SERVERS),
+            'limit': 10
+        }
+    }
+
+
 @route('/cinder/v2/<project_id>/types')
 def cinder_types(project_id):
     return {

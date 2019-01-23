@@ -1,0 +1,14 @@
+type Dataset {
+  data: [Int]
+  backgroundColor: [String]
+  label: String
+}
+
+type QuotaChartData @cacheControl(maxAge: 5000) {
+  datasets: [Dataset]
+  labels: [String]
+}
+
+extend type Query {
+  quotaChartData(resource: String): QuotaChartData
+}
