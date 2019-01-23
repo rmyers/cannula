@@ -12,15 +12,14 @@ class DashboardChart extends LitElement {
     super();
     this._chart = null;
     this.chartType = 'doughnut';
-    this.chartData = {}
+    this.chartData = {};
   }
 
   firstUpdated() {
-    // Store a reference to the canvas element for easy access
-    this._canvas = this.shadowRoot.querySelector('canvas').getContext('2d');
     const { chartData, chartType } = this;
+    let _canvas = this.shadowRoot.querySelector('canvas').getContext('2d');
     if (!this._chart) {
-      this._chart = new Chart(this._canvas, {
+      this._chart = new Chart(_canvas, {
         type: chartType,
         data: chartData
       });
@@ -29,6 +28,23 @@ class DashboardChart extends LitElement {
       this._chart.type = chartType;
       this._chart.update();
     }
+  }
+
+  updated(changedProperties) {
+    const { chartData, _chart } = this;
+    changedProperties.forEach((oldValue, propName) => {
+      if (propName === 'chartData' && oldValue) {
+        // Test if we need to update the chart with new values since we
+        // are not directly using an lit-html template for these values.
+        // Probably is a better way... but this works good enough!
+        let origData = oldValue.datasets[0].data.toString();
+        let newData = chartData.datasets[0].data.toString();
+        if (origData !== newData) {
+          _chart.data = chartData;
+          _chart.update();
+        }
+      }
+    });
   }
 
   render() {
