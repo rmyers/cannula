@@ -296,15 +296,15 @@ class API(Resolver):
 
         return resolve_fields(info.return_type)
 
-    async def field_resolver(self, resource, info, **kwargs):
-        type_name = info.parent_type.name  # schema type (Query, Mutation)
-        field_name = info.field_name  # The attribute being resolved
+    async def field_resolver(self, _resource, _info, **kwargs):
+        type_name = _info.parent_type.name  # schema type (Query, Mutation)
+        field_name = _info.field_name  # The attribute being resolved
         try:
             # First check if there is a customer resolver in the registry
             custom_resolver = self.registry[type_name][field_name]
-            return await custom_resolver(resource, info, **kwargs)
+            return await custom_resolver(_resource, _info, **kwargs)
         except KeyError:
             # If there is not a custom resolver check the resource for attributes
             # that match the field_name. The resource argument will be the result
             # of the Query type resolution.
-            return getattr(resource, field_name, None)
+            return getattr(_resource, field_name, None)
