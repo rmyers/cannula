@@ -7,6 +7,7 @@ from .resolver import compute_resolver
 class ComputeImages(OpenStackBase):
 
     catalog_name = 'compute'
+    resource_name = 'ComputeImage'
 
     async def fetchImages(self, region=None):
         url = self.get_service_url(region, 'images/detail')

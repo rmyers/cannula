@@ -1,7 +1,7 @@
 type ComputeFlavor {
   id: ID!
   region: String
-  name: String
+  name: String!
   ram: Int
   "Amount of RAM formatted like '16 GB'"
   human: String

@@ -1,0 +1,6 @@
+
+union Resource = ComputeServer | Network
+
+extend type Query {
+  resources(region: String): [ Resource ]
+}

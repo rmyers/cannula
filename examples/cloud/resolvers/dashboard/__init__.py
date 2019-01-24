@@ -1,5 +1,5 @@
-from .resolver import quota_resolver
+from .resolver import dashboard_resolver
 
 __all__ = [
-    'quota_resolver',
+    'dashboard_resolver',
 ]

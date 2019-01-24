@@ -1,3 +1,5 @@
+import asyncio
+import itertools
 import logging
 import typing
 
@@ -6,12 +8,12 @@ import cannula
 LOG = logging.getLogger(__name__)
 
 COLORS = {
-    'ComputeServers': 'rgb(54, 162, 235)',
-    'Networks': 'rgb(54, 162, 235)',
-    'Volumes': 'rgb(54, 162, 235)',
+    'ComputeServers': '#cc65fe',
+    'Networks': '#36a2eb',
+    'Volumes': '#ff6384',
 }
 
-quota_resolver = cannula.Resolver(__name__)
+dashboard_resolver = cannula.Resolver(__name__)
 
 
 class Dataset(typing.NamedTuple):
@@ -53,10 +55,9 @@ class QuotaData(typing.NamedTuple):
         return [self.label, self.quota_label]
 
 
-@quota_resolver.resolver('Query')
-async def quotaChartData(source, info, resource=None):
+@dashboard_resolver.resolver('Query')
+async def quotaChartData(source, info, resource):
     if resource == 'ComputeServers':
-        LOG.info(f'MARRIIIOOOO {resource}')
         server_quota = await info.context.ComputeServers.fetchLimits()
 
         return QuotaData(
@@ -65,3 +66,23 @@ async def quotaChartData(source, info, resource=None):
             limit=server_quota.limit,
             color=COLORS.get(resource)
         )
+    elif resource == 'Networks':
+        network_quota = await info.context.Network.fetchLimits()
+
+        return QuotaData(
+            label="Networks",
+            used=network_quota.used,
+            limit=network_quota.limit,
+            color=COLORS.get(resource)
+        )
+
+
+@dashboard_resolver.resolver('Query')
+async def resources(source, info, region):
+    servers = info.context.ComputeServers.fetchServers(region)
+    networks = info.context.Network.fetchNetworks(region)
+    images = info.context.ComputeImages.fetchImages(region)
+
+    results = await asyncio.gather(servers, networks, images)
+    # results is a list of lists [[results], [results], [results]]
+    return itertools.chain(*results)

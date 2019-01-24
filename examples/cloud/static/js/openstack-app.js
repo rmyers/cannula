@@ -90,7 +90,7 @@ class OpenstackApp extends LitElement {
                   <dashboard-chart .chartData=${data.serverQuota}></dashboard-chart>
                 </div>
                 <div class="hxCol">
-                  <dashboard-chart .chartData=${data.serverQuota}></dashboard-chart>
+                  <dashboard-chart .chartData=${data.networkQuota}></dashboard-chart>
                 </div>
                 <div class="hxCol">
                   <dashboard-chart .chartData=${data.serverQuota}></dashboard-chart>

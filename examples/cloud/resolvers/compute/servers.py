@@ -10,16 +10,17 @@ LOG = logging.getLogger(__name__)
 class ComputeServers(OpenStackBase):
 
     catalog_name = 'compute'
+    resource_name = 'ComputeServer'
 
     async def fetchServers(self, region=None):
         url = self.get_service_url(region, 'servers/detail')
         resp = await self.get(url)
-        for server in resp.servers:
+        servers = resp.servers
+        for server in servers:
             server.region = region
-        return resp.servers
+        return servers
 
     async def fetchLimits(self):
-        LOG.info('Fetching Limits')
         east_url = self.get_service_url('us-east', 'limits')
         resp = await self.get(east_url)
         return resp.servers
@@ -27,5 +28,4 @@ class ComputeServers(OpenStackBase):
 
 @compute_resolver.resolver('Query')
 async def computeServers(source, info, region):
-    LOG.info('in computeServers')
     return await info.context.ComputeServers.fetchServers(region)

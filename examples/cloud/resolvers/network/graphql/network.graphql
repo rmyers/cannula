@@ -1,0 +1,18 @@
+type Subnet {
+  id: ID!
+  cidr: String
+  gateway_ip: String
+}
+
+type Network {
+  id: ID!
+  name: String!
+  network_type: String
+  status: String
+  subnets: [Subnet]
+  external: Boolean
+}
+
+extend type Query {
+  getNetworks(region: String): [Network]
+}

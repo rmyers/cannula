@@ -8,9 +8,10 @@ from graphql import parse
 
 import session
 from resolvers.compute import compute_resolver
-from resolvers.dashboard import quota_resolver
+from resolvers.dashboard import dashboard_resolver
 from resolvers.identity import identity_resolver
 from resolvers.navigation import navigation_resolver
+from resolvers.network import network_resolver
 
 PORT = os.getenv('PORT', '8081')
 STATIC = os.path.join(os.getcwd(), 'static')
@@ -26,7 +27,8 @@ api = cannula.API(__name__, context=session.OpenStackContext, mocks=USE_MOCKS)
 api.register_resolver(navigation_resolver)
 api.register_resolver(compute_resolver)
 api.register_resolver(identity_resolver)
-api.register_resolver(quota_resolver)
+api.register_resolver(network_resolver)
+api.register_resolver(dashboard_resolver)
 
 
 def format_errors(errors):
@@ -54,13 +56,30 @@ def format_errors(errors):
 
 
 DASHBOARD_QUERY = parse("""
+    fragment quotaFields on QuotaChartData {
+        datasets {
+            data
+            backgroundColor
+        }
+        labels
+    }
     query main ($region: String!) {
         serverQuota: quotaChartData(resource: "ComputeServers") {
-            datasets {
-                data
-                backgroundColor
+            ...quotaFields
+        }
+        networkQuota: quotaChartData(resource: "Networks") {
+            ...quotaFields
+        }
+        resources: resources(region: $region) {
+            __typename
+            ... on ComputeServer {
+                name
+                id
             }
-            labels
+            ... on Network {
+                name
+                id
+            }
         }
         servers: computeServers(region: $region) {
             name

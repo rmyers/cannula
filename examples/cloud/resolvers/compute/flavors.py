@@ -7,6 +7,7 @@ from .resolver import compute_resolver
 class ComputeFlavors(OpenStackBase):
 
     catalog_name = 'compute'
+    resource_name = 'ComputeFlavor'
 
     async def fetchFlavors(self, region=None):
         url = self.get_service_url(region, 'flavors/detail')

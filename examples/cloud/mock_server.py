@@ -258,9 +258,33 @@ IMAGES = [
         "OS-EXT-IMG-SIZE:size": 260899328,
         "name": name(),
         "created": "2016-12-05T22:29:35Z",
-        "minDisk": 20,
+        "minDisk": random.randint(20, 200),
         "progress": 100,
-        "minRam": 512,
+        "minRam": 1024,
+        "metadata": {"architecture": "amd64"}
+    },
+    {
+        "status": "ACTIVE",
+        "updated": "2016-12-05T22:30:29Z",
+        "id": get_id(),
+        "OS-EXT-IMG-SIZE:size": 260899328,
+        "name": name(),
+        "created": "2016-12-05T22:29:35Z",
+        "minDisk": random.randint(20, 200),
+        "progress": 100,
+        "minRam": 2048,
+        "metadata": {"architecture": "amd64"}
+    },
+    {
+        "status": "ACTIVE",
+        "updated": "2016-12-05T22:30:29Z",
+        "id": get_id(),
+        "OS-EXT-IMG-SIZE:size": 260899328,
+        "name": name(),
+        "created": "2016-12-05T22:29:35Z",
+        "minDisk": random.randint(20, 200),
+        "progress": 100,
+        "minRam": 1024,
         "metadata": {"architecture": "amd64"}
     },
     {
@@ -272,31 +296,7 @@ IMAGES = [
         "created": "2016-12-05T22:29:35Z",
         "minDisk": 20,
         "progress": 100,
-        "minRam": 512,
-        "metadata": {"architecture": "amd64"}
-    },
-    {
-        "status": "ACTIVE",
-        "updated": "2016-12-05T22:30:29Z",
-        "id": get_id(),
-        "OS-EXT-IMG-SIZE:size": 260899328,
-        "name": name(),
-        "created": "2016-12-05T22:29:35Z",
-        "minDisk": 20,
-        "progress": 100,
-        "minRam": 512,
-        "metadata": {"architecture": "amd64"}
-    },
-    {
-        "status": "ACTIVE",
-        "updated": "2016-12-05T22:30:29Z",
-        "id": get_id(),
-        "OS-EXT-IMG-SIZE:size": 260899328,
-        "name": name(),
-        "created": "2016-12-05T22:29:35Z",
-        "minDisk": 20,
-        "progress": 100,
-        "minRam": 512,
+        "minRam": 3196,
         "metadata": {"architecture": "amd64"}
     }
 ]
@@ -371,88 +371,81 @@ def flavor_get(project_id, flavor_id):
     raise
 
 
-@route('/neutron/v2.0/extensions.json', method='GET')
-def network_extensions():
-    return {
-        "extensions": [
-            {
-                "updated": "2013-01-20T00:00:00-00:00",
-                "name": "Neutron Service Type Management",
-                "links": [],
-                "alias": "service-type",
-                "description": "API for retrieving service providers for Neutron advanced services"
-            },
-            {
-                "updated": "2012-10-05T10:00:00-00:00",
-                "name": "security-group",
-                "links": [],
-                "alias": "security-group",
-                "description": "The security groups extension."
-            }
-        ]
+NETWORKS = [
+    {
+        "status": "ACTIVE",
+        "subnets": [
+            "private-subnet"
+        ],
+        "name": "private-network",
+        "provider:physical_network": None,
+        "admin_state_up": True,
+        "project_id": "4fd44f30292945e481c7b8a0c8908869",
+        "tenant_id": "4fd44f30292945e481c7b8a0c8908869",
+        "qos_policy_id": "6a8454ade84346f59e8d40665f878b2e",
+        "provider:network_type": "local",
+        "router:external": True,
+        "mtu": 0,
+        "shared": True,
+        "id": "d32019d3-bc6e-4319-9c1d-6722fc136a22",
+        "provider:segmentation_id": None
     }
+]
 
 
 @route('/neutron/v2.0/networks.json', method='GET')
 def network_list():
     return {
-        "networks": [
-            {
-                "status": "ACTIVE",
-                "subnets": [
-                    "abc"
-                ],
-                "name": "private-network",
-                "provider:physical_network": None,
-                "admin_state_up": True,
-                "project_id": "4fd44f30292945e481c7b8a0c8908869",
-                "tenant_id": "4fd44f30292945e481c7b8a0c8908869",
-                "qos_policy_id": "6a8454ade84346f59e8d40665f878b2e",
-                "provider:network_type": "local",
-                "router:external": True,
-                "mtu": 0,
-                "shared": True,
-                "id": "d32019d3-bc6e-4319-9c1d-6722fc136a22",
-                "provider:segmentation_id": None
-            }
-        ]
+        "networks": NETWORKS
     }
+
+
+@route('/neutron/v2.0/limits.json', method='GET')
+def network_limits():
+    return {
+        'networks': {
+            'used': len(NETWORKS),
+            'limit': 3
+        }
+    }
+
+
+SUBNETS = [
+    {
+        "name": "private-subnet",
+        "enable_dhcp": True,
+        "network_id": "db193ab3-96e3-4cb3-8fc5-05f4296d0324",
+        "segment_id": None,
+        "project_id": "26a7980765d0414dbc1fc1f88cdb7e6e",
+        "tenant_id": "26a7980765d0414dbc1fc1f88cdb7e6e",
+        "dns_nameservers": [],
+        "allocation_pools": [
+            {
+                "start": get_ip(),
+                "end": get_ip()
+            }
+        ],
+        "host_routes": [],
+        "ip_version": 4,
+        "gateway_ip": get_ip(),
+        "cidr": f"{get_ip()}/24",
+        "id": "abc",
+        "created_at": "2016-10-10T14:35:34Z",
+        "description": "",
+        "ipv6_address_mode": None,
+        "ipv6_ra_mode": None,
+        "revision_number": 2,
+        "service_types": [],
+        "subnetpool_id": None,
+        "updated_at": "2016-10-10T14:35:34Z"
+    }
+]
 
 
 @route('/neutron/v2.0/subnets.json', method='GET')
 def subnet_list():
-    print(request.headers.__dict__)
     return {
-        "subnets": [
-            {
-                "name": "private-subnet",
-                "enable_dhcp": True,
-                "network_id": "db193ab3-96e3-4cb3-8fc5-05f4296d0324",
-                "segment_id": None,
-                "project_id": "26a7980765d0414dbc1fc1f88cdb7e6e",
-                "tenant_id": "26a7980765d0414dbc1fc1f88cdb7e6e",
-                "dns_nameservers": [],
-                "allocation_pools": [
-                    {
-                        "start": get_ip(),
-                        "end": get_ip()
-                    }
-                ],
-                "host_routes": [],
-                "ip_version": 4,
-                "gateway_ip": get_ip(),
-                "cidr": f"{get_ip()}/24",
-                "id": "abc",
-                "created_at": "2016-10-10T14:35:34Z",
-                "description": "",
-                "ipv6_address_mode": None,
-                "ipv6_ra_mode": None,
-                "revision_number": 2,
-                "service_types": [],
-                "subnetpool_id": None,
-                "updated_at": "2016-10-10T14:35:34Z"
-            }
-        ]
+        "subnets": SUBNETS
     }
 
 
