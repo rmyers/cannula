@@ -14,8 +14,9 @@ from graphql import (
     execute,
     ExecutionResult,
     extend_schema,
-    parse,
     GraphQLSchema,
+    GraphQLUnionType,
+    parse,
     validate_schema,
     validate,
 )
@@ -174,7 +175,21 @@ class API(Resolver):
     def schema(self):
         if not hasattr(self, '_full_schema'):
             self._full_schema = self._build_schema()
+            LOG.debug(self._full_schema.type_map)
+            self.fix_abstract_resolve_type(self._full_schema)
         return self._full_schema
+
+    def fix_abstract_resolve_type(self, schema):
+        # We need to provide a custom 'resolve_type' since the default
+        # in method only checks for __typename if the source is a dict.
+        # TODO(rmyers): submit PR to fix upstream?
+
+        def custom_resolve_type(source, _info):
+            return getattr(source, '__typename', None)
+
+        for _type_name, graphql_type in schema.type_map.items():
+            if isinstance(graphql_type, GraphQLUnionType):
+                graphql_type.resolve_type = custom_resolve_type
 
     def _build_schema(self) -> GraphQLSchema:
         schema = build_schema(ROOT_QUERY)

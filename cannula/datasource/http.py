@@ -90,14 +90,25 @@ class HTTPDataSource:
     # Timeout for an individual request in seconds.
     timeout: int = 5
 
+    # Resource name for the type that this datasource returns by default this
+    # will use the class name of the datasource.
+    resource_name: str = None
+
     def __init__(self, context):
         self.context = context
         self.memoized_requests = {}
         self.assert_has_http_session(context)
+        self.assert_has_resource_name()
 
     def assert_has_http_session(self, context: Context) -> None:
         if not hasattr(context, 'http_session'):
-            raise AttributeError('Context missing http_session did you subclass HTTPContext?')
+            raise AttributeError(
+                'Context missing http_session did you subclass HTTPContext?'
+            )
+
+    def assert_has_resource_name(self) -> None:
+        if self.resource_name is None:
+            self.resource_name = self.__class__.__name__
 
     def will_send_request(self, request: Request) -> Request:
         """Hook for subclasses to modify the request before it is sent.
@@ -131,13 +142,17 @@ class HTTPDataSource:
     def did_receive_error(self, error: Exception, request: Request):
         raise error
 
+    def convert_to_object(self, json_obj):
+        json_obj.update({'__typename': self.resource_name})
+        return types.SimpleNamespace(**json_obj)
+
     async def did_receive_response(
         self,
         response: requests.Response,
         request: Request
     )-> typing.Any:
         response.raise_for_status()
-        return response.json(object_hook=lambda d: types.SimpleNamespace(**d))
+        return response.json(object_hook=self.convert_to_object)
 
     async def get(self, path: str) -> typing.Awaitable:
         return await self.fetch('GET', path)
