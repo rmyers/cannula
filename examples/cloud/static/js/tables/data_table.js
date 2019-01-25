@@ -16,7 +16,7 @@ const defaultEmptyOverlay = html`<div class="data-table-empty">No results</div>`
 const defaultErrorOverlay = (errors) => {
   return html`
     <div class="data-table-error">
-      ${errors.map((error) => html`<p>${error.message}</p>`)}
+      ${errors.map((error) => html`<p>${error}</p>`)}
     </div>
   `;
 };

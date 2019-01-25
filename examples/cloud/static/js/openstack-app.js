@@ -80,7 +80,7 @@ class OpenstackApp extends LitElement {
     }
 
     if (errors && errors.errors) {
-      errorMessages = errors.errors.map((error) => html`<hx-toast type="error">${error.message}</hx-toast>`)
+      errorMessages = errors.errors.map((error) => html`<hx-toast type="error">${error}</hx-toast>`)
     }
 
     return html`

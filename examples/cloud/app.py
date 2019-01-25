@@ -47,11 +47,14 @@ def format_errors(errors):
 
     for err in errors:
         error_formatted = err.formatted
+        error_message = error_formatted['message']
         if err.path is not None:
             for path in err.path:
-                formatted_errors[path].append(error_formatted)
+                if error_message not in formatted_errors[path]:
+                    formatted_errors[path].append(error_message)
 
-        formatted_errors['errors'].append(error_formatted)
+        if error_message not in formatted_errors['errors']:
+            formatted_errors['errors'].append(error_message)
 
     return formatted_errors
 
@@ -109,12 +112,10 @@ DASHBOARD_QUERY = parse("""
         }
         images: computeImages(region: $region) {
             name
-            id
             minRam
         }
         flavors: computeFlavors(region: $region) {
             name
-            id
             ram
         }
         nav: getNavigation(active: "dashboard") {

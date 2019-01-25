@@ -5,3 +5,10 @@
 th.sortable {
   cursor: pointer;
 }
+
+hx-panel.login {
+  margin: 3em auto;
+  border: 1px solid #b6e3eb;
+  padding: 2em;
+  background: #e4f9f9
+}
