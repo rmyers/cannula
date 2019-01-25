@@ -1,10 +1,10 @@
 import {LitElement, html} from 'https://unpkg.com/@polymer/lit-element@0.7.1/lit-element.js?module';
 
-import './compute/server-list-compact.js';
+import './app-navigation.js';
 import './compute/flavor-list.js';
 import './compute/image-list.js';
-import './app-navigation.js';
 import './dashboard/chart.js';
+import './dashboard/resource-list.js';
 
 class OpenstackApp extends LitElement {
   static get properties() {
@@ -43,7 +43,7 @@ class OpenstackApp extends LitElement {
           this.loaded = true;
           this.data = response.data;
           this.errors = response.errors;
-          console.log('here');
+          console.log('Polling for updates.');
         });
     }
   }
@@ -64,6 +64,7 @@ class OpenstackApp extends LitElement {
 
   render() {
     const { data, errors, loaded } = this;
+    let errorMessages = null;
     if (!loaded) {
       return html`
         <div id="stage" class="wrapper">
@@ -77,6 +78,11 @@ class OpenstackApp extends LitElement {
         </div>
       `;
     }
+
+    if (errors && errors.errors) {
+      errorMessages = errors.errors.map((error) => html`<hx-toast type="error">${error.message}</hx-toast>`)
+    }
+
     return html`
     <div id="stage" class="wrapper">
       <app-navigation .navItems=${data.nav} .errors=${errors.nav}></app-navigation>
@@ -93,16 +99,17 @@ class OpenstackApp extends LitElement {
                   <dashboard-chart .chartData=${data.networkQuota}></dashboard-chart>
                 </div>
                 <div class="hxCol">
-                  <dashboard-chart .chartData=${data.serverQuota}></dashboard-chart>
+                  <dashboard-chart .chartData=${data.volumeQuota}></dashboard-chart>
                 </div>
               </div>
-              <server-list-compact .servers=${data.servers} .errors=${errors.servers}></server-list-compact>
+              <resource-list .resources=${data.resources} .errors=${errors.resources}></resource-list>
             </hx-panelbody>
           </hx-div>
         </hx-panel>
         <hx-panel class="hxSpan-4-xs">
           <hx-div scroll="both">
             <hx-panelbody class="hxBox hxMd">
+              ${errorMessages}
               <flavor-list .flavors=${data.flavors} .errors=${errors.flavors}></flavor-list>
               <image-list .images=${data.images} .errors=${errors.images}></image-list>
             </hx-panelbody>

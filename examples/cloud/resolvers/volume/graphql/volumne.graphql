@@ -1,0 +1,11 @@
+type Volume {
+  id: ID!
+  name: String!
+  size: Int
+  status: String
+  appStatus: ApplicationStatus
+}
+
+extend type Query {
+  getVolumes(region: String): [Volume]
+}

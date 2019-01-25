@@ -6,6 +6,7 @@ type ComputeServer {
   hostId: String
   region: String
   status: String
+  appStatus: ApplicationStatus
 }
 
 extend type Query {

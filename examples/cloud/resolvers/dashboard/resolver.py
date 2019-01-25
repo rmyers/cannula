@@ -75,14 +75,24 @@ async def quotaChartData(source, info, resource):
             limit=network_quota.limit,
             color=COLORS.get(resource)
         )
+    elif resource == 'Volumes':
+        volume_quota = await info.context.Volume.fetchLimits()
+
+        return QuotaData(
+            label="GB Used",
+            used=volume_quota.absolute.totalGigabytesUsed,
+            limit=volume_quota.absolute.maxTotalVolumeGigabytes,
+            color=COLORS.get(resource),
+            quota_label="GB Left"
+        )
 
 
 @dashboard_resolver.resolver('Query')
 async def resources(source, info, region):
     servers = info.context.ComputeServers.fetchServers(region)
     networks = info.context.Network.fetchNetworks(region)
-    images = info.context.ComputeImages.fetchImages(region)
+    volumes = info.context.Volume.fetchVolumes(region)
 
-    results = await asyncio.gather(servers, networks, images)
+    results = await asyncio.gather(servers, networks, volumes)
     # results is a list of lists [[results], [results], [results]]
     return itertools.chain(*results)

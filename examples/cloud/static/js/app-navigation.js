@@ -11,6 +11,7 @@ const renderSection = (section) => {
   return html`
     <hx-disclosure aria-controls="${section.title}">
       ${section.title}
+      <hx-icon class="toggle-icon" type="angle-down"></hx-icon>
     </hx-disclosure>
     <hx-reveal id="${section.title}" open>
       ${section.items.map(renderItem)}

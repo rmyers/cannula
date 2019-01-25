@@ -11,6 +11,7 @@ type Network {
   status: String
   subnets: [Subnet]
   external: Boolean
+  appStatus: ApplicationStatus
 }
 
 extend type Query {

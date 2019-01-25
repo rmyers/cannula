@@ -19,7 +19,7 @@ PORT = "8080"
 MIMIC_URL = f"http://{HOST}:{PORT}"
 COMPUTE_URL = f"{MIMIC_URL}/nova/v2.1/{{project_id}}"
 NEUTRON_URL = f"{MIMIC_URL}/neutron"
-CINDER_URL = f"{MIMIC_URL}/cinder/v2/{{project_id}}"
+CINDER_URL = f"{MIMIC_URL}/cinder/v3/{{project_id}}"
 KEYSTONE_V3 = f"{MIMIC_URL}/v3"
 SERVERS = dict()
 ACCOUNTS = dict()
@@ -543,23 +543,80 @@ def server_quota_get(project_id):
     }
 
 
-@route('/cinder/v2/<project_id>/types')
-def cinder_types(project_id):
+VOLUMES = [
+    {
+        "migration_status": None,
+        "availability_zone": "nova",
+        "os-vol-host-attr:host": "difleming@lvmdriver-1#lvmdriver-1",
+        "encrypted": False,
+        "replication_status": "disabled",
+        "snapshot_id": None,
+        "id": "6edbc2f4-1507-44f8-ac0d-eed1d2608d38",
+        "size": 200,
+        "user_id": "32779452fcd34ae1a53a797ac8a1e064",
+        "os-vol-tenant-attr:tenant_id": "bab7d5c60cd041a0a36f7c4b6e1dd978",
+        "os-vol-mig-status-attr:migstat": None,
+        "status": "in-use",
+        "description": None,
+        "multiattach": True,
+        "source_volid": None,
+        "consistencygroup_id": None,
+        "os-vol-mig-status-attr:name_id": None,
+        "name": "test-volume-attachments",
+        "bootable": "false",
+        "created_at": "2015-11-29T03:01:44.000000",
+        "volume_type": "lvmdriver-1",
+        "group_id": "8fbe5733-eb03-4c88-9ef9-f32b7d03a5e4"
+    },
+    {
+        "migration_status": None,
+        "attachments": [],
+        "availability_zone": "nova",
+        "os-vol-host-attr:host": "difleming@lvmdriver-1#lvmdriver-1",
+        "encrypted": False,
+        "replication_status": "disabled",
+        "snapshot_id": None,
+        "id": "173f7b48-c4c1-4e70-9acc-086b39073506",
+        "size": 100,
+        "user_id": "32779452fcd34ae1a53a797ac8a1e064",
+        "os-vol-tenant-attr:tenant_id": "bab7d5c60cd041a0a36f7c4b6e1dd978",
+        "os-vol-mig-status-attr:migstat": None,
+        "metadata": {},
+        "status": "available",
+        "description": "",
+        "multiattach": False,
+        "source_volid": None,
+        "consistencygroup_id": None,
+        "os-vol-mig-status-attr:name_id": None,
+        "name": "test-volume",
+        "bootable": "true",
+        "created_at": "2015-11-29T02:25:18.000000",
+        "volume_type": "lvmdriver-1",
+        "group_id": "8fbe5733-eb03-4c88-9ef9-f32b7d03a5e4"
+    }
+]
+
+
+@route('/cinder/v3/<project_id>/volumes/detail')
+def cinder_volumes(project_id):
     return {
-        "volume_types": [
-            {
-                "extra_specs": {
-                    "capabilities": "gpu"
-                },
-                "id": "6685584b-1eac-4da6-b5c3-555430cf68ff",
-                "name": "SSD"
-            },
-            {
-                "extra_specs": {},
-                "id": "8eb69a46-df97-4e41-9586-9a40a7533803",
-                "name": "SATA"
+        "volumes": VOLUMES
+    }
+
+
+@route('/cinder/v3/<project_id>/limits')
+def cinder_limits(project_id):
+    return {
+        "limits": {
+            "absolute": {
+                "totalSnapshotsUsed": 0,
+                "maxTotalBackups": 10,
+                "maxTotalVolumeGigabytes": 1000,
+                "totalVolumesUsed": 0,
+                "totalBackupsUsed": 0,
+                "totalGigabytesUsed": sum(map(lambda vol: vol['size'], VOLUMES))
             }
-        ]
+        }
     }
 
 

@@ -1,7 +1,8 @@
 import logging
 
-from .resolver import compute_resolver
+from ..application import status
 from ..base import OpenStackBase
+from .resolver import compute_resolver
 
 LOG = logging.getLogger(__name__)
 
@@ -29,3 +30,10 @@ class ComputeServers(OpenStackBase):
 @compute_resolver.resolver('Query')
 async def computeServers(source, info, region):
     return await info.context.ComputeServers.fetchServers(region)
+
+
+@compute_resolver.resolver('ComputeServer')
+async def appStatus(server, info):
+    return status.Status(
+        label=server.status,
+    )

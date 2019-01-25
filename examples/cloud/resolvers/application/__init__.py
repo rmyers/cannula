@@ -3,7 +3,7 @@ import typing
 import cannula
 
 
-navigation_resolver = cannula.Resolver(__name__)
+application_resolver = cannula.Resolver(__name__)
 
 
 class Item(typing.NamedTuple):
@@ -71,15 +71,31 @@ ALL_SECTIONS = [
             name='Create Network',
             role='network',
         ),
+    ]),
+    Section(title='Volumes', items=[
+        Item(
+            id='volumes',
+            icon='volume',
+            url='/volumes/',
+            name='Volumes',
+            role='volume',
+        ),
+        Item(
+            id='volume-new',
+            icon='add',
+            url='/volumes/new/',
+            name='Create Volume',
+            role='volume',
+        ),
     ])
 ]
 
 
-@navigation_resolver.resolver('Query')
+@application_resolver.resolver('Query')
 async def getNavigation(source, info, active: str):
     return [s for s in ALL_SECTIONS if s.is_enabled(info.context.user)]
 
 
-@navigation_resolver.resolver('NavigationItem')
+@application_resolver.resolver('NavigationItem')
 async def enabled(item, info):
     return item.is_enabled(info.context.user)

@@ -4,6 +4,7 @@ import logging
 
 import cannula
 
+from ..application import status
 from ..base import OpenStackBase
 
 LOG = logging.getLogger(__name__)
@@ -57,3 +58,10 @@ async def subnets(network, info):
 
     results = await asyncio.gather(awaitables)
     return itertools.chain(*results)
+
+
+@network_resolver.resolver('Network')
+async def appStatus(network, info):
+    return status.Status(
+        label=network.status,
+    )

@@ -7,11 +7,12 @@ import cannula
 from graphql import parse
 
 import session
+from resolvers.application import application_resolver
 from resolvers.compute import compute_resolver
 from resolvers.dashboard import dashboard_resolver
 from resolvers.identity import identity_resolver
-from resolvers.navigation import navigation_resolver
 from resolvers.network import network_resolver
+from resolvers.volume import volume_resolver
 
 PORT = os.getenv('PORT', '8081')
 STATIC = os.path.join(os.getcwd(), 'static')
@@ -24,10 +25,11 @@ LOG = logging.getLogger('application')
 api = cannula.API(__name__, context=session.OpenStackContext, mocks=USE_MOCKS)
 
 # Order matters for these applications you extend
-api.register_resolver(navigation_resolver)
+api.register_resolver(application_resolver)
 api.register_resolver(compute_resolver)
 api.register_resolver(identity_resolver)
 api.register_resolver(network_resolver)
+api.register_resolver(volume_resolver)
 api.register_resolver(dashboard_resolver)
 
 
@@ -44,24 +46,32 @@ def format_errors(errors):
     formatted_errors = collections.defaultdict(list)
 
     for err in errors:
+        error_formatted = err.formatted
         if err.path is not None:
             for path in err.path:
-                formatted_errors[path].append(err.formatted)
-        else:
-            # All other errors are probably graphql errors such as
-            # an unknown query or unknown field on a type.
-            formatted_errors['errors'].append(err.formatted)
+                formatted_errors[path].append(error_formatted)
+
+        formatted_errors['errors'].append(error_formatted)
 
     return formatted_errors
 
 
 DASHBOARD_QUERY = parse("""
+    # This is a fragment for our quota charts so we don't have to repeat it.
     fragment quotaFields on QuotaChartData {
         datasets {
             data
             backgroundColor
         }
         labels
+    }
+    # Status fragment for our resources
+    fragment statusFields on ApplicationStatus {
+        label
+        color
+        working
+        icon
+        tooltip
     }
     query main ($region: String!) {
         serverQuota: quotaChartData(resource: "ComputeServers") {
@@ -70,23 +80,31 @@ DASHBOARD_QUERY = parse("""
         networkQuota: quotaChartData(resource: "Networks") {
             ...quotaFields
         }
+        volumeQuota: quotaChartData(resource: "Volumes") {
+            ...quotaFields
+        }
         resources: resources(region: $region) {
             __typename
             ... on ComputeServer {
                 name
                 id
+                appStatus {
+                    ...statusFields
+                }
             }
             ... on Network {
                 name
                 id
+                appStatus {
+                    ...statusFields
+                }
             }
-        }
-        servers: computeServers(region: $region) {
-            name
-            id
-            flavor {
+            ... on Volume {
                 name
-                ram
+                id
+                appStatus {
+                    ...statusFields
+                }
             }
         }
         images: computeImages(region: $region) {
