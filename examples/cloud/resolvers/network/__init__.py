@@ -1,10 +1,11 @@
 import asyncio
 import itertools
 import logging
+import typing
 
 import cannula
 
-from ..application import status
+from ..application import status, actions
 from ..base import OpenStackBase
 
 LOG = logging.getLogger(__name__)
@@ -65,3 +66,33 @@ async def appStatus(network, info):
     return status.Status(
         label=network.status,
     )
+
+
+class RenameNetwork(actions.ActionForm):
+    fields = []
+    headerText = 'Please enter a new name:'
+    submitText = 'Rename'
+    network_id: str = None
+
+    @property
+    def url(self):
+        return 'something'
+
+    @classmethod
+    def initialize(cls, network):
+        return cls(network_id=network.id)
+
+
+NETWORK_ACTIONS = [
+    actions.Action(
+        label="Rename",
+        form=RenameNetwork,
+    )
+]
+
+
+@network_resolver.resolver('Network')
+async def appActions(network, info):
+    return [action.initialize(network, info) for action in NETWORK_ACTIONS]
+
+

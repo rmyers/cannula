@@ -1,5 +1,3 @@
 bottle
 requests
-requests-futures
 graphql-core-next
-aiohttp

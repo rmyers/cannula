@@ -106,23 +106,22 @@ class Resolver:
         self._schema = schema
 
     def find_graphql_schema(self)-> [str]:
+        if self._schema is not None:
+            return [self._schema]
+
         _graphql_dir = self.graphql_dir
         if not os.path.isabs(_graphql_dir):
             _graphql_dir = os.path.join(self.root_dir, self.graphql_dir)
 
         schemas = []
-        LOG.debug(f'Searching {_graphql_dir} for schema.')
         if os.path.isdir(_graphql_dir):
+            LOG.debug(f'Searching {_graphql_dir} for schema.')
             files = os.listdir(_graphql_dir)
             files.sort()
             for listing in files:
                 LOG.debug(f'Loading graphql file: {listing}')
                 with open(os.path.join(_graphql_dir, listing)) as graph:
                     schemas.append(graph.read())
-
-        # Finally add in any schema that was added in the constructor.
-        if self._schema is not None:
-            schemas.append(self._schema)
 
         return schemas
 

@@ -37,13 +37,8 @@ SAMPLE_QUERY = parse("""
 """)
 
 
-async def main():
-    who = 'world'
-    if len(sys.argv) > 1:
-        who = sys.argv[1]
+who = 'world'
+if len(sys.argv) > 1:
+    who = sys.argv[1]
 
-    results = await api.call(SAMPLE_QUERY, variables={'who': who})
-    print(results)
-
-loop = asyncio.get_event_loop()
-loop.run_until_complete(main())
+print(api.call_sync(SAMPLE_QUERY, variables={'who': who}))

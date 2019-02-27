@@ -12,6 +12,7 @@ type Network {
   subnets: [Subnet]
   external: Boolean
   appStatus: ApplicationStatus
+  appActions: [Action]
 }
 
 extend type Query {
