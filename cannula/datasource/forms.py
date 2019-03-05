@@ -175,6 +175,7 @@ type WTFOption {
 type WTFBaseField {
     name: String!
     label: String
+    description: String
     widget: WTFWidget
 
     "The current value of the field."
@@ -254,6 +255,7 @@ fragment formFieldQuery on WTFormField {
 fragment baseFieldQuery on WTFBaseField {
     name
     label
+    description
     widget {
         __typename
         ... on WTFInputWidget {
@@ -370,6 +372,10 @@ class FieldWrapper:
     @property
     def label(self):
         return self._field.label.text
+
+    @property
+    def description(self):
+        return self._field.description
 
     @property
     def errors(self):
