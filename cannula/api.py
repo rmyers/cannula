@@ -181,10 +181,14 @@ class API(Resolver):
     def fix_abstract_resolve_type(self, schema):
         # We need to provide a custom 'resolve_type' since the default
         # in method only checks for __typename if the source is a dict.
+        # Python mangles the variable name if it starts with `__` so we add
+        # `__typename__` attribute which is not mangled.
         # TODO(rmyers): submit PR to fix upstream?
 
         def custom_resolve_type(source, _info):
-            return getattr(source, '__typename', None)
+            if isinstance(source, dict):
+                return str(source.get('__typename'))
+            return getattr(source, '__typename__', None)
 
         for _type_name, graphql_type in schema.type_map.items():
             if isinstance(graphql_type, GraphQLUnionType):
