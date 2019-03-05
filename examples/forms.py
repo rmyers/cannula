@@ -1,6 +1,7 @@
 import pprint
-import cannula
-from cannula.datasource import forms
+import urllib.parse
+
+from graphql import parse, GraphQLError
 from wtforms import (
     Form,
     BooleanField,
@@ -12,6 +13,9 @@ from wtforms import (
     FieldList,
 )
 
+import cannula
+from cannula.datasource import forms
+
 
 def is_42(form, field):
     if field.data != 42:
@@ -20,6 +24,9 @@ def is_42(form, field):
 
 class Other(Form):
     name = StringField('Widget Namer', validators=[validators.Length(max=25), is_42])
+
+    class Meta:
+        name = 'Frank'
 
 
 class UpdateWidget(Form):
@@ -30,6 +37,9 @@ class UpdateWidget(Form):
     listy = FieldList(StringField('Name', [validators.required()], default='Jane'), max_entries=34, min_entries=2)
     booly = BooleanField('slkjl', default=False)
 
+    class Meta:
+        name = "Barney"
+
 
 api = cannula.API(__name__)
 
@@ -38,8 +48,14 @@ api.register_resolver(forms.wtforms_resolver)
 
 # Add in your custom resolver to get the form with data
 my_resolver = cannula.Resolver(__name__, schema='''
+    type Widget {
+        name: String
+    }
     extend type Query {
         getUpdateWidgetForm(widgetId: String!): WTForm
+    }
+    extend type Mutation {
+        updateWidget(form: String): Widget
     }
 ''')
 
@@ -52,13 +68,24 @@ async def getUpdateWidgetForm(source, info, widgetId):
     return update_form
 
 
+class DummyPostData(dict):
+
+    def getlist(self, key):
+        v = self[key]
+        if not isinstance(v, (list, tuple)):
+            v = [v]
+        return v
+
+
 @my_resolver.resolver('Mutation')
-async def updateWidget(source, info, widgetId, form=None):
-    widget = await info.context.WidgetDatasource.fetch(widgetId)
-    if form.validate():
-        # Update the Widget
-        widget.save()
-    return form
+async def updateWidget(source, info, form=None):
+    print(f'MUTATE: {form}')
+    form_data = urllib.parse.parse_qs(form)
+    update_form = UpdateWidget(DummyPostData(**form_data))
+    if not update_form.validate():
+        # ERROR!!
+        raise GraphQLError("Update Widget Error", extensions=update_form.errors)
+    return update_form
 
 
 api.register_resolver(my_resolver)
@@ -68,6 +95,14 @@ UPDATE_WIDGET_QUERY = forms.parse_form_query('''
     query getForm($widgetId: String!) {
         getUpdateWidgetForm(widgetId: $widgetId) {
             ...formQueryFragment
+        }
+    }
+''')
+
+UPDATE_WIDGET_MUTATION = parse('''
+    mutation widgetUpdate($form: String!) {
+        updateWidget(form: $form) {
+            name
         }
     }
 ''')
@@ -82,3 +117,18 @@ print('DATA:')
 pprint.pprint(results.data, compact=True, width=200)
 print('ERRORS:')
 pprint.pprint(results.errors)
+
+payload = urllib.parse.urlencode(
+    [
+        ('name', 'Darla'),
+        ('price', '1.4'),
+    ]
+)
+
+posted = api.call_sync(
+    UPDATE_WIDGET_MUTATION,
+    variables={'form': payload},
+    request=None
+)
+
+print(posted)
