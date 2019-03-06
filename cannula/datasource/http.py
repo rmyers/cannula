@@ -143,6 +143,7 @@ class HTTPDataSource:
         raise error
 
     def convert_to_object(self, json_obj):
+        json_obj.update({'__typename__': self.resource_name})
         return types.SimpleNamespace(**json_obj)
 
     async def did_receive_response(
@@ -151,11 +152,7 @@ class HTTPDataSource:
         request: Request
     )-> typing.Any:
         response.raise_for_status()
-        response_object = response.json(object_hook=self.convert_to_object)
-        # Add a variable to track the custom resource typename which is used
-        # when a query returns a union to differentiate the object types.
-        response_object.__typename__ = self.resource_name
-        return response_object
+        return response.json(object_hook=self.convert_to_object)
 
     async def get(self, path: str) -> typing.Awaitable:
         return await self.fetch('GET', path)
