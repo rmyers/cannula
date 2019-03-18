@@ -5,12 +5,11 @@ import copy
 import logging
 import inspect
 import os
-import random
 import typing
-import uuid
 
 from graphql import (
     build_schema,
+    default_field_resolver,
     execute,
     ExecutionResult,
     extend_schema,
@@ -21,8 +20,9 @@ from graphql import (
     validate,
 )
 
-from cannula.helpers import get_root_path
 from cannula.context import Context
+from cannula.helpers import get_root_path
+from cannula.mocks import MockSchemaResolver
 
 LOG = logging.getLogger(__name__)
 
@@ -46,17 +46,6 @@ ROOT_QUERY = """
     scope: CacheControlScope
   ) on FIELD_DEFINITION | OBJECT | INTERFACE
 """
-
-# TODO(rmyers): Find a better place for this.
-DEFAULT_MOCKS = {
-    'String': lambda: random.choice(['flippy', 'flappy', 'slippy', 'slappy']),
-    'Int': lambda: random.randint(4, 999),
-    'Float': lambda: random.randint(5, 999) * random.random(),
-    'Boolean': lambda: random.choice([True, False]),
-    'ID': lambda: str(uuid.uuid4()),
-    # The default number of mock items to return when results are a list.
-    '__list_length': lambda: random.randint(3, 6),
-}
 
 
 class Resolver:
@@ -165,8 +154,7 @@ class API(Resolver):
         super().__init__(*args, **kwargs)
         self._context = context
         self._mocks = mocks
-        self._mock_objects = DEFAULT_MOCKS
-        self._mock_objects.update(mock_objects)
+        self._mock_objects = mock_objects
         self._subresolvers = []
         self._graphql_schema = self.find_graphql_schema()
 
@@ -249,7 +237,8 @@ class API(Resolver):
         """
         field_resolver = self.field_resolver
         if self._mocks:
-            field_resolver = self.mock_resolver
+            mock_resolver = MockSchemaResolver(self._mock_objects)
+            field_resolver = mock_resolver.field_resolver
 
         validation_errors = validate(self.schema, document)
         if validation_errors:
@@ -276,44 +265,6 @@ class API(Resolver):
         loop = asyncio.get_event_loop()
         return loop.run_until_complete(self.call(document, request, variables))
 
-    async def mock_resolver(self, _resource, _info, **kwargs):
-        from graphql.type.definition import GraphQLList
-
-        def resolve_fields(schema_type):
-            """Recursively resolve the schema_type.
-
-            If there is a mock object defined for this type return it otherwise
-            loop over all the fields and build an object with mock data.
-            """
-
-            # Special case for list types return a random length list of type.
-            if isinstance(schema_type, GraphQLList):
-                mock = self._mock_objects.get('__list_length')
-                count = mock
-                if callable(mock):
-                    count = mock()
-                return [resolve_fields(schema_type.of_type) for x in range(count)]
-
-            schema_type = str(schema_type)
-            if schema_type.endswith('!'):
-                schema_type = schema_type[:-1]
-
-            if schema_type in self._mock_objects.keys():
-                mock = self._mock_objects.get(schema_type)
-                if callable(mock):
-                    return mock()
-                return mock
-
-            return_value = type(schema_type, (object,), {})()
-
-            found = _info.schema.get_type(schema_type)
-            for name, field in found.fields.items():
-                setattr(return_value, name, resolve_fields(field.type))
-
-            return return_value
-
-        return resolve_fields(_info.return_type)
-
     async def field_resolver(self, _resource, _info, **kwargs):
         type_name = _info.parent_type.name  # schema type (Query, Mutation)
         field_name = _info.field_name  # The attribute being resolved
@@ -325,4 +276,4 @@ class API(Resolver):
             # If there is not a custom resolver check the resource for attributes
             # that match the field_name. The resource argument will be the result
             # of the Query type resolution.
-            return getattr(_resource, field_name, None)
+            return default_field_resolver(_resource, _info, **kwargs)
