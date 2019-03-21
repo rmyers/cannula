@@ -82,6 +82,10 @@ class Resolver:
         api.register_resolver(app)
     """
 
+    root_schema = ROOT_QUERY
+    # Allow sub-resolvers to apply a base schema before applying custom schema.
+    base_schema = {}
+
     def __init__(
         self,
         name: str,
@@ -95,9 +99,6 @@ class Resolver:
         self._schema = schema
 
     def find_graphql_schema(self)-> [str]:
-        if self._schema is not None:
-            return [self._schema]
-
         _graphql_dir = self.graphql_dir
         if not os.path.isabs(_graphql_dir):
             _graphql_dir = os.path.join(self.root_dir, self.graphql_dir)
@@ -111,6 +112,9 @@ class Resolver:
                 LOG.debug(f'Loading graphql file: {listing}')
                 with open(os.path.join(_graphql_dir, listing)) as graph:
                     schemas.append(graph.read())
+
+        if self._schema is not None:
+            schemas.append(self._schema)
 
         return schemas
 
@@ -162,7 +166,6 @@ class API(Resolver):
     def schema(self):
         if not hasattr(self, '_full_schema'):
             self._full_schema = self._build_schema()
-            LOG.debug(self._full_schema.type_map)
             self.fix_abstract_resolve_type(self._full_schema)
         return self._full_schema
 
@@ -183,7 +186,11 @@ class API(Resolver):
                 graphql_type.resolve_type = custom_resolve_type
 
     def _build_schema(self) -> GraphQLSchema:
-        schema = build_schema(ROOT_QUERY)
+        schema = build_schema(self.root_schema)
+
+        for base, extension in self.base_schema.items():
+            LOG.debug(f'Applying base schema extension {base}')
+            schema = extend_schema(schema, parse(extension))
 
         for extention in self._graphql_schema:
             schema = extend_schema(schema, parse(extention))
@@ -220,6 +227,7 @@ class API(Resolver):
         This will add in all the datasources/resolvers/schema from the
         sub-resolver.
         """
+        self.base_schema.update(resolver.base_schema)
         self._graphql_schema += resolver.find_graphql_schema()
         self._merge_registry(resolver.registry)
         self.datasources.update(resolver.datasources)

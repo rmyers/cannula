@@ -16,6 +16,20 @@ from wtforms import (
 import cannula
 from cannula.datasource import forms
 
+my_resolver = cannula.datasource.forms.WTFormsResolver(__name__, schema='''
+    type Widget {
+        name: String
+    }
+    extend type Mutation {
+        updateWidget(form: String): Widget
+    }
+''')
+
+my_other_resolver = cannula.datasource.forms.WTFormsResolver(__name__, schema='''
+    type WidgetRedux {
+        name: String
+    }
+''')
 
 def is_42(form, field):
     if field.data != 42:
@@ -29,42 +43,22 @@ class Other(Form):
         name = 'Frank'
 
 
+@my_resolver.register_form(args=['id'])
 class UpdateWidget(Form):
-    name = StringField('Widget Name', validators=[validators.Length(max=25), is_42])
-    price = DecimalField('Widget Price', validators=[validators.NumberRange(min=4.0)])
-    fool = SelectMultipleField('What', choices=[('foo', 'bar')])
-    other = FormField(Other)
-    listy = FieldList(StringField('Name', [validators.required()], default='Jane'), max_entries=34, min_entries=2)
-    booly = BooleanField('slkjl', default=False)
+    name = StringField('Widget Name', validators=[validators.Length(max=25)])
+    price = DecimalField('Widget Price', validators=[validators.NumberRange(min=4.4)])
 
     class Meta:
         name = "Barney"
-
-
-api = cannula.API(__name__)
-
-# Add the wtforms_resolver to your registered resolvers
-api.register_resolver(forms.wtforms_resolver)
-
-# Add in your custom resolver to get the form with data
-my_resolver = cannula.Resolver(__name__, schema='''
-    type Widget {
-        name: String
-    }
-    extend type Query {
-        getUpdateWidgetForm(widgetId: String!): WTForm
-    }
-    extend type Mutation {
-        updateWidget(form: String): Widget
-    }
-''')
+        action = "lol"
 
 
 @my_resolver.resolver('Query')
-async def getUpdateWidgetForm(source, info, widgetId):
+async def getUpdateWidgetForm(source, info, args):
+    print(args)
     # widget = await info.context.WidgetDatasource.fetch(widgetId)
     # use your custom wtform like normal
-    update_form = UpdateWidget()
+    update_form = info.context.UpdateWidget.form(name='frank')
     return update_form
 
 
@@ -78,39 +72,23 @@ class DummyPostData(dict):
 
 
 @my_resolver.resolver('Mutation')
-async def updateWidget(source, info, form=None):
+async def postUpdateWidgetForm(source, info, args, form=None):
     print(f'MUTATE: {form}')
-    form_data = urllib.parse.parse_qs(form)
-    update_form = UpdateWidget(DummyPostData(**form_data))
+    update_form = info.context.UpdateWidget.form(form)
     if not update_form.validate():
         # ERROR!!
         raise GraphQLError("Update Widget Error", extensions=update_form.errors)
+
     return update_form
 
 
+api = cannula.API(__name__)
 api.register_resolver(my_resolver)
-
-
-UPDATE_WIDGET_QUERY = forms.parse_form_query('''
-    query getForm($widgetId: String!) {
-        getUpdateWidgetForm(widgetId: $widgetId) {
-            ...formQueryFragment
-        }
-    }
-''')
-
-UPDATE_WIDGET_MUTATION = parse('''
-    mutation widgetUpdate($form: String!) {
-        updateWidget(form: $form) {
-            name
-        }
-    }
-''')
+api.register_resolver(my_other_resolver)
 
 
 results = api.call_sync(
-    UPDATE_WIDGET_QUERY,
-    variables={'widgetId': '2345'},
+    my_resolver.get_form_query('UpdateWidget', id='1234'),
     request=None,
 )
 print('DATA:')
@@ -118,17 +96,10 @@ pprint.pprint(results.data, compact=True, width=200)
 print('ERRORS:')
 pprint.pprint(results.errors)
 
-payload = urllib.parse.urlencode(
-    [
-        ('name', 'Darla'),
-        ('price', '1.4'),
-    ]
-)
 
-posted = api.call_sync(
-    UPDATE_WIDGET_MUTATION,
-    variables={'form': payload},
-    request=None
+results = api.call_sync(
+    my_resolver.get_form_mutation('UpdateWidget', id='1234'),
+    variables={'form': forms.FormDataWrapper(DummyPostData(name='darny', price=5.0))},
+    request=None,
 )
-
-print(posted)
+print(results)
