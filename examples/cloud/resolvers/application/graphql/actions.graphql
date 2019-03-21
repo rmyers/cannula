@@ -1,0 +1,33 @@
+"""
+## Application Actions
+
+This is an generic action type that could be preformed on some other type.
+The particular actions that are possible are determined by the type of object
+and the state of the object and potetially the permissions of the user.
+We can define the action and inputs required with validation rules. That
+way we can re-use the same components on the front end with all of the logic
+to display forms or messages in a central spot.
+
+Actions should be small and not require a ton of user input. Some good
+examples are a delete confirmation box, or a rename widget. Actions that
+require a complex form or multiple data sources should most likely define
+their own custom types.
+"""
+type Action {
+  label: String!
+  icon: String
+
+  "Allow for lazy loading the form"
+  formUrl: String
+  form: WTForm
+  enabled: Boolean
+
+  "Message for the user, this could be extra details about the action or a message to display when disabled."
+  tooltip: String
+  # Optional attribute this action is related to. This would allow you to show
+  # this action item where you display this attribute from the data model. It
+  # also can inform which fields to update after a successful update.
+
+  "Optional attribute this action is related to."
+  attribute: String
+}

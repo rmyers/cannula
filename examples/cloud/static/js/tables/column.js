@@ -31,7 +31,10 @@ const defaultOptions = {
   sortDirection: 'DESC',
 
   /** Whether this column is the currently sorted. */
-  sorted: false
+  sorted: false,
+
+  /** The attribute that has the data-model ID to generate unique html id's. */
+  idAttribute: 'id',
 }
 
 /**
@@ -62,6 +65,7 @@ export class Column {
     this.sortable = opts.sortable;
     this.sortDirection = opts.sortDirection;
     this.sorted = opts.sorted;
+    this.idAttribute = opts.idAttribute;
   }
 
   /**
@@ -77,6 +81,18 @@ export class Column {
   }
 
   /**
+   * Return the value of the idAttribute on the dataModel object.
+   * @param {object} dataModel - A single item from the data table.
+   * @return {string|number}
+   */
+  getId(dataModel) {
+    if (typeof this.idAttribute === "function") {
+      return this.idAttribute(dataModel);
+    }
+    return dataModel[this.idAttribute] || this.defaultValue;
+  }
+
+  /**
    * Return the cell data.
    * For simple cases this just returns a the data wrapped in a div. You can
    * override the cell to provide a richer html response.
@@ -85,7 +101,9 @@ export class Column {
    */
   getCell(dataModel) {
     const data = this.getData(dataModel);
-    return this.cell(data);
+    const id = this.getId(dataModel);
+    console.log(id);
+    return this.cell(data, id);
   }
 
   /**

@@ -9,10 +9,10 @@ import logging
 import typing
 import uuid
 
-import bottle
 import cannula
 from cannula.datasource.http import HTTPContext
 from graphql import parse
+from starlette.responses import RedirectResponse
 
 SESSION = {}
 SESSION_COOKE_NAME = 'openstack_session_id'
@@ -101,18 +101,19 @@ LOGIN_MUTATION = parse("""
 """)
 
 
-def login(
+async def login(
+    request: typing.Any,
     username: str,
     password: str,
     api: cannula.API,
 ) -> bool:
-    resp = api.call_sync(
+    resp = await api.call(
         LOGIN_MUTATION,
         variables={
             'username': username,
             'password': password,
         },
-        request=bottle.request
+        request=request
     )
 
     if resp.errors:
@@ -128,21 +129,22 @@ def login(
         roles=token['roles']
     )
 
-    bottle.response.set_cookie(SESSION_COOKE_NAME, user.session_id)
-    return True
+    response = RedirectResponse('/dashboard')
+    response.set_cookie(SESSION_COOKE_NAME, user.session_id)
+    return response
 
 
 class OpenStackContext(HTTPContext):
 
     def handle_request(self, request):
-        session_id = request.get_cookie(SESSION_COOKE_NAME)
+        session_id = request.cookies.get(SESSION_COOKE_NAME)
         self.user = get_user(session_id)
 
         return request
 
 
 def is_authenticated(request) -> bool:
-        session_id = request.get_cookie(SESSION_COOKE_NAME)
-        user = get_user(session_id)
-        LOG.info(f'{user} {session_id}')
-        return user.is_authenticated
+    session_id = request.cookies.get(SESSION_COOKE_NAME)
+    user = get_user(session_id)
+    LOG.info(f'{user} {session_id}')
+    return user.is_authenticated

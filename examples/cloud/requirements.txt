@@ -1,3 +1,9 @@
 bottle
 requests
 graphql-core-next
+wtforms
+starlette
+uvicorn
+aiofiles
+jinja2
+python-multipart

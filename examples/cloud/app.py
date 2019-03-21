@@ -1,10 +1,20 @@
 import collections
 import logging
 import os
+import sys
 
 import bottle
 import cannula
+from cannula.datasource import forms
 from graphql import parse
+
+from starlette import status
+from starlette.applications import Starlette
+from starlette.background import BackgroundTasks
+from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
+from starlette.staticfiles import StaticFiles
+from starlette.templating import Jinja2Templates
+from starlette.types import ASGIInstance, Receive, Scope, Send
 
 import session
 from resolvers.application import application_resolver
@@ -19,10 +29,19 @@ STATIC = os.path.join(os.getcwd(), 'static')
 USE_MOCKS = bool(os.getenv('USE_MOCKS', False))
 
 logging.basicConfig(level=logging.DEBUG)
+templates = Jinja2Templates(directory='templates')
 
 LOG = logging.getLogger('application')
 
-api = cannula.API(__name__, context=session.OpenStackContext, mocks=USE_MOCKS)
+mock_objects = {
+    'ComputeServer': {
+        '__typename': 'ComputeServer',
+        'name': 'frank',
+        'id': '1233455',
+    }
+}
+
+api = cannula.API(__name__, context=session.OpenStackContext, mocks=USE_MOCKS, mock_objects=mock_objects)
 
 # Order matters for these applications you extend
 api.register_resolver(application_resolver)
@@ -76,6 +95,12 @@ DASHBOARD_QUERY = parse("""
         icon
         tooltip
     }
+    fragment actionFields on Action {
+        label
+        icon
+        enabled
+        tooltip
+    }
     query main ($region: String!) {
         serverQuota: quotaChartData(resource: "ComputeServers") {
             ...quotaFields
@@ -101,12 +126,18 @@ DASHBOARD_QUERY = parse("""
                 appStatus {
                     ...statusFields
                 }
+                appActions {
+                    ...actionFields
+                }
             }
             ... on Volume {
                 name
                 id
                 appStatus {
                     ...statusFields
+                }
+                appActions {
+                    ...actionFields
                 }
             }
         }
@@ -134,13 +165,17 @@ DASHBOARD_QUERY = parse("""
 """)
 
 
-@bottle.route('/dashboard')
-def dashboard():
-    if bottle.request.params.get('xhr'):
-        results = api.call_sync(
+app = Starlette(debug=True)
+app.mount('/static', StaticFiles(directory='static'), name='static')
+
+
+@app.route('/dashboard')
+async def dashboard(request):
+    if 'xhr' in request.query_params:
+        results = await api.call(
             DASHBOARD_QUERY,
             variables={'region': 'us-east'},
-            request=bottle.request
+            request=request
         )
 
         resp = {
@@ -148,31 +183,30 @@ def dashboard():
             'data': results.data or {}
         }
 
-        return resp
+        return JSONResponse(resp)
 
-    if not session.is_authenticated(bottle.request):
-        return bottle.redirect('/')
+    if not session.is_authenticated(request):
+        return RedirectResponse('/')
 
-    return bottle.template('index')
-
-
-@bottle.route('/')
-def login():
-    return bottle.template('login')
+    return templates.TemplateResponse('index.html', {'request': request})
 
 
-@bottle.post('/')
-def do_login():
-    username = bottle.request.forms.get('username')
-    password = bottle.request.forms.get('password')
+@app.route('/')
+async def login(request):
+    return templates.TemplateResponse('login.html', {'request': request})
+
+
+@app.route('/', methods=['POST'])
+async def do_login(request):
+    form = await request.form()
+    LOG.info(f'{form}: {dir(form)}')
+    username = form.get('username')
+    password = form.get('password')
     LOG.info(f'Attempting login for {username}')
-    session.login(username, password, api)
-    bottle.redirect("/dashboard")
+    response = await session.login(request, username, password, api)
+    return response
 
 
-@bottle.route('/static/<filename:path>')
-def send_static(filename):
-    return bottle.static_file(filename, root=STATIC)
-
-
-bottle.run(host='0.0.0.0', port=PORT, debug=True, reloader=True)
+if __name__ == '__main__':
+    import uvicorn
+    uvicorn.run(app, host='0.0.0.0', port=8081, debug=True, log_level=logging.INFO)

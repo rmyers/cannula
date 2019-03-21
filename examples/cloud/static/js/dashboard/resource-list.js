@@ -2,10 +2,12 @@ import {LitElement, html} from 'https://unpkg.com/@polymer/lit-element@0.7.1/lit
 
 import { Column } from '../tables/column.js';
 import '../tables/data_table.js';
+import { statusCell } from '../widgets/status-cell.js';
+import { actionCell } from '../widgets/action-cell.js';
 
-const statusCell = (status) => html`<hx-status class="${status.color}">${status.label}</hx-status>`;
 
 const columns = [
+  new Column('appActions', {cell: actionCell, header: html`<hx-icon type="cog"></hx-icon>`, defaultValue: []}),
   new Column('appStatus', {cell: statusCell, header: 'Status'}),
   new Column('name', {sortable: true, sorted: true}),
   new Column('id')
