@@ -59,7 +59,7 @@ class Resolver:
         resolvers/
             subpackage/
                 app.py  # `app = cannula.Resolver(__name__)`
-                graphql/
+                schema/
                    myschema.graphql
 
     You then register resolvers and dataloaders in the same way::
@@ -89,7 +89,7 @@ class Resolver:
     def __init__(
         self,
         name: str,
-        graphql_dir: str = 'graphql',
+        graphql_dir: str = 'schema',
         schema: str = None,
     )-> typing.Any:
         self.registry = collections.defaultdict(dict)

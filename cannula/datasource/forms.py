@@ -436,7 +436,6 @@ class FormDataWrapper(Wrapper):
 async def action(form, info, *args, **kwargs):
     """Resolves the fields on a wtform object."""
     # HMMM maybe this does not belong here.
-    print(f'MARIO: {args} {kwargs} {form}')
     return '/foo'
 
 
@@ -584,3 +583,11 @@ class WTFormsResolver(Resolver):
             {query_fragment}
         ''')
         return parse(query)
+
+
+def unwrap_args(form_query_argument_list):
+    """Turn the serialized key/value pairs back into a dict."""
+    kwargs = {}
+    for arg in form_query_argument_list:
+        kwargs[arg['key']] = arg['value']
+    return kwargs
