@@ -19,15 +19,8 @@ type Action {
 
   "Allow for lazy loading the form"
   formUrl: String
-  form: WTForm
   enabled: Boolean
 
   "Message for the user, this could be extra details about the action or a message to display when disabled."
   tooltip: String
-  # Optional attribute this action is related to. This would allow you to show
-  # this action item where you display this attribute from the data model. It
-  # also can inform which fields to update after a successful update.
-
-  "Optional attribute this action is related to."
-  attribute: String
 }

@@ -1,13 +1,11 @@
 import typing
 
-import wtforms
-
 from .resolver import application_resolver
 
 
 class Action:
     label: str
-    form_class: wtforms.Form = None
+    icon: str
     formUrl: str = None
     obj: typing.Any = None
     attribute: str = None
@@ -18,12 +16,14 @@ class Action:
     action_message: str = None
     state_attribute: str = 'state'
     state: str = None
-    form: wtforms.Form = None
 
     def __init__(self, source, info, **kwargs):
         """Initialize the form with the source as the object."""
         self.state = getattr(source, self.state_attribute, None)
-        self.form = self.form_class(obj=source, **kwargs)
+        self.formUrl = self.get_form_url(source, info, **kwargs)
+
+    def get_form_url(self, source, info, **kwargs):
+        raise NotImplementedError('Subclasses must define `get_form_url`')
 
     def is_enabled(self, user) -> bool:
         role_is_set = self.allow_role is not None

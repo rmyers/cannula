@@ -1,11 +1,9 @@
 import asyncio
 import itertools
 import logging
-import typing
 
-import cannula
 import wtforms
-from cannula.datasource.forms import WTFormsResolver
+from cannula.datasource.forms import WTFormsResolver, unwrap_args
 
 from ..application import status, actions
 from ..base import OpenStackBase
@@ -27,6 +25,12 @@ class Network(OpenStackBase):
         for network in networks:
             network.region = region
         return networks
+
+    async def fetchNetwork(self, region=None, id=None):
+        networks = await self.fetchNetworks(region)
+        for network in networks:
+            network.id == id
+            return network
 
     async def fetchLimits(self):
         east_url = self.get_service_url('us-east', 'v2.0/limits.json')
@@ -70,6 +74,7 @@ async def appStatus(network, info):
     )
 
 
+@network_resolver.register_form(args=['id', 'region'])
 class RenameNetwork(wtforms.Form):
     name = wtforms.TextField(
         'New Name',
@@ -77,9 +82,24 @@ class RenameNetwork(wtforms.Form):
     )
 
 
+@network_resolver.resolver('Query')
+async def getRenameNetworkForm(source, info, args):
+    # Turn the args list back into a dict
+    kwargs = unwrap_args(args)
+
+    # Use the kwargs to fetch the resource like:
+    network = await info.context.Network.fetchNetwork(**kwargs)
+
+    action_form = info.context.RenameNetwork.form(obj=network)
+    return action_form
+
+
 class RenameNetworkAction(actions.Action):
     label = "Rename Network"
     form_class = RenameNetwork
+
+    def get_form_url(self, source, info, **kwargs):
+        return f'/network/action/RenameNetwork?id={source.id}&region={source.region}'
 
 
 NETWORK_ACTIONS = [

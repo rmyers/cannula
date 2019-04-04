@@ -519,7 +519,7 @@ class WTFormsResolver(Resolver):
         return decorator
 
     def _extend_schema(self, query_name: str, mutation_name: str, return_type: str) -> None:
-        self._schema += textwrap.dedent(f'''
+        extra_schema = textwrap.dedent(f'''
             extend type Query {{
                 {query_name}(args: [WTFormQueryArgs]): WTForm
             }}
@@ -527,6 +527,12 @@ class WTFormsResolver(Resolver):
                 {mutation_name}(args: [WTFormQueryArgs], form: WTFJSON): {return_type}
             }}
         ''')
+
+        if self._schema is None:
+            self._schema = extra_schema
+            return
+
+        self._schema += extra_schema
 
     def _get_form_args(self, **kwargs):
         """Return a query list string of key/value pairs from kwargs"""
@@ -549,7 +555,7 @@ class WTFormsResolver(Resolver):
         args_string = self._get_form_args(**kwargs)
         query = textwrap.dedent(f'''
             query form {{
-                {form.query_name}(args: [{args_string}]) {{
+                form: {form.query_name}(args: [{args_string}]) {{
                     {self.query_fragment}
                 }}
             }}
@@ -576,7 +582,7 @@ class WTFormsResolver(Resolver):
 
         query = textwrap.dedent(f'''
             mutation form($form: WTFJSON) {{
-                {form.mutation_name}(args: [{args_string}], form: $form) {{
+                form: {form.mutation_name}(args: [{args_string}], form: $form) {{
                     {return_fields}
                 }}
             }}

@@ -97,6 +97,7 @@ DASHBOARD_QUERY = parse("""
     }
     fragment actionFields on Action {
         label
+        formUrl
         icon
         enabled
         tooltip
@@ -205,6 +206,23 @@ async def do_login(request):
     LOG.info(f'Attempting login for {username}')
     response = await session.login(request, username, password, api)
     return response
+
+
+@app.route('/network/action/{form_name}')
+async def network_action_form_get(request):
+    form_name = request.path_params['form_name']
+    query = network_resolver.get_form_query(form_name, **request.query_params)
+    results = await api.call(
+        query,
+        request=request
+    )
+
+    resp = {
+        'errors': format_errors(results.errors),
+        'data': results.data or {}
+    }
+
+    return JSONResponse(resp)
 
 
 if __name__ == '__main__':

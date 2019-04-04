@@ -17,9 +17,4 @@ type Network {
 
 extend type Query {
   getNetworks(region: String!): [Network]
-  getRenameNetworkForm(id: String!): WTForm
-}
-
-extend type Mutation {
-  renameNetwork(form: String!): Network
 }

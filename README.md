@@ -99,9 +99,9 @@ loop.run_until_complete(main())
 Now you should see the results if you run the sample on the command line:
 
 ```bash
-$ PYTHONPATH=. python3 examples/hello.py
+$ python3 examples/hello.py
 ExecutionResult(data={'hello': {'text': 'Hello, world!'}}, errors=None)
-$ PYTHONPATH=. python3 examples/hello.py Bob
+$ python3 examples/hello.py Bob
 ExecutionResult(data={'hello': {'text': 'Hello, Bob!'}}, errors=None)
 ```
 

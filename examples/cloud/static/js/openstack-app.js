@@ -117,6 +117,7 @@ class OpenstackApp extends LitElement {
         </hx-panel>
       </main>
     </div>
+    <hx-modal id="app-action-modal"></hx-modal>
     `;
   }
 }
