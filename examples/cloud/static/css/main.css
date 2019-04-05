@@ -12,3 +12,15 @@ hx-panel.login {
   padding: 2em;
   background: #e4f9f9
 }
+
+label abbr {
+  color: #eb0000;
+}
+
+.helpText {
+  font-size: .75rem;
+}
+
+form {
+  margin-bottom: 2em;
+}

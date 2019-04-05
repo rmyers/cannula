@@ -24,24 +24,32 @@ class ActionModal extends LitElement {
       });
   }
 
+  createRenderRoot() {
+    return this;
+  }
+
   render() {
     const { form, title } = this;
     const fields = form.fields || [];
     return html`
-        <hx-modal>
-          <h3>${title}</h3>
-          <form class="beta-hxForm" id="action-form-modal">
-            ${fields.map(field => html`
-              <label for=${field.name}>${field.label}</label>
-              <input type=${field.widget.type} value=${field.data} name=${field.name} />
-              ${field.description ? html`<p>${field.description}</p>` : '' }
-            `)}
-          </form>
-          <footer>
-            <button class="hxBtn hxPrimary">Submit</button>
-            <button class="hxBtn">Cancel</button>
-          </footer>
-      `;
+      <h3>${title}</h3>
+      <form class="beta-hxForm" id="action-form-modal">
+        <fieldset>
+          ${fields.map(field => html`
+            <label for=${field.name} class="hxSubdued">
+              <abbr title="required">*</abbr>
+              <span>${field.label}</span>
+              <input class="hxTextCtrl" type=${field.widget.type} value=${field.data} name=${field.name} />
+              ${field.description ? html`<p class="hxSubdued helpText">${field.description}</p>` : '' }
+            </label>
+          `)}
+        </fieldset>
+      </form>
+      <footer>
+        <button class="hxBtn hxPrimary">Submit</button>
+        <button class="hxBtn">Cancel</button>
+      </footer>
+    `;
   }
 }
 
