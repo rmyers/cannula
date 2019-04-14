@@ -8,8 +8,9 @@ import os
 import typing
 
 from graphql import (
-    build_schema,
+    build_ast_schema,
     default_field_resolver,
+    DocumentNode,
     execute,
     ExecutionResult,
     extend_schema,
@@ -23,29 +24,9 @@ from graphql import (
 from cannula.context import Context
 from cannula.helpers import get_root_path
 from cannula.mocks import MockSchemaResolver
+from cannula.schema import build_and_extend_schema
 
 LOG = logging.getLogger(__name__)
-
-# This is the root query that we provide, since the Query type cannot be
-# completely empty we need to provide something that we can extend with
-# the schema you are extending. We also define cacheControl directive for
-# overriding field or objects cache policy.
-ROOT_QUERY = """
-  type Query {
-    _empty: String
-  }
-  type Mutation {
-    _empty: String
-  }
-  enum CacheControlScope {
-    PUBLIC
-    PRIVATE
-  }
-  directive @cacheControl(
-    maxAge: Int
-    scope: CacheControlScope
-  ) on FIELD_DEFINITION | OBJECT | INTERFACE
-"""
 
 
 class Resolver:
@@ -81,16 +62,14 @@ class Resolver:
         api = cannula.API(__name__)
         api.register_resolver(app)
     """
-
-    root_schema = ROOT_QUERY
     # Allow sub-resolvers to apply a base schema before applying custom schema.
-    base_schema = {}
+    base_schema = None
 
     def __init__(
         self,
         name: str,
         graphql_dir: str = 'schema',
-        schema: str = None,
+        schema: typing.Union[str, DocumentNode] = None,
     )-> typing.Any:
         self.registry = collections.defaultdict(dict)
         self.datasources = {}
@@ -111,10 +90,17 @@ class Resolver:
             for listing in files:
                 LOG.debug(f'Loading graphql file: {listing}')
                 with open(os.path.join(_graphql_dir, listing)) as graph:
-                    schemas.append(graph.read())
+                    schemas.append(parse(graph.read()))
 
         if self._schema is not None:
+            if isinstance(self._schema, str):
+                self._schema = parse(self._schema)
             schemas.append(self._schema)
+
+        if self.base_schema is not None:
+            if isinstance(self.base_schema, str):
+                self.base_schema = parse(self.base_schema)
+            schemas.append(self.base_schema)
 
         return schemas
 
@@ -186,14 +172,7 @@ class API(Resolver):
                 graphql_type.resolve_type = custom_resolve_type
 
     def _build_schema(self) -> GraphQLSchema:
-        schema = build_schema(self.root_schema)
-
-        for base, extension in self.base_schema.items():
-            LOG.debug(f'Applying base schema extension {base}')
-            schema = extend_schema(schema, parse(extension))
-
-        for extention in self._graphql_schema:
-            schema = extend_schema(schema, parse(extention))
+        schema = build_and_extend_schema(self._graphql_schema)
 
         schema_validation_errors = validate_schema(schema)
         if schema_validation_errors:
@@ -227,7 +206,6 @@ class API(Resolver):
         This will add in all the datasources/resolvers/schema from the
         sub-resolver.
         """
-        self.base_schema.update(resolver.base_schema)
         self._graphql_schema += resolver.find_graphql_schema()
         self._merge_registry(resolver.registry)
         self.datasources.update(resolver.datasources)
@@ -245,8 +223,7 @@ class API(Resolver):
         """
         field_resolver = self.field_resolver
         if self._mocks:
-            mock_resolver = MockSchemaResolver(self._mock_objects)
-            field_resolver = mock_resolver.field_resolver
+            field_resolver = MockSchemaResolver(self._mock_objects)
 
         validation_errors = validate(self.schema, document)
         if validation_errors:

@@ -50,27 +50,6 @@ Here is a simple example::
 
 
     api.register_resolver(my_resolver)
-
-
-Now you can serialize this form and send that to your front end for rendering,
-you can use the `parse_form_query` that adds the formQueryFragment and parses
-the results to a query document::
-
-    UPDATE_WIDGET_QUERY = forms.parse_form_query('''
-        query getForm($widgetId: String!) {
-            getUpdateWidgetForm(widgetId: $widgetId) {
-                ...formQueryFragment
-            }
-        }
-    ''')
-
-    @route('/widget/<widget_id:str>/update')
-    def update_widget(widget_id):
-        API.call_sync(
-            UPDATE_WIDGET_QUERY,
-            variables={'widgetId': widget_id},
-            request=request
-        )
 """
 
 import textwrap
@@ -84,9 +63,10 @@ except ImportError:
     raise Exception('You must install wtforms to use this module')
 
 from cannula.api import Resolver
+from cannula.utils import gql
 
 
-WTFORMS_SCHEMA = '''
+WTFORMS_SCHEMA = gql('''
 # WTFORMS_SCHEMA
 # --------------
 #
@@ -202,7 +182,7 @@ input WTFormQueryArgs {
     key: String
     value: String
 }
-'''
+''')
 
 FORM_QUERY_FRAGMENT = '''
 fragment formQueryFragment on WTForm {
@@ -474,9 +454,7 @@ class WTFormsDataSource(typing.NamedTuple):
 class WTFormsResolver(Resolver):
 
     query_fragment = '...formQueryFragment'
-    base_schema = {
-        'wtforms': WTFORMS_SCHEMA,
-    }
+    base_schema = WTFORMS_SCHEMA
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

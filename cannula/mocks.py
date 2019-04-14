@@ -57,7 +57,7 @@ class MockSchemaResolver:
 
         return return_value
 
-    async def field_resolver(self, _resource, _info, **kwargs):
+    async def __call__(self, _resource, _info, **kwargs):
         type_name = _info.parent_type.name  # schema type (Query, Mutation)
         field_name = _info.field_name  # The attribute being resolved
         return_type = _info.return_type  # The field type that is being returned.
