@@ -2,18 +2,18 @@ import asyncio
 import typing
 import sys
 
-from graphql.language import parse
-
 import cannula
 
-api = cannula.API(__name__, schema="""
+SCHEMA = cannula.gql("""
   type Message {
     text: String
   }
-  extend type Query {
+  type Query {
     hello(who: String): Message
   }
 """)
+
+api = cannula.API(__name__, schema=SCHEMA)
 
 
 class Message(typing.NamedTuple):
@@ -28,7 +28,7 @@ async def hello(source, info, who):
 
 # Pre-parse your query to speed up your requests. Here is an example of how
 # to pass arguments to your query functions.
-SAMPLE_QUERY = parse("""
+SAMPLE_QUERY = cannula.gql("""
   query HelloWorld ($who: String!) {
     hello(who: $who) {
       text

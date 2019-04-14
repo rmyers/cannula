@@ -1,12 +1,14 @@
 import collections
 import logging
+import functools
+import json
 import os
 import sys
 
 import bottle
 import cannula
 from cannula.datasource import forms
-from graphql import parse
+from graphql import parse, DocumentNode
 
 from starlette import status
 from starlette.applications import Starlette
@@ -27,6 +29,7 @@ from resolvers.volume import volume_resolver
 PORT = os.getenv('PORT', '8081')
 STATIC = os.path.join(os.getcwd(), 'static')
 USE_MOCKS = bool(os.getenv('USE_MOCKS', False))
+CURRENT_DIR = os.path.abspath(os.path.dirname(__file__))
 
 logging.basicConfig(level=logging.DEBUG)
 templates = Jinja2Templates(directory='templates')
@@ -78,92 +81,13 @@ def format_errors(errors):
     return formatted_errors
 
 
-DASHBOARD_QUERY = parse("""
-    # This is a fragment for our quota charts so we don't have to repeat it.
-    fragment quotaFields on QuotaChartData {
-        datasets {
-            data
-            backgroundColor
-        }
-        labels
-    }
-    # Status fragment for our resources
-    fragment statusFields on ApplicationStatus {
-        label
-        color
-        working
-        icon
-        tooltip
-    }
-    fragment actionFields on Action {
-        label
-        formUrl
-        icon
-        enabled
-        tooltip
-    }
-    query main ($region: String!) {
-        serverQuota: quotaChartData(resource: "ComputeServers") {
-            ...quotaFields
-        }
-        networkQuota: quotaChartData(resource: "Networks") {
-            ...quotaFields
-        }
-        volumeQuota: quotaChartData(resource: "Volumes") {
-            ...quotaFields
-        }
-        resources: resources(region: $region) {
-            __typename
-            ... on ComputeServer {
-                name
-                id
-                appStatus {
-                    ...statusFields
-                }
-            }
-            ... on Network {
-                name
-                id
-                appStatus {
-                    ...statusFields
-                }
-                appActions {
-                    ...actionFields
-                }
-            }
-            ... on Volume {
-                name
-                id
-                appStatus {
-                    ...statusFields
-                }
-                appActions {
-                    ...actionFields
-                }
-            }
-        }
-        images: computeImages(region: $region) {
-            name
-            minRam
-        }
-        flavors: computeFlavors(region: $region) {
-            name
-            ram
-        }
-        nav: getNavigation(active: "dashboard") {
-            title
-            items {
-                active
-                icon
-                url
-                name
-                className
-                enabled
-                disabledMessage
-            }
-        }
-    }
-""")
+@functools.lru_cache(maxsize=128)
+def load_query(query_name: str) -> DocumentNode:
+    path = f'{CURRENT_DIR}/queries/{query_name}.graphql'
+    assert os.path.isfile(path), f"No query found for {query_name}"
+
+    with open(path) as query:
+        return parse(query.read())
 
 
 app = Starlette(debug=True)
@@ -174,7 +98,7 @@ app.mount('/static', StaticFiles(directory='static'), name='static')
 async def dashboard(request):
     if 'xhr' in request.query_params:
         results = await api.call(
-            DASHBOARD_QUERY,
+            load_query('dashboard'),
             variables={'region': 'us-east'},
             request=request
         )
@@ -190,6 +114,28 @@ async def dashboard(request):
         return RedirectResponse('/')
 
     return templates.TemplateResponse('index.html', {'request': request})
+
+
+@app.route('/simple')
+async def simple(request):
+    if 'xhr' in request.query_params:
+        results = await api.call(
+            load_query('simple'),
+            variables={'region': 'us-east'},
+            request=request
+        )
+
+        resp = {
+            'errors': format_errors(results.errors),
+            'data': results.data or {}
+        }
+
+        return JSONResponse(resp)
+
+    if not session.is_authenticated(request):
+        return RedirectResponse('/')
+
+    return templates.TemplateResponse('simple.html', {'request': request})
 
 
 @app.route('/')

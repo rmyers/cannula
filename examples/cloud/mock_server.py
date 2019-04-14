@@ -455,6 +455,10 @@ def server_create(project_id):
     flavor_id = request.json['server']['flavorRef']
     name = request.json['server']['name']
     response.status = 202
+    return create_new_server(project_id, image_id, flavor_id, name)
+
+
+def create_new_server(project_id, image_id, flavor_id, name):
     server_id = get_id()
     new_server = {"server": {
         "status": "ACTIVE",
@@ -667,6 +671,10 @@ def root():
         ]
       }
     }
+
+
+for server_id in SERVER_IDS:
+    create_new_server('fake', IMAGES[0].get('id'), FLAVORS[0].get('id'), server_id)
 
 
 LOG.info(f'starting mock openstack server on {PORT}')

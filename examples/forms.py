@@ -23,6 +23,12 @@ my_resolver = cannula.datasource.forms.WTFormsResolver(__name__, schema='''
         name: String
         price: Float
     }
+    type Query {
+        _empty: String
+    }
+    type Mutation {
+        _empty: String
+    }
 ''')
 
 

@@ -13,11 +13,9 @@ You can change the `schema` or `sample_query` as well to see how the data
 automatically changes too.
 """
 
-from graphql.language import parse
-
 import cannula
 
-schema = """
+schema = cannula.gql("""
   type Veggy {
     name: String
     id: ID
@@ -36,13 +34,13 @@ schema = """
     id: ID
     brocoli: Brocoli
   }
-  extend type Query {
-    mockity(input: String): [Message]
+  type Query {
+    mockity: [Message]
   }
-"""
+""")
 
-sample_query = parse("""{
-  mockity(input: "ignored") {
+sample_query = cannula.gql("""{
+  mockity {
     text
     number
     float
@@ -69,6 +67,10 @@ print(f'\nDEFAULT:\n{default.call_sync(sample_query)}')
 custom_mocks = {
   'String': 'This will be used for all Strings',
   'Int': 42,
+  'Veggy': {
+    'name': "HOT STUFF",
+    'id': "999999"
+  }
 }
 
 custom = cannula.API(__name__, schema=schema, mocks=True, mock_objects=custom_mocks)

@@ -1,0 +1,30 @@
+# Status fragment for our resources
+fragment statusFields on ApplicationStatus {
+  label
+  color
+  working
+  icon
+  tooltip
+}
+
+query main ($region: String!) {
+  resources: computeServers(region: $region) {
+    name
+    id
+    appStatus {
+      ...statusFields
+    }
+  }
+  nav: getNavigation(active: "dashboard") {
+    title
+    items {
+      active
+      icon
+      url
+      name
+      className
+      enabled
+      disabledMessage
+    }
+  }
+}
