@@ -24,7 +24,7 @@ from graphql import (
 from cannula.context import Context
 from cannula.helpers import get_root_path
 from cannula.mocks import MockSchemaResolver
-from cannula.schema import build_and_extend_schema
+from cannula.schema import build_and_extend_schema, load_schema, maybe_parse
 
 LOG = logging.getLogger(__name__)
 
@@ -63,7 +63,7 @@ class Resolver:
         api.register_resolver(app)
     """
     # Allow sub-resolvers to apply a base schema before applying custom schema.
-    base_schema = None
+    base_schema = {}
 
     def __init__(
         self,
@@ -77,7 +77,7 @@ class Resolver:
         self.root_dir = get_root_path(name)
         self._schema = schema
 
-    def find_graphql_schema(self)-> [str]:
+    def find_graphql_schema(self)-> [DocumentNode]:
         _graphql_dir = self.graphql_dir
         if not os.path.isabs(_graphql_dir):
             _graphql_dir = os.path.join(self.root_dir, self.graphql_dir)
@@ -85,22 +85,10 @@ class Resolver:
         schemas = []
         if os.path.isdir(_graphql_dir):
             LOG.debug(f'Searching {_graphql_dir} for schema.')
-            files = os.listdir(_graphql_dir)
-            files.sort()
-            for listing in files:
-                LOG.debug(f'Loading graphql file: {listing}')
-                with open(os.path.join(_graphql_dir, listing)) as graph:
-                    schemas.append(parse(graph.read()))
+            schemas = load_schema(_graphql_dir)
 
         if self._schema is not None:
-            if isinstance(self._schema, str):
-                self._schema = parse(self._schema)
-            schemas.append(self._schema)
-
-        if self.base_schema is not None:
-            if isinstance(self.base_schema, str):
-                self.base_schema = parse(self.base_schema)
-            schemas.append(self.base_schema)
+            schemas.append(maybe_parse(self._schema))
 
         return schemas
 
@@ -149,13 +137,13 @@ class API(Resolver):
         self._graphql_schema = self.find_graphql_schema()
 
     @property
-    def schema(self):
+    def schema(self) -> GraphQLSchema:
         if not hasattr(self, '_full_schema'):
             self._full_schema = self._build_schema()
             self.fix_abstract_resolve_type(self._full_schema)
         return self._full_schema
 
-    def fix_abstract_resolve_type(self, schema):
+    def fix_abstract_resolve_type(self, schema: GraphQLSchema) -> None:
         # We need to provide a custom 'resolve_type' since the default
         # in method only checks for __typename if the source is a dict.
         # Python mangles the variable name if it starts with `__` so we add
@@ -172,7 +160,8 @@ class API(Resolver):
                 graphql_type.resolve_type = custom_resolve_type
 
     def _build_schema(self) -> GraphQLSchema:
-        schema = build_and_extend_schema(self._graphql_schema)
+        ast_documents = self._graphql_schema + list(self.base_schema.values())
+        schema = build_and_extend_schema(ast_documents)
 
         schema_validation_errors = validate_schema(schema)
         if schema_validation_errors:
@@ -206,6 +195,7 @@ class API(Resolver):
         This will add in all the datasources/resolvers/schema from the
         sub-resolver.
         """
+        self.base_schema.update(resolver.base_schema)
         self._graphql_schema += resolver.find_graphql_schema()
         self._merge_registry(resolver.registry)
         self.datasources.update(resolver.datasources)

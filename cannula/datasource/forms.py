@@ -55,7 +55,8 @@ Here is a simple example::
 import textwrap
 import typing
 
-from graphql import parse
+from graphql import parse, concat_ast
+
 try:
     import wtforms
     from wtforms.widgets import html5
@@ -76,7 +77,9 @@ WTFORMS_SCHEMA = gql('''
 
 union WTField = WTFormField | WTFieldList | WTFBaseField
 
-"Represents a JSON field to allow arbitrary key/value pairs"
+"""
+Represents a JSON field to allow arbitrary key/value pairs.
+"""
 scalar WTFJSON
 
 """
@@ -121,7 +124,9 @@ type WTFSelectWidget {
     multiple: Boolean
 }
 
-"Encapsulate an ordered list of multiple instances of the same field type, keeping data as a list."
+"""
+Encapsulate an ordered list of multiple instances of the same field type, keeping data as a list.
+"""
 type WTFieldList {
     name: String!
     label: String
@@ -177,14 +182,16 @@ type WTForm {
     errors: [String]
 }
 
-"Input arguments used to pass arguments to the resolver function"
+"""
+Input arguments used to pass arguments to the resolver function.
+"""
 input WTFormQueryArgs {
     key: String
     value: String
 }
 ''')
 
-FORM_QUERY_FRAGMENT = '''
+FORM_QUERY_FRAGMENT = gql('''
 fragment formQueryFragment on WTForm {
     action
     method
@@ -266,7 +273,7 @@ fragment baseFieldQuery on WTFBaseField {
     data
     errors
 }
-'''
+''')
 
 
 class Wrapper:
@@ -454,7 +461,9 @@ class WTFormsDataSource(typing.NamedTuple):
 class WTFormsResolver(Resolver):
 
     query_fragment = '...formQueryFragment'
-    base_schema = WTFORMS_SCHEMA
+    base_schema = {
+        'wtforms': WTFORMS_SCHEMA
+    }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -497,7 +506,7 @@ class WTFormsResolver(Resolver):
         return decorator
 
     def _extend_schema(self, query_name: str, mutation_name: str, return_type: str) -> None:
-        extra_schema = textwrap.dedent(f'''
+        extra_schema = gql(f'''
             extend type Query {{
                 {query_name}(args: [WTFormQueryArgs]): WTForm
             }}
@@ -506,11 +515,13 @@ class WTFormsResolver(Resolver):
             }}
         ''')
 
-        if self._schema is None:
-            self._schema = extra_schema
+        if self._schema is not None:
+            if isinstance(self._schema, str):
+                self._schema = parse(self._schema)
+            self._schema = concat_ast([self._schema, extra_schema])
             return
 
-        self._schema += extra_schema
+        self._schema = extra_schema
 
     def _get_form_args(self, **kwargs):
         """Return a query list string of key/value pairs from kwargs"""
@@ -531,15 +542,14 @@ class WTFormsResolver(Resolver):
             form_args.append({'key': arg, 'value': kwargs[arg]})
 
         args_string = self._get_form_args(**kwargs)
-        query = textwrap.dedent(f'''
+        query = gql(f'''
             query form {{
                 form: {form.query_name}(args: [{args_string}]) {{
                     {self.query_fragment}
                 }}
             }}
-            {FORM_QUERY_FRAGMENT}
         ''')
-        return parse(query)
+        return concat_ast([query, FORM_QUERY_FRAGMENT])
 
     def get_form_mutation(self, name, **kwargs):
         form = self.get_form(name)
@@ -556,17 +566,15 @@ class WTFormsResolver(Resolver):
         needs_query_fragment = form.return_type == 'WTForm'
 
         return_fields = self.query_fragment if needs_query_fragment else form.return_fields
-        query_fragment = FORM_QUERY_FRAGMENT if needs_query_fragment else ''
 
-        query = textwrap.dedent(f'''
+        query = gql(f'''
             mutation form($form: WTFJSON) {{
                 form: {form.mutation_name}(args: [{args_string}], form: $form) {{
                     {return_fields}
                 }}
             }}
-            {query_fragment}
         ''')
-        return parse(query)
+        return concat_ast([query, FORM_QUERY_FRAGMENT]) if needs_query_fragment else query
 
 
 def unwrap_args(form_query_argument_list):
