@@ -4,7 +4,7 @@ type Dataset {
   label: String
 }
 
-type QuotaChartData @cacheControl(maxAge: 5000) {
+type QuotaChartData {
   datasets: [Dataset]
   labels: [String]
 }
