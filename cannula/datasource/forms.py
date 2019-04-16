@@ -392,10 +392,6 @@ class FieldWrapper(Wrapper):
             yield OptionWrapper(value, label, selected)
 
 
-def parse_form_query(query_doc):
-    return parse(query_doc + FORM_QUERY_FRAGMENT)
-
-
 class FormDataWrapper(Wrapper):
     """Form Data Wrapper
 
