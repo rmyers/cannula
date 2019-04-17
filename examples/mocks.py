@@ -14,6 +14,7 @@ automatically changes too.
 """
 
 import cannula
+from cannula.middleware import MockMiddleware
 
 schema = cannula.gql("""
   type Veggy {
@@ -58,7 +59,13 @@ sample_query = cannula.gql("""{
 }
 """)
 
-default = cannula.API(__name__, schema=schema, mocks=True)
+default = cannula.API(
+  __name__,
+  schema=schema,
+  middleware=[
+    MockMiddleware(),
+  ],
+)
 
 
 print(f'\nDEFAULT:\n{default.call_sync(sample_query)}')
@@ -73,6 +80,14 @@ custom_mocks = {
   }
 }
 
-custom = cannula.API(__name__, schema=schema, mocks=True, mock_objects=custom_mocks)
+custom = cannula.API(
+  __name__,
+  schema=schema,
+  middleware=[
+    MockMiddleware(
+      mock_objects=custom_mocks
+    ),
+  ],
+)
 
 print(f'\nCUSTOM:\n{custom.call_sync(sample_query)}')

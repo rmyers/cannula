@@ -23,7 +23,6 @@ from graphql import (
 
 from cannula.context import Context
 from cannula.helpers import get_root_path
-from cannula.mocks import MockSchemaResolver
 from cannula.schema import build_and_extend_schema, load_schema, maybe_parse
 
 LOG = logging.getLogger(__name__)
@@ -68,24 +67,28 @@ class Resolver:
     def __init__(
         self,
         name: str,
-        graphql_dir: str = 'schema',
+        graphql_directory: str = 'schema',
         schema: typing.Union[str, DocumentNode] = None,
     )-> typing.Any:
         self.registry = collections.defaultdict(dict)
         self.datasources = {}
-        self.graphql_dir = graphql_dir
+        self._graphql_directory = graphql_directory
         self.root_dir = get_root_path(name)
         self._schema = schema
 
-    def find_graphql_schema(self)-> [DocumentNode]:
-        _graphql_dir = self.graphql_dir
-        if not os.path.isabs(_graphql_dir):
-            _graphql_dir = os.path.join(self.root_dir, self.graphql_dir)
+    @property
+    def graphql_directory(self):
+        if not hasattr(self, '_schema_dir'):
+            if os.path.isabs(self._graphql_directory):
+                setattr(self, '_schema_dir', self._graphql_directory)
+            setattr(self, '_schema_dir', os.path.join(self.root_dir, self._graphql_directory))
+        return self._schema_dir
 
+    def find_graphql_schema(self)-> [DocumentNode]:
         schemas = []
-        if os.path.isdir(_graphql_dir):
-            LOG.debug(f'Searching {_graphql_dir} for schema.')
-            schemas = load_schema(_graphql_dir)
+        if os.path.isdir(self.graphql_directory):
+            LOG.debug(f'Searching {self.graphql_directory} for schema.')
+            schemas = load_schema(self.graphql_directory)
 
         if self._schema is not None:
             schemas.append(maybe_parse(self._schema))
@@ -124,16 +127,15 @@ class API(Resolver):
     def __init__(
         self,
         *args,
+        resolvers: typing.List[Resolver] = [],
         context: Context = Context,
-        mocks: bool = False,
-        mock_objects: typing.Dict = {},
+        middleware: typing.List[typing.Any] = [],
         **kwargs,
-    )-> typing.Any:
+    ) -> typing.Any:
         super().__init__(*args, **kwargs)
         self._context = context
-        self._mocks = mocks
-        self._mock_objects = mock_objects
-        self._subresolvers = []
+        self._resolvers = resolvers
+        self._middleware = middleware
         self._graphql_schema = self.find_graphql_schema()
 
     @property
@@ -211,10 +213,6 @@ class API(Resolver):
         This is meant to be called in an asyncio.loop, if you are using a
         web framework that is synchronous use the `call_sync` method.
         """
-        field_resolver = self.field_resolver
-        if self._mocks:
-            field_resolver = MockSchemaResolver(self._mock_objects)
-
         validation_errors = validate(self.schema, document)
         if validation_errors:
             return ExecutionResult(data=None, errors=validation_errors)
@@ -225,7 +223,8 @@ class API(Resolver):
             document=document,
             context_value=context,
             variable_values=variables,
-            field_resolver=field_resolver
+            field_resolver=self.field_resolver,
+            middleware=self._middleware,
         )
         if inspect.isawaitable(result):
             return await result

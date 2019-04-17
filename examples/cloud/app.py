@@ -1,6 +1,7 @@
 import collections
 import logging
 import functools
+import inspect
 import json
 import os
 import sys
@@ -8,7 +9,7 @@ import sys
 import bottle
 import cannula
 from cannula.datasource import forms
-from graphql import parse, DocumentNode
+from graphql import parse, DocumentNode, GraphQLResolveInfo
 
 from starlette import status
 from starlette.applications import Starlette
@@ -44,15 +45,23 @@ mock_objects = {
     }
 }
 
-api = cannula.API(__name__, context=session.OpenStackContext, mocks=USE_MOCKS, mock_objects=mock_objects)
+api = cannula.API(
+    __name__,
+    resolvers=[
+        application_resolver,
+        compute_resolver,
+        identity_resolver,
+        network_resolver,
+        volume_resolver,
+        dashboard_resolver,
+    ],
+    context=session.OpenStackContext,
+    middleware=[
+        # mocky,
+    ],
+)
 
 # Order matters for these applications you extend
-api.register_resolver(application_resolver)
-api.register_resolver(compute_resolver)
-api.register_resolver(identity_resolver)
-api.register_resolver(network_resolver)
-api.register_resolver(volume_resolver)
-api.register_resolver(dashboard_resolver)
 
 
 def format_errors(errors):
@@ -146,7 +155,6 @@ async def login(request):
 @app.route('/', methods=['POST'])
 async def do_login(request):
     form = await request.form()
-    LOG.info(f'{form}: {dir(form)}')
     username = form.get('username')
     password = form.get('password')
     LOG.info(f'Attempting login for {username}')
