@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import requests
 
-from cannula.context import Context
+from .context import Context
 
 LOG = logging.getLogger('cannula.datasource.http')
 MAX_WORKERS = int(os.getenv('CANNULA_HTTP_MAX_WORKERS', 4))

@@ -62,8 +62,8 @@ try:
 except ImportError:
     raise Exception('You must install wtforms to use this module')
 
-from cannula.api import Resolver
-from cannula.utils import gql
+from .api import Resolver
+from .utils import gql
 
 
 WTFORMS_SCHEMA = gql('''

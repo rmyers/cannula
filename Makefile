@@ -1,18 +1,18 @@
 #% _________________________________________________
-#%  _____ _____ _____ _____ _____ _____ _____ _____
-#% |   __|   __|  _  |_   _|  |  | __  |   __|   __|
-#% |   __|   __|     | | | |  |  |    -|   __|__   |
-#% |__|  |_____|__|__| |_| |_____|__|__|_____|_____|
+#%      _________    _   ___   ____  ____    ___
+#%     / ____/   |  / | / / | / / / / / /   /   |
+#%    / /   / /| | /  |/ /  |/ / / / / /   / /| |
+#%   / /___/ ___ |/ /|  / /|  / /_/ / /___/ ___ |
+#%   \____/_/  |_/_/ |_/_/ |_/\____/_____/_/  |_|
 #% _________________________________________________
 #%
-#% Tools for building, running, and testing cannula
+#% Tools for building, running, and testing cannula.
 #%
 #% Usage:
 #%   make <command>
 #%
-#% Start up the developer tools locally:
-#%   make build
-#%   make dev
+#% Getting Started:
+#%   make setup
 #%
 #% Run the tests locally (requires Python >= 3.6):
 #%   make test
@@ -34,8 +34,8 @@ else
 endif
 
 .SILENT: help
-.PHONY: setup build run dev docs clean
-.PHONY: test flake8 unit inttest integration
+.PHONY: setup docs clean
+.PHONY: test flake8 unit
 .PHONY: help
 
 default: help
@@ -78,7 +78,7 @@ run-tests: .coverage
 
 watch:  ## Watch for changes to python modules and re-run the tests
 	@rm -f .coverage
-	@while true; do $(MAKE) --no-print-directory -q run-tests || $(MAKE) run-tests; sleep 0.5; done
+	@while true; do $(MAKE) --no-print-directory -q run-tests || $(MAKE) run-tests; sleep 5; done
 
 #% Available Commands:
 help: ## Help is on the way

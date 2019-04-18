@@ -54,11 +54,9 @@ import asyncio
 import typing
 import sys
 
-from graphql.language import parse
-
 import cannula
 
-api = cannula.API(__name__, schema="""
+api = cannula.API(__name__, schema=cannula.gql("""
   type Message {
     text: String
   }
@@ -78,7 +76,7 @@ async def hello(source, info, who):
 
 # Pre-parse your query to speed up your requests. Here is an example of how
 # to pass arguments to your query functions.
-SAMPLE_QUERY = parse("""
+SAMPLE_QUERY = cannula.gql("""
   query HelloWorld ($who: String!) {
     hello(who: $who) {
       text
@@ -110,10 +108,10 @@ ExecutionResult(data={'hello': {'text': 'Hello, Bob!'}}, errors=None)
 But what about Django integration or flask?
 
 ```python
-
+import cannula
 from django.contrib.auth.models import User
 
-schema = """
+schema = cannula.gql("""
   type User {
     username: String   # Only expose the fields you actually use
     first_name: String
@@ -123,7 +121,7 @@ schema = """
   extend type Query {
     getUserById(user_id: String): User
   }
-"""
+""")
 
 @api.query()
 async def getUserById(source, info, user_id):
