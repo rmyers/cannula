@@ -13,3 +13,5 @@ __all__ = [
     'Resolver',
     'gql',
 ]
+
+__VERSION__ = '0.0.2'

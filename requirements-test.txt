@@ -1,0 +1,10 @@
+-r requirements.txt
+coverage==4.5.2
+wsgi_intercept==1.8.0
+flake8==3.7.5
+
+# flake8 deps
+mccabe==0.6.1
+pycodestyle==2.5.0
+pyflakes==2.1.0
+entrypoints==0.3
