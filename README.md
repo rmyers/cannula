@@ -1,5 +1,7 @@
 # Cannula
 
+[![CircleCI](https://circleci.com/gh/rmyers/cannula.svg?style=svg)](https://circleci.com/gh/rmyers/cannula)
+
 > GraphQL for people who like Python!
 
 * [Why Cannula](#why)
