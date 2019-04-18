@@ -66,9 +66,9 @@ flake8: setup ## Run flake8 checks
 
 unit: setup ## Run unit tests
 	$(VIRTUAL_ENV)/bin/coverage erase
-	FAKE_MODE=True UNITTEST_RUN=True CACHE_URL=cache://localhost $(VIRTUAL_ENV)/bin/coverage run --branch --source=cannula -m unittest
+	$(VIRTUAL_ENV)/bin/coverage run --branch --source=cannula -m unittest
 	$(VIRTUAL_ENV)/bin/coverage html
-	$(VIRTUAL_ENV)/bin/coverage report -m --fail-under=100
+	$(VIRTUAL_ENV)/bin/coverage report -m
 
 .coverage: $(PYTHON_MODULES)
 	@touch .coverage # Create the .coverage file to catch errors in test setup

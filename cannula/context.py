@@ -10,5 +10,5 @@ class Context:
     def __init__(self, request: typing.Any):
         self.request = self.handle_request(request)
 
-    def handle_request(self, request: typing.Any)-> typing.Any:
+    def handle_request(self, request: typing.Any) -> typing.Any:
         return request

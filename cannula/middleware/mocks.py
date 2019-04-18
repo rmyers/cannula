@@ -22,7 +22,8 @@ DEFAULT_MOCKS = {
 
 class MockMiddleware:
 
-    def __init__(self,
+    def __init__(
+        self,
         mock_objects: typing.Dict[str, MockObjectTypes] = {},
         mock_all: bool = True,
         mock_object_header: str = 'X-Mock-Objects',

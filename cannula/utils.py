@@ -1,5 +1,3 @@
-import typing
-
 from graphql import parse, DocumentNode
 
 

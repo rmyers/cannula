@@ -52,7 +52,6 @@ Here is a simple example::
     api.register_resolver(my_resolver)
 """
 
-import textwrap
 import typing
 
 from graphql import parse, concat_ast

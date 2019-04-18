@@ -8,22 +8,19 @@ import os
 import typing
 
 from graphql import (
-    build_ast_schema,
     default_field_resolver,
     DocumentNode,
     execute,
     ExecutionResult,
-    extend_schema,
     GraphQLSchema,
     GraphQLUnionType,
-    parse,
     validate_schema,
     validate,
 )
 
-from cannula.context import Context
-from cannula.helpers import get_root_path
-from cannula.schema import build_and_extend_schema, load_schema, maybe_parse
+from .context import Context
+from .helpers import get_root_path
+from .schema import build_and_extend_schema, load_schema, maybe_parse
 
 LOG = logging.getLogger(__name__)
 
@@ -97,7 +94,7 @@ class Resolver:
 
         return schemas
 
-    def resolver(self, type_name: str = 'Query')-> typing.Any:
+    def resolver(self, type_name: str = 'Query') -> typing.Any:
         def decorator(function):
             self.registry[type_name][function.__name__] = function
         return decorator
@@ -209,7 +206,7 @@ class API(Resolver):
         document: GraphQLSchema,
         request: typing.Any = None,
         variables: typing.Dict[str, typing.Any] = None
-    )-> ExecutionResult:
+    ) -> ExecutionResult:
         """Preform a query against the schema.
 
         This is meant to be called in an asyncio.loop, if you are using a
@@ -237,7 +234,7 @@ class API(Resolver):
         document: GraphQLSchema,
         request: typing.Any = None,
         variables: typing.Dict[str, typing.Any] = None
-    )-> ExecutionResult:
+    ) -> ExecutionResult:
         loop = asyncio.get_event_loop()
         return loop.run_until_complete(self.call(document, request, variables))
 

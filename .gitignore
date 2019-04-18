@@ -4,3 +4,5 @@ build
 dist
 .mypy_cache
 .venv
+.coverage
+htmlcov

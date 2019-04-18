@@ -150,7 +150,7 @@ class HTTPDataSource:
         self,
         response: requests.Response,
         request: Request
-    )-> typing.Any:
+    ) -> typing.Any:
         response.raise_for_status()
         return response.json(object_hook=self.convert_to_object)
 
@@ -174,7 +174,7 @@ class HTTPDataSource:
         method: str,
         path: str,
         body: typing.Any = None
-    )-> typing.Awaitable:
+    ) -> typing.Awaitable:
         url = self.get_request_url(path)
 
         request = Request(url, method, body)
