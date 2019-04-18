@@ -62,14 +62,16 @@ class Resolver:
         api.register_resolver(app)
     """
     # Allow sub-resolvers to apply a base schema before applying custom schema.
-    base_schema = {}
+    base_schema: typing.Dict[str, DocumentNode] = {}
+    registry: typing.Dict[str, dict]
+    datasources: typing.Dict[str, typing.Any]
 
     def __init__(
         self,
         name: str,
         graphql_directory: str = 'schema',
         schema: typing.Union[str, DocumentNode] = None,
-    )-> typing.Any:
+    ):
         self.registry = collections.defaultdict(dict)
         self.datasources = {}
         self._graphql_directory = graphql_directory
@@ -84,8 +86,8 @@ class Resolver:
             setattr(self, '_schema_dir', os.path.join(self.root_dir, self._graphql_directory))
         return self._schema_dir
 
-    def find_graphql_schema(self)-> [DocumentNode]:
-        schemas = []
+    def find_graphql_schema(self) -> typing.List[DocumentNode]:
+        schemas: typing.List[DocumentNode] = []
         if os.path.isdir(self.graphql_directory):
             LOG.debug(f'Searching {self.graphql_directory} for schema.')
             schemas = load_schema(self.graphql_directory)
@@ -128,10 +130,10 @@ class API(Resolver):
         self,
         *args,
         resolvers: typing.List[Resolver] = [],
-        context: Context = Context,
+        context: typing.Any = Context,
         middleware: typing.List[typing.Any] = [],
         **kwargs,
-    ) -> typing.Any:
+    ):
         super().__init__(*args, **kwargs)
         self._context = context
         self._resolvers = resolvers

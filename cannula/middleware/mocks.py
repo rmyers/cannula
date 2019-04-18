@@ -26,7 +26,7 @@ class MockMiddleware:
         mock_objects: typing.Dict[str, MockObjectTypes] = {},
         mock_all: bool = True,
         mock_object_header: str = 'X-Mock-Objects',
-    ) -> typing.Any:
+    ):
         self.mock_all = mock_all
         self.mock_object_header = mock_object_header
         self._mock_objects = mock_objects

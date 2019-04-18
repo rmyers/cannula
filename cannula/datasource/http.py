@@ -78,7 +78,7 @@ class Request(typing.NamedTuple):
 class HTTPDataSource:
 
     # The base url of this resource
-    base_url: str = None
+    base_url: typing.Optional[str] = None
     # A mapping of requests using the cache_key_for_request. Multiple resolvers
     # could attempt to fetch the same resource, using this we can limit to at
     # most one request per cache key.
@@ -92,9 +92,9 @@ class HTTPDataSource:
 
     # Resource name for the type that this datasource returns by default this
     # will use the class name of the datasource.
-    resource_name: str = None
+    resource_name: typing.Optional[str] = None
 
-    def __init__(self, context):
+    def __init__(self, context: typing.Any):
         self.context = context
         self.memoized_requests = {}
         self.assert_has_http_session(context)
