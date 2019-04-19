@@ -13,8 +13,12 @@ You can change the `schema` or `sample_query` as well to see how the data
 automatically changes too.
 """
 
+import logging
+
 import cannula
-from cannula.middleware import MockMiddleware
+from cannula.middleware import MockMiddleware, DebugMiddleware
+
+logging.basicConfig(level=logging.DEBUG)
 
 schema = cannula.gql("""
   type Veggy {
@@ -64,6 +68,7 @@ default = cannula.API(
   schema=schema,
   middleware=[
     MockMiddleware(),
+    DebugMiddleware(),
   ],
 )
 

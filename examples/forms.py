@@ -79,8 +79,9 @@ async def postUpdateWidgetForm(source, info, args, form=None):
     return update_form
 
 
-api = cannula.API(__name__)
-api.register_resolver(my_resolver)
+api = cannula.API(__name__, resolvers=[
+    my_resolver
+])
 
 
 results = api.call_sync(

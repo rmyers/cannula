@@ -1,8 +1,9 @@
-import asyncio
+import logging
 import typing
 import sys
 
 import cannula
+from cannula.middleware import DebugMiddleware
 
 SCHEMA = cannula.gql("""
   type Message {
@@ -13,7 +14,9 @@ SCHEMA = cannula.gql("""
   }
 """)
 
-api = cannula.API(__name__, schema=SCHEMA)
+logging.basicConfig(level=logging.DEBUG)
+
+api = cannula.API(__name__, schema=SCHEMA, middleware=[DebugMiddleware()])
 
 
 class Message(typing.NamedTuple):

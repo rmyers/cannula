@@ -5,6 +5,7 @@ import typing
 
 from graphql import (
     GraphQLSchema,
+    GraphQLUnionType,
     DocumentNode,
     parse,
     build_ast_schema,
@@ -12,11 +13,9 @@ from graphql import (
     concat_ast,
 )
 
-from cannula.utils import gql
-
 LOG = logging.getLogger(__name__)
-QUERY_TYPE = gql('type Query { _empty: String }')
-MUTATION_TYPE = gql('type Mutation { _empty: String }')
+QUERY_TYPE = parse("type Query { _empty: String }")
+MUTATION_TYPE = parse("type Mutation { _empty: String }")
 
 object_definition_kind = 'object_type_definition'
 object_extension_kind = 'object_type_extension'
@@ -70,10 +69,12 @@ def maybe_parse(type_def: typing.Union[str, DocumentNode]):
 
 
 def build_and_extend_schema(
-    type_defs: typing.Union[str, typing.List[str], DocumentNode, typing.List[DocumentNode]],
+    type_defs: typing.Union[
+        typing.List[str],
+        typing.List[DocumentNode],
+        typing.Iterator[DocumentNode],
+    ],
 ) -> GraphQLSchema:
-    if not isinstance(type_defs, list):
-        type_defs = [type_defs]
 
     document_list = [maybe_parse(type_def) for type_def in type_defs]
 
@@ -92,6 +93,25 @@ def build_and_extend_schema(
     return schema
 
 
+def fix_abstract_resolve_type(schema: GraphQLSchema) -> GraphQLSchema:
+    # We need to provide a custom 'resolve_type' since the default
+    # in method only checks for __typename if the source is a dict.
+    # Python mangles the variable name if it starts with `__` so we add
+    # `__typename__` attribute which is not mangled.
+    # TODO(rmyers): submit PR to fix upstream?
+
+    def custom_resolve_type(source, _info):
+        if isinstance(source, dict):
+            return str(source.get('__typename'))
+        return getattr(source, '__typename__', None)
+
+    for _type_name, graphql_type in schema.type_map.items():
+        if isinstance(graphql_type, GraphQLUnionType):
+            graphql_type.resolve_type = custom_resolve_type
+
+    return schema
+
+
 def load_schema(directory: str) -> typing.List[DocumentNode]:
     assert os.path.isdir(directory), f'Directory not found: {directory}'
     path = pathlib.Path(directory)
@@ -101,4 +121,4 @@ def load_schema(directory: str) -> typing.List[DocumentNode]:
             with open(os.path.join(directory, graph)) as graphfile:
                 yield graphfile.read()
 
-    return [parse(gql) for gql in find_graphql_files()]
+    return [parse(schema) for schema in find_graphql_files()]

@@ -8,19 +8,22 @@ import os
 import typing
 
 from graphql import (
-    default_field_resolver,
     DocumentNode,
     execute,
     ExecutionResult,
     GraphQLSchema,
-    GraphQLUnionType,
     validate_schema,
     validate,
 )
 
 from .context import Context
 from .helpers import get_root_path
-from .schema import build_and_extend_schema, load_schema, maybe_parse
+from .schema import (
+    build_and_extend_schema,
+    fix_abstract_resolve_type,
+    load_schema,
+    maybe_parse,
+)
 
 LOG = logging.getLogger(__name__)
 
@@ -83,7 +86,7 @@ class Resolver:
             setattr(self, '_schema_dir', os.path.join(self.root_dir, self._graphql_directory))
         return self._schema_dir
 
-    def find_graphql_schema(self) -> typing.List[DocumentNode]:
+    def find_schema(self) -> typing.List[DocumentNode]:
         schemas: typing.List[DocumentNode] = []
         if os.path.isdir(self.graphql_directory):
             LOG.debug(f'Searching {self.graphql_directory} for schema.')
@@ -135,40 +138,49 @@ class API(Resolver):
         self._context = context
         self._resolvers = resolvers
         self._middleware = middleware
-        self._graphql_schema = self.find_graphql_schema()
 
     @property
     def schema(self) -> GraphQLSchema:
         if not hasattr(self, '_full_schema'):
             self._full_schema = self._build_schema()
-            self.fix_abstract_resolve_type(self._full_schema)
         return self._full_schema
 
-    def fix_abstract_resolve_type(self, schema: GraphQLSchema) -> None:
-        # We need to provide a custom 'resolve_type' since the default
-        # in method only checks for __typename if the source is a dict.
-        # Python mangles the variable name if it starts with `__` so we add
-        # `__typename__` attribute which is not mangled.
-        # TODO(rmyers): submit PR to fix upstream?
+    def _all_schema(self) -> typing.Iterator[DocumentNode]:
+        for document_node in self.find_schema():
+            yield document_node
 
-        def custom_resolve_type(source, _info):
-            if isinstance(source, dict):
-                return str(source.get('__typename'))
-            return getattr(source, '__typename__', None)
+        for resolver in self._resolvers:
+            self._merge_registry(resolver.registry)
+            self.base_schema.update(resolver.base_schema)
+            self.datasources.update(resolver.datasources)
+            for document_node in resolver.find_schema():
+                yield document_node
 
-        for _type_name, graphql_type in schema.type_map.items():
-            if isinstance(graphql_type, GraphQLUnionType):
-                graphql_type.resolve_type = custom_resolve_type
+        for document_node in self.base_schema.values():
+            yield document_node
 
     def _build_schema(self) -> GraphQLSchema:
-        ast_documents = self._graphql_schema + list(self.base_schema.values())
-        schema = build_and_extend_schema(ast_documents)
+        schema = build_and_extend_schema(self._all_schema())
 
         schema_validation_errors = validate_schema(schema)
         if schema_validation_errors:
             raise Exception(f'Invalid schema: {schema_validation_errors}')
 
+        schema = fix_abstract_resolve_type(schema)
+
+        self._make_executable(schema)
+
         return schema
+
+    def _make_executable(self, schema: GraphQLSchema):
+        for type_name, fields in self.registry.items():
+            object_type = schema.get_type(type_name)
+            for field_name, resolver_fn in fields.items():
+                field_definition = object_type.fields.get(field_name)
+                if not field_definition:
+                    raise Exception(f'Invalid field {type_name}.{field_name}')
+
+                field_definition.resolve = resolver_fn
 
     def context(self):
         def decorator(klass):
@@ -189,17 +201,6 @@ class API(Resolver):
     def _merge_registry(self, registry: dict):
         for type_name, value in registry.items():
             self.registry[type_name].update(value)
-
-    def register_resolver(self, resolver: Resolver) -> None:
-        """Register a sub-resolver.
-
-        This will add in all the datasources/resolvers/schema from the
-        sub-resolver.
-        """
-        self.base_schema.update(resolver.base_schema)
-        self._graphql_schema += resolver.find_graphql_schema()
-        self._merge_registry(resolver.registry)
-        self.datasources.update(resolver.datasources)
 
     async def call(
         self,
@@ -222,7 +223,6 @@ class API(Resolver):
             document=document,
             context_value=context,
             variable_values=variables,
-            field_resolver=self.field_resolver,
             middleware=self._middleware,
         )
         if inspect.isawaitable(result):
@@ -237,16 +237,3 @@ class API(Resolver):
     ) -> ExecutionResult:
         loop = asyncio.get_event_loop()
         return loop.run_until_complete(self.call(document, request, variables))
-
-    async def field_resolver(self, _resource, _info, **kwargs):
-        type_name = _info.parent_type.name  # schema type (Query, Mutation)
-        field_name = _info.field_name  # The attribute being resolved
-        try:
-            # First check if there is a customer resolver in the registry
-            custom_resolver = self.registry[type_name][field_name]
-            return await custom_resolver(_resource, _info, **kwargs)
-        except KeyError:
-            # If there is not a custom resolver check the resource for attributes
-            # that match the field_name. The resource argument will be the result
-            # of the Query type resolution.
-            return default_field_resolver(_resource, _info, **kwargs)
