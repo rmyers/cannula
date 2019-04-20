@@ -18,20 +18,11 @@
 #%   make test
 #%
 
-ARCH                     := $(shell uname -s)
-REQUIREMENTS             := $(shell cat requirements*)
+REQUIREMENTS             := $(shell find . -name 'requirements*.txt')
 SHELL                    := /bin/bash
 VIRTUAL_ENV              ?= .venv
 PYTHON_MODULES           := $(shell find . -name '*.py')
 DOCKER_COMPOSE           := $(shell which docker-compose)
-
-# Generate the MD5SUM of the requirements files.
-# Mac and Linx have slightly different md5 commands, hense the ARCH check.
-ifeq ("${ARCH}", "Darwin")
-	MD5SUM := $(shell md5 -q -s "${REQUIREMENTS}")
-else
-	MD5SUM := $(shell echo "${REQUIREMENTS}" | md5sum | cut -d ' ' -f1)
-endif
 
 .SILENT: help
 .PHONY: setup docs clean
@@ -45,11 +36,11 @@ $(VIRTUAL_ENV):
 	python3 -m venv $(VIRTUAL_ENV)
 
 # Check for the existence of reqs-(md5) and run pip install if missing.
-$(VIRTUAL_ENV)/reqs-$(MD5SUM):
+$(VIRTUAL_ENV)/.requirements-installed: $(REQUIREMENTS)
 	$(VIRTUAL_ENV)/bin/pip install -r requirements-test.txt
-	touch $(VIRTUAL_ENV)/reqs-$(MD5SUM)
+	touch $(VIRTUAL_ENV)/.requirements-installed
 
-setup: $(VIRTUAL_ENV) $(VIRTUAL_ENV)/reqs-$(MD5SUM) ## Setup local environment
+setup: $(VIRTUAL_ENV) $(VIRTUAL_ENV)/.requirements-installed ## Setup local environment
 
 clean: ## Clean your local workspace
 	rm -rf $(VIRTUAL_ENV)

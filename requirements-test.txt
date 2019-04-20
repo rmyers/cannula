@@ -2,6 +2,7 @@
 coverage==4.5.2
 wsgi_intercept==1.8.0
 flake8==3.7.5
+mypy==0.701
 
 # flake8 deps
 mccabe==0.6.1
