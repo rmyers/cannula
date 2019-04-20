@@ -4,10 +4,8 @@ import uuid
 from datetime import datetime
 from datetime import timedelta
 
-from bottle import request
-from bottle import response
-from bottle import route
-from bottle import run
+from starlette.applications import Starlette
+from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -68,6 +66,9 @@ NOUNS = [
   'plantation',
   'battle',
 ]
+
+
+app = Starlette(debug=True)
 
 
 def name():
@@ -169,8 +170,8 @@ def expires():
     }
 
 
-@route('/v3')
-def v3():
+@app.route('/v3')
+async def v3(request):
     return {
         "version": {
             "status": "stable",
@@ -192,8 +193,8 @@ def v3():
     }
 
 
-@route('/v3/auth/catalog', method='GET')
-def v3_catalog():
+@app.route('/v3/auth/catalog', methods=['GET'])
+async def v3_catalog(request):
     auth_token = request.headers.get('X-Auth-Token')
     _, project_id = auth_token.split(':')
     _catalog = catalog(project_id)
@@ -202,17 +203,17 @@ def v3_catalog():
     }
 
 
-@route('/v3/auth/tokens', method='POST')
-def v3_auth_tokens():
+@app.route('/v3/auth/tokens', methods=['POST'])
+async def v3_auth_tokens(request):
     LOG.info('Identity Log Request')
-    user = request.json['auth']['identity']['password']['user']['name']
+    payload = await request.json()
+    user = payload['auth']['identity']['password']['user']['name']
     project_id = USERS.get(user)
     if project_id is None:
         project_id = get_id()
         USERS[user] = project_id
     ex = expires()
     _catalog = catalog(project_id)
-    response.status = 201
     resp = {
         "token": {
             "methods": ["password"],
@@ -246,8 +247,7 @@ def v3_auth_tokens():
             "issued_at": ex['issued'],
         }
     }
-    response.set_header('X-Subject-Token', f'{user}:{project_id}')
-    return resp
+    return JSONResponse(resp, headers={'X-Subject-Token': f'{user}:{project_id}'})
 
 
 IMAGES = [
@@ -302,18 +302,18 @@ IMAGES = [
 ]
 
 
-@route('/nova/v2.1/<project_id>/images/detail', method='GET')
-@route('/nova/v2.1/<project_id>/images', method='GET')
-def nova_images_details(project_id):
+@app.route('/nova/v2.1/{project_id}/images/detail', methods=['GET'])
+async def nova_images_details(request):
     resp = {"images": IMAGES}
-    return resp
+    return JSONResponse(resp)
 
 
-@route('/nova/v2.1/<project_id>/images/<image_id>', method='GET')
-def nova_image_get(project_id, image_id):
+@app.route('/nova/v2.1/{project_id}/images/{image_id}', methods=['GET'])
+async def nova_image_get(request):
+    image_id = request.path_params['image_id']
     for image in IMAGES:
         if image['id'] == image_id:
-            return {"image": image}
+            return JSONResponse({"image": image})
 
 
 FLAVORS = [
@@ -356,18 +356,18 @@ FLAVORS = [
 ]
 
 
-@route('/nova/v2.1/<project_id>/flavors/detail', method='GET')
-@route('/nova/v2.1/<project_id>/flavors', method='GET')
-def flavor_list_detail(project_id):
+@app.route('/nova/v2.1/{project_id}/flavors/detail', methods=['GET'])
+async def flavor_list_detail(request):
     resp = {"flavors": FLAVORS}
-    return resp
+    return JSONResponse(resp)
 
 
-@route('/nova/v2.1/<project_id>/flavors/<flavor_id>', method='GET')
-def flavor_get(project_id, flavor_id):
+@app.route('/nova/v2.1/{project_id}/flavors/{flavor_id}', methods=['GET'])
+async def flavor_get(request):
+    flavor_id = request.path_params['flavor_id']
     for flavor in FLAVORS:
         if flavor['id'] == flavor_id:
-            return {"flavor": flavor}
+            return JSONResponse({"flavor": flavor})
     raise
 
 
@@ -393,21 +393,21 @@ NETWORKS = [
 ]
 
 
-@route('/neutron/v2.0/networks.json', method='GET')
-def network_list():
-    return {
+@app.route('/neutron/v2.0/networks.json', methods=['GET'])
+async def network_list(request):
+    return JSONResponse({
         "networks": NETWORKS
-    }
+    })
 
 
-@route('/neutron/v2.0/limits.json', method='GET')
-def network_limits():
-    return {
+@app.route('/neutron/v2.0/limits.json', methods=['GET'])
+async def network_limits(request):
+    return JSONResponse({
         'networks': {
             'used': len(NETWORKS),
             'limit': 3
         }
-    }
+    })
 
 
 SUBNETS = [
@@ -442,15 +442,15 @@ SUBNETS = [
 ]
 
 
-@route('/neutron/v2.0/subnets.json', method='GET')
-def subnet_list():
-    return {
+@app.route('/neutron/v2.0/subnets.json', methods=['GET'])
+async def subnet_list(request):
+    return JSONResponse({
         "subnets": SUBNETS
-    }
+    })
 
 
-@route('/nova/v2.1/<project_id>/servers', method='POST')
-def server_create(project_id):
+@app.route('/nova/v2.1/{project_id}/servers', methods=['POST'])
+async def server_create(request):
     image_id = request.json['server']['imageRef']
     flavor_id = request.json['server']['flavorRef']
     name = request.json['server']['name']
@@ -496,35 +496,36 @@ def create_new_server(project_id, image_id, flavor_id, name):
         "metadata": {}}
     }
     SERVERS[server_id] = new_server
-    return new_server
+    return JSONResponse(new_server)
 
 
-@route('/nova/v2.1/<project_id>/servers/detail')
-def server_list(project_id):
+@app.route('/nova/v2.1/{project_id}/servers/detail')
+async def server_list(request):
     resp = {"servers": []}
     for server in SERVERS.values():
         resp["servers"].append(server["server"])
-    return resp
+    return JSONResponse(resp)
 
 
-# Note: May also need /nova/v2.1/<project_id/servers?name=<server_name> someday
-@route('/nova/v2.1/<project_id>/servers/<server_id>', method='GET')
-def server_get(project_id, server_id):
-    return SERVERS.get(server_id)
+# Note: May also need /nova/v2.1/{project_id/servers?name={server_name} someday
+@app.route('/nova/v2.1/{project_id}/servers/{server_id}', methods=['GET'])
+async def server_get(request):
+    server_id = request.path_params['server_id']
+    return JSONResponse(SERVERS.get(server_id))
 
 
-@route('/nova/v2.1/<project_id>/servers/<server_id>', method='DELETE')
-def server_delete(project_id, server_id):
-    response.status = 202
+@app.route('/nova/v2.1/{project_id}/servers/{server_id}', methods=['DELETE'])
+async def server_delete(request):
+    server_id = request.path_params['server_id']
     del SERVERS[server_id]
     SERVER_IDS.insert(0, server_id)
-    return
+    return JSONResponse(None, status=202)
 
 
-@route('/nova/v2.1/<project_id>/os-availability-zone')
-def availability_zone(project_id):
+@app.route('/nova/v2.1/{project_id}/os-availability-zone')
+async def availability_zone(request):
     print(request.headers['X-Auth-Token'])
-    return {
+    return JSONResponse({
         "availabilityZoneInfo": [
             {
                 "hosts": None,
@@ -534,17 +535,17 @@ def availability_zone(project_id):
                 }
             }
         ]
-    }
+    })
 
 
-@route('/nova/v2.1/<project_id>/limits', method='GET')
-def server_quota_get(project_id):
-    return {
+@app.route('/nova/v2.1/{project_id}/limits', methods=['GET'])
+async def server_quota_get(request):
+    return JSONResponse({
         'servers': {
             'used': len(SERVERS),
             'limit': 10
         }
-    }
+    })
 
 
 VOLUMES = [
@@ -601,16 +602,16 @@ VOLUMES = [
 ]
 
 
-@route('/cinder/v3/<project_id>/volumes/detail')
-def cinder_volumes(project_id):
-    return {
+@app.route('/cinder/v3/{project_id}/volumes/detail')
+async def cinder_volumes(request):
+    return JSONResponse({
         "volumes": VOLUMES
-    }
+    })
 
 
-@route('/cinder/v3/<project_id>/limits')
-def cinder_limits(project_id):
-    return {
+@app.route('/cinder/v3/{project_id}/limits')
+async def cinder_limits(request):
+    return JSONResponse({
         "limits": {
             "absolute": {
                 "totalSnapshotsUsed": 0,
@@ -621,13 +622,12 @@ def cinder_limits(project_id):
                 "totalGigabytesUsed": sum(map(lambda vol: vol['size'], VOLUMES))
             }
         }
-    }
+    })
 
 
-@route('/')
-def root():
-    response.status = 300
-    return {
+@app.route('/')
+async def root(request):
+    return JSONResponse({
       "versions": {
         "values": [
           {
@@ -670,12 +670,14 @@ def root():
           }
         ]
       }
-    }
+    })
 
 
 for server_id in SERVER_IDS:
     create_new_server('fake', IMAGES[0].get('id'), FLAVORS[0].get('id'), server_id)
 
 
-LOG.info(f'starting mock openstack server on {PORT}')
-run(host='0.0.0.0', port=PORT, debug=True, reloader=True)
+if __name__ == '__main__':
+    import uvicorn
+    LOG.info(f'starting mock openstack server on {PORT}')
+    uvicorn.run(app, host='0.0.0.0', port=8080, debug=True, log_level=logging.INFO)
