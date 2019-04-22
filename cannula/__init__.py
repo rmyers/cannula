@@ -3,14 +3,14 @@ from .api import (
     Context,
     Resolver,
 )
-from .utils import (
-    gql,
-)
+from .errors import format_errors
+from .utils import gql
 
 __all__ = [
     'API',
     'Context',
     'Resolver',
+    'format_errors',
     'gql',
 ]
 

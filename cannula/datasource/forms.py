@@ -440,6 +440,7 @@ class WTFormsDataSource(typing.NamedTuple):
     return_type: str
     return_fields: str
     context: typing.Any = None
+    query_fragment = '...formQueryFragment'
 
     def __call__(self, context):
         return WTFormsDataSource(
@@ -452,17 +453,59 @@ class WTFormsDataSource(typing.NamedTuple):
             context,
         )
 
+    def _get_form_args(self, **kwargs):
+        """Return a query list string of key/value pairs from kwargs"""
+        args = [f'{{key: "{key}", value: "{value}"}}' for key, value in kwargs.items()]
+        return ','.join(args)
+
+    def get_query(self, **kwargs):
+        form_args = []
+        # Make sure all the arguments are available
+        for arg in self.args:
+            assert arg in kwargs, f'required argument {arg} missing!'
+            form_args.append({'key': arg, 'value': kwargs[arg]})
+
+        args_string = self._get_form_args(**kwargs)
+        query = gql(f'''
+            query form {{
+                form: {self.query_name}(args: [{args_string}]) {{
+                    {self.query_fragment}
+                }}
+            }}
+        ''')
+        return concat_ast([query, FORM_QUERY_FRAGMENT])
+
+    def get_mutation(self, **kwargs):
+        form_args = []
+        # Make sure all the arguments are available
+        for arg in self.args:
+            assert arg in kwargs, f'required argument {arg} missing!'
+            form_args.append({'key': arg, 'value': kwargs[arg]})
+
+        args_string = self._get_form_args(**kwargs)
+
+        needs_query_fragment = self.return_type == 'WTForm'
+
+        return_fields = self.query_fragment if needs_query_fragment else self.return_fields
+
+        query = gql(f'''
+            mutation form($form: WTFJSON) {{
+                form: {self.mutation_name}(args: [{args_string}], form: $form) {{
+                    {return_fields}
+                }}
+            }}
+        ''')
+        return concat_ast([query, FORM_QUERY_FRAGMENT]) if needs_query_fragment else query
+
 
 class WTFormsResolver(Resolver):
 
-    query_fragment = '...formQueryFragment'
     base_schema = {
         'wtforms': WTFORMS_SCHEMA
     }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._forms = {}
         self.registry['WTForm']['fields'] = fields
         self.registry['WTForm']['action'] = action
 
@@ -494,7 +537,7 @@ class WTFormsResolver(Resolver):
             )
 
             self.datasources[registry_name] = FormDataSource
-            self._forms[registry_name] = FormDataSource
+            self.forms[registry_name] = FormDataSource
             self._extend_schema(query_name, mutation_name, return_type)
 
             return klass
@@ -517,59 +560,6 @@ class WTFormsResolver(Resolver):
             return
 
         self._schema = extra_schema
-
-    def _get_form_args(self, **kwargs):
-        """Return a query list string of key/value pairs from kwargs"""
-        args = [f'{{key: "{key}", value: "{value}"}}' for key, value in kwargs.items()]
-        return ','.join(args)
-
-    def get_form(self, name):
-        return self._forms.get(name)
-
-    def get_form_query(self, name, **kwargs):
-        form = self.get_form(name)
-        assert form is not None, f'Form {name} not registered!'
-
-        form_args = []
-        # Make sure all the arguments are available
-        for arg in form.args:
-            assert arg in kwargs, f'required argument {arg} missing!'
-            form_args.append({'key': arg, 'value': kwargs[arg]})
-
-        args_string = self._get_form_args(**kwargs)
-        query = gql(f'''
-            query form {{
-                form: {form.query_name}(args: [{args_string}]) {{
-                    {self.query_fragment}
-                }}
-            }}
-        ''')
-        return concat_ast([query, FORM_QUERY_FRAGMENT])
-
-    def get_form_mutation(self, name, **kwargs):
-        form = self.get_form(name)
-        assert form is not None, f'Form {name} not registered!'
-
-        form_args = []
-        # Make sure all the arguments are available
-        for arg in form.args:
-            assert arg in kwargs, f'required argument {arg} missing!'
-            form_args.append({'key': arg, 'value': kwargs[arg]})
-
-        args_string = self._get_form_args(**kwargs)
-
-        needs_query_fragment = form.return_type == 'WTForm'
-
-        return_fields = self.query_fragment if needs_query_fragment else form.return_fields
-
-        query = gql(f'''
-            mutation form($form: WTFJSON) {{
-                form: {form.mutation_name}(args: [{args_string}], form: $form) {{
-                    {return_fields}
-                }}
-            }}
-        ''')
-        return concat_ast([query, FORM_QUERY_FRAGMENT]) if needs_query_fragment else query
 
 
 def unwrap_args(form_query_argument_list):

@@ -2,6 +2,7 @@
 import asyncio
 import collections
 import copy
+import functools
 import logging
 import inspect
 import os
@@ -12,6 +13,7 @@ from graphql import (
     execute,
     ExecutionResult,
     GraphQLSchema,
+    parse,
     validate_schema,
     validate,
 )
@@ -69,33 +71,52 @@ class Resolver:
     def __init__(
         self,
         name: str,
-        graphql_directory: str = 'schema',
         schema: typing.Union[str, DocumentNode] = None,
+        schema_directory: str = 'schema',
+        query_directory: str = 'queries',
     ):
         self.registry = collections.defaultdict(dict)
         self.datasources = {}
-        self._graphql_directory = graphql_directory
+        self.forms = {}
+        self._schema_directory = schema_directory
+        self._query_directory = query_directory
         self.root_dir = get_root_path(name)
         self._schema = schema
 
     @property
-    def graphql_directory(self):
+    def schema_directory(self):
         if not hasattr(self, '_schema_dir'):
-            if os.path.isabs(self._graphql_directory):
-                setattr(self, '_schema_dir', self._graphql_directory)
-            setattr(self, '_schema_dir', os.path.join(self.root_dir, self._graphql_directory))
+            if os.path.isabs(self._schema_directory):
+                setattr(self, '_schema_dir', self._schema_directory)
+            setattr(self, '_schema_dir', os.path.join(self.root_dir, self._schema_directory))
         return self._schema_dir
 
     def find_schema(self) -> typing.List[DocumentNode]:
         schemas: typing.List[DocumentNode] = []
-        if os.path.isdir(self.graphql_directory):
-            LOG.debug(f'Searching {self.graphql_directory} for schema.')
-            schemas = load_schema(self.graphql_directory)
+        if os.path.isdir(self.schema_directory):
+            LOG.debug(f'Searching {self.schema_directory} for schema.')
+            schemas = load_schema(self.schema_directory)
 
         if self._schema is not None:
             schemas.append(maybe_parse(self._schema))
 
         return schemas
+
+    @property
+    def query_directory(self) -> str:
+        if not hasattr(self, '_query_dir'):
+            if os.path.isabs(self._query_directory):
+                setattr(self, '_query_dir', self._query_directory)
+            setattr(self, '_query_dir', os.path.join(self.root_dir, self._query_directory))
+        return self._query_dir
+
+    @functools.lru_cache(maxsize=128)
+    def load_query(self, query_name: str) -> DocumentNode:
+        path = os.path.join(self.query_directory, f'{query_name}.graphql')
+        assert os.path.isfile(path), f"No query found for {query_name}"
+
+        with open(path) as query:
+            return parse(query.read())
 
     def resolver(self, type_name: str = 'Query') -> typing.Any:
         def decorator(function):
@@ -106,6 +127,20 @@ class Resolver:
         def decorator(klass):
             self.datasources[klass.__name__] = klass
         return decorator
+
+    def get_form_query(self, name: str, **kwargs) -> DocumentNode:
+        """Get registered form query document"""
+        form = self.forms.get(name)
+        assert form is not None, f'Form: {name} is not registered!'
+
+        return form.get_query(**kwargs)
+
+    def get_form_mutation(self, name: str, **kwargs) -> DocumentNode:
+        """Get registered form mutation document"""
+        form = self.forms.get(name)
+        assert form is not None, f'Form: {name} is not registered!'
+
+        return form.get_mutation(**kwargs)
 
 
 class API(Resolver):
@@ -153,6 +188,7 @@ class API(Resolver):
             self._merge_registry(resolver.registry)
             self.base_schema.update(resolver.base_schema)
             self.datasources.update(resolver.datasources)
+            self.forms.update(resolver.forms)
             for document_node in resolver.find_schema():
                 yield document_node
 
