@@ -451,10 +451,11 @@ async def subnet_list(request):
 
 @app.route('/nova/v2.1/{project_id}/servers', methods=['POST'])
 async def server_create(request):
-    image_id = request.json['server']['imageRef']
-    flavor_id = request.json['server']['flavorRef']
-    name = request.json['server']['name']
-    response.status = 202
+    project_id = request.path_params['project_id']
+    body = await request.json()
+    image_id = body['server']['imageRef']
+    flavor_id = body['server']['flavorRef']
+    name = body['server']['name']
     return create_new_server(project_id, image_id, flavor_id, name)
 
 
@@ -524,7 +525,6 @@ async def server_delete(request):
 
 @app.route('/nova/v2.1/{project_id}/os-availability-zone')
 async def availability_zone(request):
-    print(request.headers['X-Auth-Token'])
     return JSONResponse({
         "availabilityZoneInfo": [
             {

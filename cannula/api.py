@@ -137,7 +137,7 @@ class API(Resolver):
         super().__init__(*args, **kwargs)
         self._context = context
         self._resolvers = resolvers
-        self._middleware = middleware
+        self.middleware = middleware
 
     @property
     def schema(self) -> GraphQLSchema:
@@ -223,7 +223,7 @@ class API(Resolver):
             document=document,
             context_value=context,
             variable_values=variables,
-            middleware=self._middleware,
+            middleware=self.middleware,
         )
         if inspect.isawaitable(result):
             return await result

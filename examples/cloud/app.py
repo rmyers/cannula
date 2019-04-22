@@ -105,6 +105,7 @@ app.mount('/static', StaticFiles(directory='static'), name='static')
 
 @app.route('/dashboard')
 async def dashboard(request):
+    LOG.info(request.headers)
     if 'xhr' in request.query_params:
         results = await api.call(
             load_query('dashboard'),
