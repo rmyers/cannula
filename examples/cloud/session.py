@@ -64,7 +64,7 @@ def set_user(
     auth_token: str,
     catalog: typing.List[dict],
     roles: typing.List[dict],
-)-> User:
+) -> User:
     session_id = str(uuid.uuid4())
     service_catalog = flatten_catalog(catalog)
     user_roles = [role['name'] for role in roles]
