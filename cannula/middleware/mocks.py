@@ -9,6 +9,7 @@ from graphql import (
     GraphQLNonNull,
     GraphQLType,
     GraphQLUnionType,
+    get_named_type,
 )
 
 MockObjectTypes = typing.Union[typing.Callable, str, int, float, bool, dict]
@@ -100,7 +101,6 @@ class MockMiddleware:
         except Exception:
             return {}
 
-
     async def run_next(self, _next, _resource, _info, **kwargs):
         if inspect.isawaitable(_next):
             results = await _next(_resource, _info, **kwargs)
@@ -132,13 +132,9 @@ class MockMiddleware:
             if isinstance(schema_type, GraphQLList):
                 return [mock_resolve_fields(schema_type.of_type) for x in range(self.list_length)]
 
-            if isinstance(schema_type, GraphQLUnionType):
-                schema_type = random.choice(schema_type.types)
+            named_type = get_named_type(return_type)
 
-            if isinstance(schema_type, GraphQLNonNull):
-                return mock_resolve_fields(schema_type.of_type)
-
-            if schema_type.name in mock_objects.keys():
+            if named_type.name in mock_objects.keys():
                 mock = mock_objects.get(schema_type.name)
                 return mock() if callable(mock) else mock
 
@@ -146,12 +142,12 @@ class MockMiddleware:
             # explicitly overridden in the mock_objects. Just return a dict
             # with a `__typename` set to the type name to assist in resolving
             # Unions and Interfaces.
-            return {'__typename': schema_type.name}
+            return {'__typename': named_type.name}
 
         if type_name in ['Query', 'Mutation', 'Subscription']:
             return mock_resolve_fields(return_type)
 
-        # First check if we previously resolved a mock object.
+        # Check if we previously resolved a mock object.
         if isinstance(_resource, dict):
             field_value = _resource.get(field_name)
         else:
@@ -173,11 +169,6 @@ def is_valid_return_type(
         list_type = return_type.of_type
         return return_type if is_valid_return_type(mock_objects, list_type) else None
 
-    if isinstance(return_type, GraphQLUnionType):
-        return return_type if all([t.name in available_mocks for t in return_type.types]) else None
+    named_type = get_named_type(return_type)
 
-    if isinstance(return_type, GraphQLNonNull):
-        non_null_type = return_type.of_type
-        return return_type if is_valid_return_type(mock_objects, non_null_type) else None
-
-    return return_type if return_type.name in available_mocks else None
+    return return_type if named_type.name in available_mocks else None

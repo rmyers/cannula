@@ -7,7 +7,7 @@ Cypress.on('window:before:load', (win) => {
 });
 
 var mocks = JSON.stringify({
-  "ComputeServer": {
+  "Resource": {
     "__typename": "ComputeServer",
     "name": "frank",
     "id": "1233455"

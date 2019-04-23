@@ -41,6 +41,7 @@ You can optionally use this middleware as a standalone with the `graphql-core-ne
 """
 import inspect
 import logging
+import time
 
 
 class DebugMiddleware:
@@ -50,14 +51,15 @@ class DebugMiddleware:
         self.logger = logger or logging.getLogger('cannula.middleware.debug')
 
     async def resolve(self, _next, _resource, _info, **kwargs):
-        type_name = _info.parent_type.name  # schema type (Query, Mutation)
-        field_name = _info.field_name  # The attribute being resolved
-        return_type = _info.return_type  # The field type that is being returned.
+        parent_name = _info.parent_type.name
+        field_name = _info.field_name
+        return_type = _info.return_type
 
         self.logger.log(
             self.level,
-            f'Resolving {field_name} on {type_name} with type {return_type}'
+            f'Resolving {parent_name}.{field_name} expecting type {return_type}'
         )
+        start_time = time.perf_counter()
 
         if inspect.isawaitable(_next):
             results = await _next(_resource, _info, **kwargs)
@@ -67,9 +69,11 @@ class DebugMiddleware:
         if inspect.isawaitable(results):
             results = await results
 
+        end_time = time.perf_counter()
+        total_time = end_time - start_time
         self.logger.log(
             self.level,
-            f'Field {field_name} on {type_name} resolved: {results}'
+            f'Field {parent_name}.{field_name} resolved: {results!r} in {total_time:.3} seconds'
         )
 
         return results

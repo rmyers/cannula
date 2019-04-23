@@ -2,7 +2,8 @@ import logging
 import os
 
 import cannula
-
+import uvicorn
+from cannula.middleware import MockMiddleware, DebugMiddleware
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse, RedirectResponse
 from starlette.staticfiles import StaticFiles
@@ -103,5 +104,9 @@ async def network_action_form_get(request):
 
 
 if __name__ == '__main__':
-    import uvicorn
-    uvicorn.run(app, host='0.0.0.0', port=8081, debug=True, log_level=logging.INFO)
+    if USE_MOCKS:
+        api.middleware = [
+            DebugMiddleware(),
+            MockMiddleware(mock_all=False)
+        ]
+    uvicorn.run(app, host='0.0.0.0', port=int(PORT), debug=True, log_level=logging.INFO)

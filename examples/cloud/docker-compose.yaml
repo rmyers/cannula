@@ -21,3 +21,5 @@ services:
       - ../../:/external/lib/
     ports:
       - "8081:8081"
+    environment:
+      USE_MOCKS:
