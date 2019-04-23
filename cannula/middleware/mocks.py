@@ -1,16 +1,63 @@
+import inspect
+import json
 import random
 import typing
 import uuid
 
 from graphql import (
     GraphQLList,
+    GraphQLNonNull,
+    GraphQLType,
     GraphQLUnionType,
 )
 
 MockObjectTypes = typing.Union[typing.Callable, str, int, float, bool, dict]
 
-DEFAULT_MOCKS = {
-    'String': lambda: random.choice(['flippy', 'flappy', 'slippy', 'slappy']),
+ADJECTIVES: typing.List[str] = [
+    'imminent',
+    'perfect',
+    'organic',
+    'elderly',
+    'dapper',
+    'reminiscent',
+    'mysterious',
+    'trashy',
+    'workable',
+    'flaky',
+    'offbeat',
+    'spooky',
+    'thirsty',
+    'stereotyped',
+    'wild',
+    'devilish',
+    'quarrelsome',
+    'dysfunctional',
+]
+NOUNS: typing.List[str] = [
+    'note',
+    'yak',
+    'hammer',
+    'cause',
+    'price',
+    'quill',
+    'truck',
+    'glass',
+    'color',
+    'ring',
+    'trees',
+    'window',
+    'letter',
+    'seed',
+    'sponge',
+    'pie',
+    'mass',
+    'table',
+    'plantation',
+    'battle',
+]
+
+DEFAULT_MOCKS: typing.Dict[str, MockObjectTypes] = {
+    'String': lambda: f'{random.choice(ADJECTIVES)}-{random.choice(NOUNS)}',
     'Int': lambda: random.randint(4, 999),
     'Float': lambda: random.randint(5, 999) * random.random(),
     'Boolean': lambda: random.choice([True, False]),
@@ -30,63 +77,78 @@ class MockMiddleware:
     ):
         self.mock_all = mock_all
         self.mock_object_header = mock_object_header
-        self._mock_objects = mock_objects
+        self._mock_objects = DEFAULT_MOCKS.copy() if mock_all else {}
+        self._mock_objects.update(mock_objects)
+        ll_mock = self._mock_objects.get('__list_length', 3)
+        self.list_length = ll_mock() if callable(ll_mock) else ll_mock
 
-    def get_mocks(self, info):
-        mock_header = {}
-
-        if (
-            hasattr(info.context, 'request') and
-            hasattr(info.context.request, 'headers') and
-            isinstance(info.context.request.header, dict)
-        ):
-            mock_header = info.context.request.header.get(self.mock_object_header, {})
-
-        mock_objects = DEFAULT_MOCKS.copy() if self.mock_all else {}
-        mock_objects.update(self._mock_objects)
-        mock_objects.update(mock_header)
+    def get_mocks(self, extra: dict) -> dict:
+        mock_objects = self._mock_objects.copy()
+        mock_objects.update(extra)
         return mock_objects
 
+    def get_mocks_from_headers(self, context: typing.Any) -> dict:
+        try:
+            mock_header = context.request.headers.get(self.mock_object_header)
+            if not mock_header:
+                return {}
+        except Exception:
+            return {}
+
+        try:
+            return json.loads(mock_header)
+        except Exception:
+            return {}
+
+
+    async def run_next(self, _next, _resource, _info, **kwargs):
+        if inspect.isawaitable(_next):
+            results = await _next(_resource, _info, **kwargs)
+        else:
+            results = _next(_resource, _info, **kwargs)
+
+        if inspect.isawaitable(results):
+            return await results
+        return results
+
     async def resolve(self, _next, _resource, _info, **kwargs):
+        mock_header = self.get_mocks_from_headers(_info.context)
+        mock_objects = self.get_mocks(extra=mock_header)
+        if not mock_objects:
+            return await self.run_next(_next, _resource, _info, **kwargs)
+
+        return_type = _info.return_type
+        if not self.mock_all:
+            return_type = is_valid_return_type(mock_objects, _info.return_type)
+
+        if not return_type:
+            return await self.run_next(_next, _resource, _info, **kwargs)
+
         type_name = _info.parent_type.name  # schema type (Query, Mutation)
         field_name = _info.field_name  # The attribute being resolved
-        return_type = _info.return_type  # The field type that is being returned.
-
-        mock_objects = self.get_mocks(_info)
 
         def mock_resolve_fields(schema_type: typing.Any = None):
             # Special case for list types return a random length list of type.
             if isinstance(schema_type, GraphQLList):
-                mock = mock_objects.get('__list_length', 3)
-                count = mock
-                if callable(mock):
-                    count = mock()
-                return [mock_resolve_fields(schema_type.of_type) for x in range(count)]
+                return [mock_resolve_fields(schema_type.of_type) for x in range(self.list_length)]
 
             if isinstance(schema_type, GraphQLUnionType):
                 schema_type = random.choice(schema_type.types)
 
-            schema_type_name = str(schema_type)
-            if schema_type_name.endswith('!'):
-                schema_type_name = schema_type_name[:-1]
+            if isinstance(schema_type, GraphQLNonNull):
+                return mock_resolve_fields(schema_type.of_type)
 
-            if schema_type_name in mock_objects.keys():
-                mock = mock_objects.get(schema_type_name)
-                if callable(mock):
-                    return mock()
-                return mock
+            if schema_type.name in mock_objects.keys():
+                mock = mock_objects.get(schema_type.name)
+                return mock() if callable(mock) else mock
 
             # If we reached this point this is a custom type that has not
-            # explicitly overridden in the mock_objects. Create a dummy object of
-            # type 'schema_type_name' and add `__typename__` attribute to assist
-            # resolving Union and Interface types.
-            return_value = type(schema_type_name, (object,), {})()
-            setattr(return_value, '__typename__', schema_type_name)
+            # explicitly overridden in the mock_objects. Just return a dict
+            # with a `__typename` set to the type name to assist in resolving
+            # Unions and Interfaces.
+            return {'__typename': schema_type.name}
 
-            return return_value
-
-        # TODO(rmyers): handle subscriptions.
-        if type_name in ['Query', 'Mutation']:
+        if type_name in ['Query', 'Mutation', 'Subscription']:
             return mock_resolve_fields(return_type)
 
         # First check if we previously resolved a mock object.
@@ -99,3 +161,23 @@ class MockMiddleware:
             field_value = mock_resolve_fields(return_type)
 
         return field_value
+
+
+def is_valid_return_type(
+    mock_objects: dict,
+    return_type: typing.Any
+) -> GraphQLType:
+    available_mocks = list(mock_objects.keys())
+
+    if isinstance(return_type, GraphQLList):
+        list_type = return_type.of_type
+        return return_type if is_valid_return_type(mock_objects, list_type) else None
+
+    if isinstance(return_type, GraphQLUnionType):
+        return return_type if all([t.name in available_mocks for t in return_type.types]) else None
+
+    if isinstance(return_type, GraphQLNonNull):
+        non_null_type = return_type.of_type
+        return return_type if is_valid_return_type(mock_objects, non_null_type) else None
+
+    return return_type if return_type.name in available_mocks else None
