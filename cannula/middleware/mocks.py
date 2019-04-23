@@ -6,9 +6,7 @@ import uuid
 
 from graphql import (
     GraphQLList,
-    GraphQLNonNull,
     GraphQLType,
-    GraphQLUnionType,
     get_named_type,
 )
 
