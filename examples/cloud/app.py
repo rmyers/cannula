@@ -105,8 +105,5 @@ async def network_action_form_get(request):
 
 if __name__ == '__main__':
     if USE_MOCKS:
-        api.middleware = [
-            DebugMiddleware(),
-            MockMiddleware(mock_all=False)
-        ]
+        api.middleware.insert(0, MockMiddleware(mock_all=False))
     uvicorn.run(app, host='0.0.0.0', port=int(PORT), debug=True, log_level=logging.INFO)

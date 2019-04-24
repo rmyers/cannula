@@ -10,11 +10,15 @@ var mocks = JSON.stringify({
   "Resource": {
     "__typename": "ComputeServer",
     "name": "frank",
-    "id": "1233455"
+    "id": "1233455",
+    "status": "active"
   }
 });
 
-describe('Test Login Page', function() {
+describe('Test Dashboard', function() {
+  beforeEach(() => {
+    cy.login()
+  });
   it('Visits the login page', function() {
     cy.server({
       onAnyRequest: function(route, proxy) {

@@ -1,3 +1,90 @@
+"""
+MockMiddleware
+==============
+
+Wrapps an existing schema and resolvers to provide an easy way to automatically
+mock the responses from Queries, Mutations or Subscriptions. You can choose
+to mock all resolvers or you could selectively provide mock objects to replace
+only a handful of calls while preserving the existing resolvers.
+
+This is really useful for end to end testing, as you can simply add a header
+to the request with the mock objects you wish to replace. This way the entire
+stack is validated down to the resolver level.
+
+Example Usage
+-------------
+
+You can add the middleware in a couple different ways. If you are using the
+cannula API you can add this in the middleware list in the contructor::
+
+    import cannula
+    from cannula.middleware import MockMiddleware
+
+    api = cannula.API(
+        __name__,
+        SCHEMA,
+        middleware = [
+            MockMiddleware(mock_all=True, mock_objects={'my': {'fakes': 'here'}}}),
+        ]
+    )
+
+Or you can use this with just the `graphql-core-next` library like::
+
+    from cannula.middleware import MockMiddleware
+    from graphql import graphql
+
+    graphql(
+        schema=SCHEMA,
+        query=QUERY,
+        middleware=[
+            MockMiddleware(mock_all=True, mock_objects={'my': {'fakes': 'here'}}}),
+        ],
+    )
+
+Example Using `X-Mock-Objects` Header
+-------------------------------------
+
+Most testing frameworks have a way to add headers to requests that you are
+testing. Usually this done for authentication, but we are going to abuse this
+functionality to tell the server what data to respond with. Here is an
+example using Cypress.io::
+
+    var resourceMock = JSON.stringify({
+        "Resource": {
+            "name": "Mocky",
+            "id": "12345"
+        }
+    });
+
+    describe('Test Resource View', function() {
+        it('Renders the resource correctly', function() {
+            cy.server({
+                onAnyRequest: function(route, proxy) {
+                    proxy.xhr.setRequestHeader('X-Mock-Objects', resourceMock);
+                }
+            });
+            cy.visit('http://localhost:8000/resource/view/');
+            cy.get(.resource).within(() => {
+                cy.get(.name).should('equal', 'Mocky');
+                cy.get(.id).should('equal', '12345');
+            });
+        })
+    });
+
+The key difference here from mocking the request is that we are actually
+making the request to the server at localhost and we know that the routes are
+setup correctly. We can freely change the payload and the urls that the actual
+code uses and this test will continue to function. That is, unless we break
+the contract of this page and those routes no longer respond with the data
+we are testing for. Since we are not actually mocking the request or the
+response breaking changes will be realized by this test.
+
+Another reason why this pattern is great is that we are not testing against
+a mock server that is specifically setup to respond to our request. While that
+will work just fine the mocks are hidden from the tests in some other file.
+Changing that file is complicated especially if it is used in multiple tests.
+"""
+
 import inspect
 import json
 import random

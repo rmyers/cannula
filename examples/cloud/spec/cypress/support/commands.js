@@ -8,18 +8,10 @@
 // https://on.cypress.io/custom-commands
 // ***********************************************
 //
-//
-// -- This is a parent command --
-// Cypress.Commands.add("login", (email, password) => { ... })
-//
-//
-// -- This is a child command --
-// Cypress.Commands.add("drag", { prevSubject: 'element'}, (subject, options) => { ... })
-//
-//
-// -- This is a dual command --
-// Cypress.Commands.add("dismiss", { prevSubject: 'optional'}, (subject, options) => { ... })
-//
-//
-// -- This is will overwrite an existing command --
-// Cypress.Commands.overwrite("visit", (originalFn, url, options) => { ... })
+// Custom Login Command
+Cypress.Commands.add("login", (username, password) => {
+  cy.visit('http://localhost:8081/')
+  cy.get('input[name="username"]').type(username || 'admin')
+  cy.get('input[name="password"]').type(password || 'password')
+  cy.get('button[type=submit]').click()
+});
