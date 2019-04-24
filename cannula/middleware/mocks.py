@@ -153,6 +153,61 @@ DEFAULT_MOCKS: typing.Dict[str, MockObjectTypes] = {
 }
 
 
+class SuperDict(dict):
+    """Wraps a dictionary to provide attribute access.
+
+    This is returned instead of a plain `dict` object to handle cases where
+    the underlining resolvers where expecting an object returned. Since we
+    allow setting up mocks via a JSON header this makes it possible to
+    mock only the responses while preserving the rest of the resolvers attached
+    to the schema.
+
+        >>> mock = SuperDict({'foo': {'bar': {'baz': 42}}})
+        >>> print(f"{mock.foo.bar.baz} == {mock['foo']['bar']['baz']}")
+        42 == 42
+
+    """
+
+    def __init__(self, mapping: dict):
+        super().__init__([], **mapping)
+        for key, value in mapping.items():
+            if isinstance(value, dict):
+                value = SuperDict(value)
+            setattr(self, key, value)
+
+
+class MockObjectStore:
+    """Stores and processes the mock objects to return correct results.
+
+    The mock objects can be various types and instead of just returning
+    the raw mock we first want to convert it to a better format. IE if the
+    mock is callable we want to call it first and if the results or the
+    mock are a dict, we need to wrap that in our SuperDict object.
+    """
+    __slots__ = ['mock_objects']
+
+    def __init__(self, mock_objects: typing.Dict[str, MockObjectTypes]):
+        self.mock_objects = mock_objects
+
+    def __contains__(self, key):
+        return key in self.mock_objects
+
+    def get(self, key, default=None):
+        mock = self.mock_objects.get(key, default)
+        if mock is None:
+            return
+
+        results = (
+            mock()
+            if callable(mock)
+            else mock
+        )
+
+        if isinstance(results, dict):
+            return SuperDict(results)
+        return results
+
+
 class MockMiddleware:
 
     def __init__(
@@ -168,10 +223,10 @@ class MockMiddleware:
         ll_mock = self._mock_objects.get('__list_length', 3)
         self.list_length = ll_mock() if callable(ll_mock) else ll_mock
 
-    def get_mocks(self, extra: dict) -> dict:
+    def get_mocks(self, extra: typing.Dict[str, MockObjectTypes]) -> MockObjectStore:
         mock_objects = self._mock_objects.copy()
         mock_objects.update(extra)
-        return mock_objects
+        return MockObjectStore(mock_objects)
 
     def get_mocks_from_headers(self, context: typing.Any) -> dict:
         try:
@@ -219,9 +274,8 @@ class MockMiddleware:
 
             named_type = get_named_type(return_type)
 
-            if named_type.name in mock_objects.keys():
-                mock = mock_objects.get(schema_type.name)
-                return mock() if callable(mock) else mock
+            if named_type.name in mock_objects:
+                return mock_objects.get(schema_type.name)
 
             # If we reached this point this is a custom type that has not
             # explicitly overridden in the mock_objects. Just return a dict
@@ -245,15 +299,13 @@ class MockMiddleware:
 
 
 def is_valid_return_type(
-    mock_objects: dict,
+    mock_objects: MockObjectStore,
     return_type: typing.Any
 ) -> GraphQLType:
-    available_mocks = list(mock_objects.keys())
-
     if isinstance(return_type, GraphQLList):
         list_type = return_type.of_type
         return return_type if is_valid_return_type(mock_objects, list_type) else None
 
     named_type = get_named_type(return_type)
 
-    return return_type if named_type.name in available_mocks else None
+    return return_type if named_type.name in mock_objects else None

@@ -59,6 +59,7 @@ class DebugMiddleware:
             self.level,
             f'Resolving {parent_name}.{field_name} expecting type {return_type}'
         )
+
         start_time = time.perf_counter()
 
         if inspect.isawaitable(_next):
@@ -73,7 +74,7 @@ class DebugMiddleware:
         total_time = end_time - start_time
         self.logger.log(
             self.level,
-            f'Field {parent_name}.{field_name} resolved: {results!r} in {total_time:.3} seconds'
+            f'Field {parent_name}.{field_name} resolved: {results!r} in {total_time:.6f} seconds'
         )
 
         return results
