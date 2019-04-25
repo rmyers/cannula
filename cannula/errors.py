@@ -22,7 +22,7 @@ def format_errors(
     if logger is None:
         logger = logging.getLogger(__name__)
 
-    formatted_errors = collections.defaultdict(list)
+    formatted_errors: typing.Dict[str, typing.List] = collections.defaultdict(list)
 
     for err in errors:
         log_error(err, logger, level)

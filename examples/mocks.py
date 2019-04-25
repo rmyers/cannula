@@ -82,6 +82,11 @@ custom_mocks = {
   'Veggy': {
     'name': "HOT STUFF",
     'id': "999999"
+  },
+  'Query': {
+    'mockity': [
+      {'isOn': False, 'brocoli': {}}
+    ]
   }
 }
 
@@ -90,7 +95,21 @@ custom = cannula.API(
   schema=schema,
   middleware=[
     MockMiddleware(
-      mock_objects=custom_mocks
+      mock_objects=custom_mocks,
+      mock_all=True
+    ),
+  ],
+)
+
+print(f'\nCUSTOM:\n{custom.call_sync(sample_query)}')
+
+custom = cannula.API(
+  __name__,
+  schema=schema,
+  middleware=[
+    MockMiddleware(
+      mock_objects=custom_mocks,
+      mock_all=False
     ),
   ],
 )

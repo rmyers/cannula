@@ -97,7 +97,7 @@ from graphql import (
     get_named_type,
 )
 
-MockObjectTypes = typing.Union[typing.Callable, str, int, float, bool, dict]
+MockObjectTypes = typing.Union[typing.Callable, str, int, float, bool, dict, list]
 
 ADJECTIVES: typing.List[str] = [
     'imminent',
@@ -142,6 +142,7 @@ NOUNS: typing.List[str] = [
     'battle',
 ]
 
+LIST_LENGTH_KEY: str = '__list_length'
 DEFAULT_MOCKS: typing.Dict[str, MockObjectTypes] = {
     'String': lambda: f'{random.choice(ADJECTIVES)}-{random.choice(NOUNS)}',
     'Int': lambda: random.randint(4, 999),
@@ -149,7 +150,7 @@ DEFAULT_MOCKS: typing.Dict[str, MockObjectTypes] = {
     'Boolean': lambda: random.choice([True, False]),
     'ID': lambda: str(uuid.uuid4()),
     # The default number of mock items to return when results are a list.
-    '__list_length': lambda: random.randint(3, 6),
+    LIST_LENGTH_KEY: lambda: random.randint(3, 6),
 }
 
 
@@ -165,7 +166,6 @@ class SuperDict(dict):
         >>> mock = SuperDict({'foo': {'bar': {'baz': 42}}})
         >>> print(f"{mock.foo.bar.baz} == {mock['foo']['bar']['baz']}")
         42 == 42
-
     """
 
     def __init__(self, mapping: dict):
@@ -192,6 +192,16 @@ class MockObjectStore:
     def __contains__(self, key):
         return key in self.mock_objects
 
+    def has_named_type(self, named_type_name: str) -> bool:
+        return named_type_name in self.mock_objects
+
+    def has_parent_field(self, parent_type_name: str, field_name: str) -> bool:
+        return (
+            parent_type_name in self.mock_objects and
+            isinstance(self.mock_objects[parent_type_name], dict) and
+            field_name in typing.cast(typing.Dict, self.mock_objects[parent_type_name])
+        )
+
     def get(self, key, default=None):
         mock = self.mock_objects.get(key, default)
         if mock is None:
@@ -203,6 +213,12 @@ class MockObjectStore:
             else mock
         )
 
+        if isinstance(results, list):
+            return [self.maybe_wrap(r) for r in results]
+
+        return self.maybe_wrap(results)
+
+    def maybe_wrap(self, results):
         if isinstance(results, dict):
             return SuperDict(results)
         return results
@@ -220,12 +236,17 @@ class MockMiddleware:
         self.mock_object_header = mock_object_header
         self._mock_objects = DEFAULT_MOCKS.copy() if mock_all else {}
         self._mock_objects.update(mock_objects)
-        ll_mock = self._mock_objects.get('__list_length', 3)
-        self.list_length = ll_mock() if callable(ll_mock) else ll_mock
 
-    def get_mocks(self, extra: typing.Dict[str, MockObjectTypes]) -> MockObjectStore:
+    def get_mocks(
+        self,
+        extra: typing.Dict[str, MockObjectTypes]
+    ) -> typing.Optional[MockObjectStore]:
         mock_objects = self._mock_objects.copy()
         mock_objects.update(extra)
+
+        if not mock_objects:
+            return None
+
         return MockObjectStore(mock_objects)
 
     def get_mocks_from_headers(self, context: typing.Any) -> dict:
@@ -257,55 +278,49 @@ class MockMiddleware:
         if not mock_objects:
             return await self.run_next(_next, _resource, _info, **kwargs)
 
+        field_name = _info.field_name
         return_type = _info.return_type
-        if not self.mock_all:
-            return_type = is_valid_return_type(mock_objects, _info.return_type)
+        named_type = get_named_type(return_type)
+        parent_type_name = _info.parent_type.name
 
-        if not return_type:
+        resolver_is_mocked = (
+            self.mock_all or
+            mock_objects.has_named_type(named_type.name) or
+            mock_objects.has_parent_field(parent_type_name, field_name)
+        )
+
+        if not resolver_is_mocked:
             return await self.run_next(_next, _resource, _info, **kwargs)
 
-        type_name = _info.parent_type.name  # schema type (Query, Mutation)
-        field_name = _info.field_name  # The attribute being resolved
+        if mock_objects.has_parent_field(parent_type_name, field_name):
+            return mock_objects.get(parent_type_name).get(field_name)
 
-        def mock_resolve_fields(schema_type: typing.Any = None):
+        # Check if we previously resolved a mock object.
+        field_value = (
+            _resource.get(field_name)
+            if isinstance(_resource, dict)
+            else getattr(_resource, field_name, None)
+        )
+
+        if field_value:
+            return field_value
+
+        # Finally check the return_type for mocks
+
+        def resolve_return_type(schema_type: GraphQLType):
             # Special case for list types return a random length list of type.
             if isinstance(schema_type, GraphQLList):
-                return [mock_resolve_fields(schema_type.of_type) for x in range(self.list_length)]
+                list_length = mock_objects.get(LIST_LENGTH_KEY, 3)
+                return [resolve_return_type(schema_type.of_type) for x in range(list_length)]
 
-            named_type = get_named_type(return_type)
-
-            if named_type.name in mock_objects:
-                return mock_objects.get(schema_type.name)
+            named_type_name = get_named_type(schema_type).name
+            if named_type_name in mock_objects:
+                return mock_objects.get(named_type_name)
 
             # If we reached this point this is a custom type that has not
             # explicitly overridden in the mock_objects. Just return a dict
             # with a `__typename` set to the type name to assist in resolving
             # Unions and Interfaces.
-            return {'__typename': named_type.name}
+            return {'__typename': named_type_name}
 
-        if type_name in ['Query', 'Mutation', 'Subscription']:
-            return mock_resolve_fields(return_type)
-
-        # Check if we previously resolved a mock object.
-        if isinstance(_resource, dict):
-            field_value = _resource.get(field_name)
-        else:
-            field_value = getattr(_resource, field_name, None)
-
-        if field_value is None:
-            field_value = mock_resolve_fields(return_type)
-
-        return field_value
-
-
-def is_valid_return_type(
-    mock_objects: MockObjectStore,
-    return_type: typing.Any
-) -> GraphQLType:
-    if isinstance(return_type, GraphQLList):
-        list_type = return_type.of_type
-        return return_type if is_valid_return_type(mock_objects, list_type) else None
-
-    named_type = get_named_type(return_type)
-
-    return return_type if named_type.name in mock_objects else None
+        return resolve_return_type(return_type)

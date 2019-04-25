@@ -67,6 +67,7 @@ class Resolver:
     base_schema: typing.Dict[str, DocumentNode] = {}
     registry: typing.Dict[str, dict]
     datasources: typing.Dict[str, typing.Any]
+    forms: typing.Dict[str, typing.Any]
 
     def __init__(
         self,
@@ -106,8 +107,8 @@ class Resolver:
     def query_directory(self) -> str:
         if not hasattr(self, '_query_dir'):
             if os.path.isabs(self._query_directory):
-                setattr(self, '_query_dir', self._query_directory)
-            setattr(self, '_query_dir', os.path.join(self.root_dir, self._query_directory))
+                self._query_dir: str = self._query_directory
+            self._query_dir = os.path.join(self.root_dir, self._query_directory)
         return self._query_dir
 
     @functools.lru_cache(maxsize=128)

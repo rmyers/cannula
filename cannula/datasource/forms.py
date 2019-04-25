@@ -440,7 +440,7 @@ class WTFormsDataSource(typing.NamedTuple):
     return_type: str
     return_fields: str
     context: typing.Any = None
-    query_fragment = '...formQueryFragment'
+    query_fragment: str = '...formQueryFragment'
 
     def __call__(self, context):
         return WTFormsDataSource(
