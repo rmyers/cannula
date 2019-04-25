@@ -15,3 +15,12 @@ Cypress.Commands.add("login", (username, password) => {
   cy.get('input[name="password"]').type(password || 'password')
   cy.get('button[type=submit]').click()
 });
+
+Cypress.Commands.add("addMocks", (mocks) => {
+  let jsonHeader = JSON.stringify(mocks)
+  cy.server({
+    onAnyRequest: function(_, proxy) {
+      proxy.xhr.setRequestHeader('X-Mock-Objects', jsonHeader);
+    }
+  });
+});

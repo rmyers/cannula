@@ -33,8 +33,9 @@ class ResourceList extends LitElement {
 
   render() {
     const { resources, errors } = this;
+    const className = "hxHoverable resource-list";
     return html`
-      <data-table .data=${resources} .columns=${columns} .errors=${errors}></data-table>
+      <data-table .data=${resources} .columns=${columns} .errors=${errors} .className=${className}></data-table>
     `;
   }
 }

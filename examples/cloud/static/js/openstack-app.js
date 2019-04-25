@@ -27,7 +27,7 @@ class OpenstackApp extends LitElement {
     this.nav = [];
     this.errors = {};
     this.loaded = false;
-    this.pollingInterval = 5000;
+    this.pollingInterval = null;
   }
 
   /*
@@ -36,16 +36,13 @@ class OpenstackApp extends LitElement {
   _fetchData() {
     // Only preform the fetch if the browser is in focus cause they aren't
     // looking at it anyway, if you want you can still do it
-    if ( document.hasFocus() ) {
-      fetch('?xhr=1')
-        .then((response) => response.json())
-        .then((response) => {
-          this.loaded = true;
-          this.data = response.data;
-          this.errors = response.errors;
-          console.log('Polling for updates.');
-        });
-    }
+    fetch('?xhr=1')
+      .then((response) => response.json())
+      .then((response) => {
+        this.loaded = true;
+        this.data = response.data;
+        this.errors = response.errors;
+      });
   }
 
   firstUpdated() {
