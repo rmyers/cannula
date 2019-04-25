@@ -202,11 +202,25 @@ class MockObjectStore:
             field_name in typing.cast(typing.Dict, self.mock_objects[parent_type_name])
         )
 
-    def get(self, key, default=None):
-        mock = self.mock_objects.get(key, default)
+    def get(self, key: str) -> typing.Any:
+        mock = self.mock_objects.get(key)
         if mock is None:
             return
 
+        return self.return_results(mock)
+
+    def get_parent_field(self, parent_type_name: str, field_name: str) -> typing.Any:
+        parent = self.mock_objects.get(parent_type_name)
+
+        mock = (
+            parent.get(field_name)
+            if isinstance(parent, dict)
+            else getattr(parent, field_name, None)
+        )
+
+        return self.return_results(mock)
+
+    def return_results(self, mock: MockObjectTypes) -> typing.Any:
         results = (
             mock()
             if callable(mock)
@@ -218,7 +232,7 @@ class MockObjectStore:
 
         return self.maybe_wrap(results)
 
-    def maybe_wrap(self, results):
+    def maybe_wrap(self, results: typing.Any) -> typing.Any:
         if isinstance(results, dict):
             return SuperDict(results)
         return results
@@ -293,7 +307,7 @@ class MockMiddleware:
             return await self.run_next(_next, _resource, _info, **kwargs)
 
         if mock_objects.has_parent_field(parent_type_name, field_name):
-            return mock_objects.get(parent_type_name).get(field_name)
+            return mock_objects.get_parent_field(parent_type_name, field_name)
 
         # Check if we previously resolved a mock object.
         field_value = (
@@ -321,6 +335,6 @@ class MockMiddleware:
             # explicitly overridden in the mock_objects. Just return a dict
             # with a `__typename` set to the type name to assist in resolving
             # Unions and Interfaces.
-            return {'__typename': named_type_name}
+            return SuperDict({'__typename': named_type_name})
 
         return resolve_return_type(return_type)
