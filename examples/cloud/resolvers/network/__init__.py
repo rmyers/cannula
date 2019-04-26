@@ -29,8 +29,8 @@ class Network(OpenStackBase):
     async def fetchNetwork(self, region=None, id=None):
         networks = await self.fetchNetworks(region)
         for network in networks:
-            network.id == id
-            return network
+            if network.id == id:
+                return network
 
     async def fetchLimits(self):
         east_url = self.get_service_url('us-east', 'v2.0/limits.json')

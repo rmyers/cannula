@@ -87,6 +87,7 @@ Changing that file is complicated especially if it is used in multiple tests.
 
 import inspect
 import json
+import logging
 import random
 import typing
 import uuid
@@ -98,6 +99,8 @@ from graphql import (
 )
 
 MockObjectTypes = typing.Union[typing.Callable, str, int, float, bool, dict, list]
+
+LOG = logging.getLogger(__name__)
 
 ADJECTIVES: typing.List[str] = [
     'imminent',
