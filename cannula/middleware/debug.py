@@ -10,6 +10,8 @@ can override that when you setup the middleware.
 Example with Cannula API
 ------------------------
 
+::
+
     import cannula
     from cannula.middleware import DebugMiddleware
 
@@ -25,7 +27,7 @@ Example with Cannula API
 Example with `graphql-core-next`
 --------------------------------
 
-You can optionally use this middleware as a standalone with the `graphql-core-next`
+You can optionally use this middleware as a standalone with the `graphql-core-next`::
 
     from cannula.middleware import DebugMiddleware
     from graphql import graphql

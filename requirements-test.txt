@@ -9,3 +9,7 @@ mccabe==0.6.1
 pycodestyle==2.5.0
 pyflakes==2.1.0
 entrypoints==0.3
+
+# Sphinx
+Sphinx==2.0.1
+sphinx-autodoc-typehints==1.6.0

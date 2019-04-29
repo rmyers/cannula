@@ -1,3 +1,17 @@
+"""
+Getting Started
+===============
+
+First make sure you have cannula installed::
+
+    pip3 install cannula
+
+Next do some fun stuff with the api::
+
+    import cannula
+
+    api = cannula.API(__name__)
+"""
 
 import asyncio
 import collections
@@ -34,7 +48,7 @@ class Resolver:
     """Resolver Registry
 
     This class is a helper to organize your project as it grows. It allows you
-    to put your resolver modules and schema in different packages. For example:
+    to put your resolver modules and schema in different packages. For example::
 
         app/
             api.py  # `api = cannula.API(__name__)`
@@ -62,6 +76,11 @@ class Resolver:
 
         api = cannula.API(__name__)
         api.register_resolver(app)
+
+    :param name: The import name of the resolver, typically `__name__`
+    :param schema: GraphQL Schema for this resolver.
+    :param schema_directory: Directory name to search for schema files.
+    :param query_directory: Directory name to search for query docs.
     """
     # Allow sub-resolvers to apply a base schema before applying custom schema.
     base_schema: typing.Dict[str, DocumentNode] = {}
@@ -72,9 +91,9 @@ class Resolver:
     def __init__(
         self,
         name: str,
-        schema: typing.Union[str, DocumentNode] = None,
-        schema_directory: str = 'schema',
-        query_directory: str = 'queries',
+        schema: typing.Optional[typing.Union[str, DocumentNode]] = None,
+        schema_directory: typing.Optional[str] = 'schema',
+        query_directory: typing.Optional[str] = 'queries',
     ):
         self.registry = collections.defaultdict(dict)
         self.datasources = {}

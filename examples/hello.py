@@ -16,21 +16,29 @@ SCHEMA = cannula.gql("""
 
 logging.basicConfig(level=logging.DEBUG)
 
-api = cannula.API(__name__, schema=SCHEMA, middleware=[DebugMiddleware()])
+api = cannula.API(
+  __name__,
+  schema=SCHEMA,
+  middleware=[
+    DebugMiddleware()
+  ]
+)
 
 
 class Message(typing.NamedTuple):
     text: str
 
 
-# The query resolver takes a source and info objects and any arguments
-# defined by the schema. Here we only accept a single argument `who`.
+# The query resolver takes a source and info objects
+# and any arguments defined by the schema. Here we
+# only accept a single argument `who`.
 @api.resolver('Query')
 async def hello(source, info, who):
     return Message(f"Hello, {who}!")
 
-# Pre-parse your query to speed up your requests. Here is an example of how
-# to pass arguments to your query functions.
+# Pre-parse your query to speed up your requests.
+# Here is an example of how to pass arguments to your
+# query functions.
 SAMPLE_QUERY = cannula.gql("""
   query HelloWorld ($who: String!) {
     hello(who: $who) {

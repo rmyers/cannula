@@ -1,13 +1,13 @@
 # Cannula
 
-[![CircleCI](https://circleci.com/gh/rmyers/cannula.svg?style=svg)](https://circleci.com/gh/rmyers/cannula)
+[![CircleCI](https://circleci.com/gh/rmyers/cannula.svg?style=shield)](https://circleci.com/gh/rmyers/cannula)
 
 > GraphQL for people who like Python!
 
 * [Why Cannula](#why)
 * [Installation](#install)
 * [Quick Start](#start)
-* [Documentation](#docs)
+* [Documentation](docs/)
 
 <h2 id="why">Why Cannula?</h2>
 
@@ -16,9 +16,7 @@ on making the web fun again. Too much attention has been given to Javascript
 client libraries. They all seem to compete on size and speed and features but
 most of them do not solve any of the actual problems you have. So while the
 todo application is quick and easy to follow the hard parts take a long time
-to complete. For starters Javascript use to be simple and it did not require
-using a transpiler. It was mostly JQuery and it sort of worked but it didn't
-get in your way.
+to complete.
 
 Now a days if you want a fancy single page application you need to invest a
 good week or so planning out all the tools you will need to assemble your site.
@@ -37,9 +35,16 @@ Our Philosophy:
 3. Don't lock yourself into a framework.
 4. Be happy!
 
+Watch me talk about using GraphQL with very little client dependencies:
+
+<a href="http://www.youtube.com/watch?feature=player_embedded&v=SgbZ1Qs3Vxg
+" target="_blank"><img src="http://img.youtube.com/vi/SgbZ1Qs3Vxg/0.jpg"
+alt="My PyTexas Talk" width="480" border="2" /></a>
+
 <h2 id="install">Installation</h2>
 
-Requires Python 3.6 or greater!
+Requires Python 3.6 or greater! The only dependency is
+[graphql-core-next](https://graphql-core-next.readthedocs.io/en/latest/).
 
 ```bash
 pip3 install cannula
@@ -50,32 +55,47 @@ pip3 install cannula
 Here is a small [hello world example](examples/hello.py):
 
 ```python
-import asyncio
+import logging
 import typing
 import sys
 
 import cannula
+from cannula.middleware import DebugMiddleware
 
-api = cannula.API(__name__, schema=cannula.gql("""
+SCHEMA = cannula.gql("""
   type Message {
     text: String
   }
-  extend type Query {
+  type Query {
     hello(who: String): Message
   }
 """)
 
+logging.basicConfig(level=logging.DEBUG)
+
+api = cannula.API(
+  __name__,
+  schema=SCHEMA,
+  middleware=[
+    DebugMiddleware()
+  ]
+)
+
+
 class Message(typing.NamedTuple):
     text: str
 
-# The query resolver takes a source and info objects and any arguments
-# defined by the schema. Here we only accept a single argument `who`.
+
+# The query resolver takes a source and info objects
+# and any arguments defined by the schema. Here we
+# only accept a single argument `who`.
 @api.resolver('Query')
 async def hello(source, info, who):
     return Message(f"Hello, {who}!")
 
-# Pre-parse your query to speed up your requests. Here is an example of how
-# to pass arguments to your query functions.
+# Pre-parse your query to speed up your requests.
+# Here is an example of how to pass arguments to your
+# query functions.
 SAMPLE_QUERY = cannula.gql("""
   query HelloWorld ($who: String!) {
     hello(who: $who) {
@@ -84,31 +104,48 @@ SAMPLE_QUERY = cannula.gql("""
   }
 """)
 
-async def main():
-    who = 'world'
-    if len(sys.argv) > 1:
-        who = sys.argv[1]
 
-    results = await api.call(SAMPLE_QUERY, variables={'who': who})
-    print(results)
+who = 'world'
+if len(sys.argv) > 1:
+    who = sys.argv[1]
 
-loop = asyncio.get_event_loop()
-loop.run_until_complete(main())
+print(api.call_sync(SAMPLE_QUERY, variables={'who': who}))
 ```
 
 Now you should see the results if you run the sample on the command line:
 
 ```bash
 $ python3 examples/hello.py
-ExecutionResult(data={'hello': {'text': 'Hello, world!'}}, errors=None)
+DEBUG:asyncio:Using selector: KqueueSelector
+DEBUG:cannula.schema:Adding default empty Mutation type
+DEBUG:cannula.middleware.debug:Resolving Query.hello expecting type Message
+DEBUG:cannula.middleware.debug:Field Query.hello resolved: Message(text='Hello, world!') in 0.000108 seconds
+DEBUG:cannula.middleware.debug:Resolving Message.text expecting type String
+DEBUG:cannula.middleware.debug:Field Message.text resolved: 'Hello, world!' in 0.000067 seconds
+ExecutionResult(
+  data={'hello': {'text': 'Hello, world!'}},
+  errors=None
+)
+
 $ python3 examples/hello.py Bob
-ExecutionResult(data={'hello': {'text': 'Hello, Bob!'}}, errors=None)
+DEBUG:asyncio:Using selector: KqueueSelector
+DEBUG:cannula.schema:Adding default empty Mutation type
+DEBUG:cannula.middleware.debug:Resolving Query.hello expecting type Message
+DEBUG:cannula.middleware.debug:Field Query.hello resolved: Message(text='Hello, Bob!') in 0.000104 seconds
+DEBUG:cannula.middleware.debug:Resolving Message.text expecting type String
+DEBUG:cannula.middleware.debug:Field Message.text resolved: 'Hello, Bob!' in 0.000101 seconds
+ExecutionResult(
+  data={'hello': {'text': 'Hello, Bob!'}},
+  errors=None
+)
 ```
 
 But what about Django integration or flask?
 
 ```python
+# pip install channels, Django
 import cannula
+from channels.db import database_sync_to_async
 from django.contrib.auth.models import User
 
 schema = cannula.gql("""
@@ -125,6 +162,10 @@ schema = cannula.gql("""
 
 @api.query()
 async def getUserById(source, info, user_id):
+    return await get_user(user_id)
+
+@database_sync_to_async
+def get_user(user_id):
     return User.objects.get(pk=user_id)
 
 @api.resolve('User')
@@ -140,13 +181,3 @@ Django and sqlalchemy already provide tools to query the database. And they
 work quite well. Or you may choose to use an async database library to make
 concurrent requests work even better. Try them all and see what works best for
 your team and your use case.
-
-
-<h2 id="docs">Documentation</h2>
-
-A little light right now... Come back soon for more. Meanwhile have a look at
-our examples:
-
-* [Hello World](./examples/hello.py)
-* [Automatic Mocks](./examples/mocks.py)
-* [A Large Custom UI](./examples/cloud)
