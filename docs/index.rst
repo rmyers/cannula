@@ -1,12 +1,56 @@
-.. Cannula documentation master file, created by
-   sphinx-quickstart on Sat Apr 27 17:40:27 2019.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
-
 Cannula Documentation
 =====================
 
-.. include:: ../readme.rst
+Using GraphQL you can simplify your web application stack and reduce
+dependencies to achieve the same customer experience without regret. By using
+just a few core libraries you can increase productivity and make your
+application easier to maintain.
+
+Our Philosophy:
+
+1. Make your site easy to maintain.
+2. Document your code.
+3. Don't lock yourself into a framework.
+4. Be happy!
+
+Listen to me talk about `GraphQL <http://www.youtube.com/watch?feature=player_embedded&v=SgbZ1Qs3Vxg>`_
+
+Installation
+------------
+
+Requirements:
+
+* Python 3.6+
+* `graphql-core-next <https://graphql-core-next.readthedocs.io/en/latest/>`_
+
+Use pip::
+
+    $ pip3 install cannula
+
+Quick Start
+-----------
+
+Here is a small `hello world` example:
+
+.. literalinclude:: examples/hello.py
+
+Dataloaders
+-----------
+
+TODO: example dataloader
+
+Testing Your Code
+-----------------
+
+Since GraphQL is typed it is trivial to mock the responses to any Query or
+Mutation. Cannula provides a :ref:`mock-middleware` which can mock all
+types or only select few to provide flexibility when writing your tests.
+Here is a small example:
+
+.. literalinclude:: examples/mocks.py
+
+Read More About It
+------------------
 
 .. toctree::
    :maxdepth: 2

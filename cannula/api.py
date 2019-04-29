@@ -1,16 +1,8 @@
 """
-Getting Started
-===============
+Using the API
+=============
 
-First make sure you have cannula installed::
 
-    pip3 install cannula
-
-Next do some fun stuff with the api::
-
-    import cannula
-
-    api = cannula.API(__name__)
 """
 
 import asyncio

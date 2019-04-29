@@ -1,13 +1,14 @@
 # Cannula
 
 [![CircleCI](https://circleci.com/gh/rmyers/cannula.svg?style=shield)](https://circleci.com/gh/rmyers/cannula)
+[![Documentation Status](https://readthedocs.org/projects/cannula/badge/?version=latest)](https://cannula.readthedocs.io/en/latest/?badge=latest)
 
 > GraphQL for people who like Python!
 
 * [Why Cannula](#why)
 * [Installation](#install)
 * [Quick Start](#start)
-* [Documentation](docs/)
+* [Documentation](https://cannula.readthedocs.io/)
 
 <h2 id="why">Why Cannula?</h2>
 

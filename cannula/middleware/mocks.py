@@ -1,4 +1,6 @@
 """
+.. _mock-middleware:
+
 MockMiddleware
 ==============
 
@@ -24,7 +26,15 @@ cannula API you can add this in the middleware list in the contructor::
         __name__,
         SCHEMA,
         middleware = [
-            MockMiddleware(mock_all=True, mock_objects={'my': {'fakes': 'here'}}}),
+            MockMiddleware(
+                mock_all=True,
+                mock_objects={
+                    'Query': {
+                        'field_to_fake': 'mock_value'
+                    },
+                    'String': 'I will be used for any String type',
+                }
+            ),
         ]
     )
 
@@ -37,7 +47,12 @@ Or you can use this with just the `graphql-core-next` library like::
         schema=SCHEMA,
         query=QUERY,
         middleware=[
-            MockMiddleware(mock_all=True, mock_objects={'my': {'fakes': 'here'}}}),
+            MockMiddleware(
+                mock_all=True,
+                mock_objects={
+                    'String': 'just like before'
+                }
+            ),
         ],
     )
 
@@ -47,7 +62,9 @@ Example Using `X-Mock-Objects` Header
 Most testing frameworks have a way to add headers to requests that you are
 testing. Usually this done for authentication, but we are going to abuse this
 functionality to tell the server what data to respond with. Here is an
-example using Cypress.io::
+example using Cypress.io:
+
+.. code-block:: javascript
 
     var resourceMock = JSON.stringify({
         "Resource": {
@@ -60,13 +77,15 @@ example using Cypress.io::
         it('Renders the resource correctly', function() {
             cy.server({
                 onAnyRequest: function(route, proxy) {
-                    proxy.xhr.setRequestHeader('X-Mock-Objects', resourceMock);
+                    proxy.xhr.setRequestHeader(
+                        'X-Mock-Objects', resourceMock
+                    );
                 }
             });
             cy.visit('http://localhost:8000/resource/view/');
-            cy.get(.resource).within(() => {
-                cy.get(.name).should('equal', 'Mocky');
-                cy.get(.id).should('equal', '12345');
+            cy.get('.resource').within(() => {
+                cy.get('.name').should('equal', 'Mocky');
+                cy.get('.id').should('equal', '12345');
             });
         })
     });
@@ -83,6 +102,9 @@ Another reason why this pattern is great is that we are not testing against
 a mock server that is specifically setup to respond to our request. While that
 will work just fine the mocks are hidden from the tests in some other file.
 Changing that file is complicated especially if it is used in multiple tests.
+
+Mock Middleware API
+-------------------
 """
 
 import inspect
@@ -242,6 +264,16 @@ class MockObjectStore:
 
 
 class MockMiddleware:
+    """Mocking Middleware
+
+    Initialize the MockMiddleware, you can choose to mock all types or just
+    the ones provided by the `mock_objects` param. Alternatively you can
+    provide the mock_objects via a request header.
+
+    :param mock_objects: Mapping of return values for types.
+    :param mock_all: Whether to mock all resolvers.
+    :param mock_object_header: Customize the header used to set mock_objects.
+    """
 
     def __init__(
         self,

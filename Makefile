@@ -71,6 +71,9 @@ watch:  ## Watch for changes to python modules and re-run the tests
 	@rm -f .coverage
 	@while true; do $(MAKE) --no-print-directory -q run-tests || $(MAKE) run-tests; sleep 5; done
 
+docs: setup  ## Build the documentation
+	$(VIRTUAL_ENV)/bin/sphinx-build -a docs docs/_build
+
 #% Available Commands:
 help: ## Help is on the way
 	grep '^#%' $(MAKEFILE_LIST) | sed -e 's/#%//'
