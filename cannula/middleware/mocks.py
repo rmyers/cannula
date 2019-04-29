@@ -227,8 +227,12 @@ class MockObjectStore:
             field_name in typing.cast(typing.Dict, self.mock_objects[parent_type_name])
         )
 
-    def get(self, key: str) -> typing.Any:
-        mock = self.mock_objects.get(key)
+    def get(
+        self,
+        key: str,
+        default: typing.Optional[typing.Any] = None
+    ) -> typing.Any:
+        mock = self.mock_objects.get(key, default)
         if mock is None:
             return
 
@@ -242,6 +246,9 @@ class MockObjectStore:
             if isinstance(parent, dict)
             else getattr(parent, field_name, None)
         )
+
+        if mock is None:
+            return
 
         return self.return_results(mock)
 

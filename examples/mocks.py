@@ -1,35 +1,10 @@
-"""
-Automatic Mocks Example
------------------------
-
-This shows off how the automatic mocking works. All you need to do is specify
-`mocks=True` and optionally `mock_objects` to the API.
-
-Run this program multiple times to see how the data is randomly generated:
-
-    $ PYTHONPATH=../ python3 mocks.py
-
-You can change the `schema` or `sample_query` as well to see how the data
-automatically changes too.
-"""
-
-import logging
 
 import cannula
-from cannula.middleware import MockMiddleware, DebugMiddleware
-
-logging.basicConfig(level=logging.DEBUG)
+from cannula.middleware import MockMiddleware
 
 schema = cannula.gql("""
-  type Veggy {
-    name: String
-    id: ID
-  }
   type Brocoli {
-    name: String
-    id: ID
     taste: String
-    vegatable: Veggy
   }
   type Message {
     text: String
@@ -52,12 +27,7 @@ sample_query = cannula.gql("""{
     isOn
     id
     brocoli {
-      name
-      id
-      vegatable {
-        name
-        id
-      }
+      taste
     }
   }
 }
@@ -67,21 +37,24 @@ default = cannula.API(
   __name__,
   schema=schema,
   middleware=[
-    MockMiddleware(),
-    DebugMiddleware(),
+    MockMiddleware()
   ],
 )
 
 
-print(f'\nDEFAULT:\n{default.call_sync(sample_query)}')
+print(f'''
+  Results with the default 'mock_all=True'. Since the result
+  is a list you will get a random number of results unless
+  you specify '__list_length' in mock_objects:
+  {default.call_sync(sample_query).data}
+''')
 
 
 custom_mocks = {
   'String': 'This will be used for all Strings',
   'Int': 42,
-  'Veggy': {
-    'name': "HOT STUFF",
-    'id': "999999"
+  'Brocoli': {
+    'taste': "Delicious"
   },
   'Query': {
     'mockity': [
@@ -101,9 +74,13 @@ custom = cannula.API(
   ],
 )
 
-print(f'\nCUSTOM:\n{custom.call_sync(sample_query)}')
+print(f'''
+  Custom `mock_objects` with `mock_all=True` will return
+  a fake result for every field:
+  {custom.call_sync(sample_query).data}
+''')
 
-custom = cannula.API(
+limited_mocks = cannula.API(
   __name__,
   schema=schema,
   middleware=[
@@ -114,4 +91,8 @@ custom = cannula.API(
   ],
 )
 
-print(f'\nCUSTOM:\n{custom.call_sync(sample_query)}')
+print(f'''
+  Limited mocks with `mock_all=False` will only return
+  fake results for fields mocked in `mock_objects`:
+  {limited_mocks.call_sync(sample_query).data}
+''')

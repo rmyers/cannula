@@ -13,7 +13,11 @@ Our Philosophy:
 3. Don't lock yourself into a framework.
 4. Be happy!
 
-Listen to me talk about `GraphQL <http://www.youtube.com/watch?feature=player_embedded&v=SgbZ1Qs3Vxg>`_
+Listen to me talk about `GraphQL`:
+
+.. raw:: html
+
+    <iframe width="560" height="315" src="https://www.youtube.com/embed/SgbZ1Qs3Vxg" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
 
 Installation
 ------------

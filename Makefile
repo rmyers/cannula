@@ -50,7 +50,7 @@ clean: ## Clean your local workspace
 	find . -name '__pycache__' -delete
 	find . -name '*.pyc' -delete
 
-test: flake8 unit ## Run the tests (flake8, unit)
+test: flake8 mypy unit ## Run the tests (flake8, unit)
 
 flake8: setup ## Run flake8 checks
 	$(VIRTUAL_ENV)/bin/flake8 cannula tests
@@ -60,6 +60,9 @@ unit: setup ## Run unit tests
 	$(VIRTUAL_ENV)/bin/coverage run --branch --source=cannula -m unittest
 	$(VIRTUAL_ENV)/bin/coverage html
 	$(VIRTUAL_ENV)/bin/coverage report -m
+
+mypy: setup ## Run mypy on code
+	$(VIRTUAL_ENV)/bin/mypy cannula
 
 .coverage: $(PYTHON_MODULES)
 	@touch .coverage # Create the .coverage file to catch errors in test setup

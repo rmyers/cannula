@@ -84,8 +84,8 @@ class Resolver:
         self,
         name: str,
         schema: typing.Optional[typing.Union[str, DocumentNode]] = None,
-        schema_directory: typing.Optional[str] = 'schema',
-        query_directory: typing.Optional[str] = 'queries',
+        schema_directory: str = 'schema',
+        query_directory: str = 'queries',
     ):
         self.registry = collections.defaultdict(dict)
         self.datasources = {}
