@@ -8,6 +8,7 @@
 * [Why Cannula](#why)
 * [Installation](#install)
 * [Quick Start](#start)
+* [Examples](#examples)
 * [Documentation](https://cannula.readthedocs.io/)
 
 <h2 id="why">Why Cannula?</h2>
@@ -35,12 +36,6 @@ Our Philosophy:
 2. Document your code.
 3. Don't lock yourself into a framework.
 4. Be happy!
-
-Watch me talk about using GraphQL with very little client dependencies:
-
-<a href="http://www.youtube.com/watch?feature=player_embedded&v=SgbZ1Qs3Vxg
-" target="_blank"><img src="http://img.youtube.com/vi/SgbZ1Qs3Vxg/0.jpg"
-alt="My PyTexas Talk" width="480" border="2" /></a>
 
 <h2 id="install">Installation</h2>
 
@@ -182,3 +177,11 @@ Django and sqlalchemy already provide tools to query the database. And they
 work quite well. Or you may choose to use an async database library to make
 concurrent requests work even better. Try them all and see what works best for
 your team and your use case.
+
+<h2 id="examples">Examples and Documentation</h2>
+
+* [hello world](examples/hello.py)
+* [using mocks](examples/mocks.py)
+* [Real World Example](examples/cloud)
+
+[Documentation](https://cannula.readthedocs.io/)
