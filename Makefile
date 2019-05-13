@@ -27,6 +27,7 @@ DOCKER_COMPOSE           := $(shell which docker-compose)
 .SILENT: help
 .PHONY: setup docs clean
 .PHONY: test flake8 unit
+.PHONY: publish publish-test
 .PHONY: help
 
 default: help
@@ -76,6 +77,26 @@ watch:  ## Watch for changes to python modules and re-run the tests
 
 docs: setup  ## Build the documentation
 	$(VIRTUAL_ENV)/bin/sphinx-build -a docs docs/_build
+
+publish-test: setup  ## Publish the library to test pypi
+ifndef TWINE_USERNAME
+	$(error "You must set the TWINE_USERNAME env variable 'export TWINE_USERNAME=theusername'")
+endif
+ifndef TWINE_PASSWORD
+	$(error "You must set the TWINE_PASSWORD env variable 'export TWINE_PASSWORD=thevalueofthepassword'")
+endif
+	$(VIRTUAL_ENV)/bin/python setup.py sdist bdist_wheel
+	$(VIRTUAL_ENV)/bin/python -m twine upload --repository-url https://test.pypi.org/legacy/ dist/*
+
+publish: setup  ## Publish the library to pypi
+ifndef TWINE_USERNAME
+	$(error "You must set the TWINE_USERNAME env variable 'export TWINE_USERNAME=theusername'")
+endif
+ifndef TWINE_PASSWORD
+	$(error "You must set the TWINE_PASSWORD env variable 'export TWINE_PASSWORD=thevalueofthepassword'")
+endif
+	$(VIRTUAL_ENV)/bin/python setup.py sdist bdist_wheel
+	$(VIRTUAL_ENV)/bin/python -m twine upload dist/*
 
 #% Available Commands:
 help: ## Help is on the way
