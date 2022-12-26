@@ -17,4 +17,4 @@ sphinx-autodoc-typehints==1.6.0
 # twine PYPI Publish
 twine==1.13.0
 setuptools==41.0.1
-wheel==0.33.4
+wheel==0.38.1
