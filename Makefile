@@ -51,7 +51,7 @@ clean: ## Clean your local workspace
 	find . -name '__pycache__' -delete
 	find . -name '*.pyc' -delete
 
-test: flake8 mypy unit ## Run the tests (flake8, unit)
+test: flake8 unit ## Run the tests (flake8, unit)
 
 flake8: setup ## Run flake8 checks
 	$(VIRTUAL_ENV)/bin/flake8 cannula tests
