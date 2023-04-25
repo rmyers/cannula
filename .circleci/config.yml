@@ -7,7 +7,7 @@ version: 2.1
 executors:
   default:
     docker:
-      - image: circleci/python:3.6.8-jessie
+      - image: cimg/python:3.9.16
     working_directory: ~/repo
 
 jobs:
