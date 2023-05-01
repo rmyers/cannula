@@ -74,22 +74,21 @@ class Resolver:
     :param schema_directory: Directory name to search for schema files.
     :param query_directory: Directory name to search for query docs.
     """
+
     # Allow sub-resolvers to apply a base schema before applying custom schema.
     base_schema: typing.Dict[str, DocumentNode] = {}
     registry: typing.Dict[str, dict]
     datasources: typing.Dict[str, typing.Any]
-    forms: typing.Dict[str, typing.Any]
 
     def __init__(
         self,
         name: str,
-        schema: typing.Optional[typing.Union[str, DocumentNode]] = None,
-        schema_directory: str = 'schema',
-        query_directory: str = 'queries',
+        schema: typing.List[typing.Union[str, DocumentNode]] = [],
+        schema_directory: str = "schema",
+        query_directory: str = "queries",
     ):
         self.registry = collections.defaultdict(dict)
         self.datasources = {}
-        self.forms = {}
         self._schema_directory = schema_directory
         self._query_directory = query_directory
         self.root_dir = get_root_path(name)
@@ -97,26 +96,28 @@ class Resolver:
 
     @property
     def schema_directory(self):
-        if not hasattr(self, '_schema_dir'):
+        if not hasattr(self, "_schema_dir"):
             if os.path.isabs(self._schema_directory):
-                setattr(self, '_schema_dir', self._schema_directory)
-            setattr(self, '_schema_dir', os.path.join(self.root_dir, self._schema_directory))
+                setattr(self, "_schema_dir", self._schema_directory)
+            setattr(
+                self, "_schema_dir", os.path.join(self.root_dir, self._schema_directory)
+            )
         return self._schema_dir
 
     def find_schema(self) -> typing.List[DocumentNode]:
         schemas: typing.List[DocumentNode] = []
         if os.path.isdir(self.schema_directory):
-            LOG.debug(f'Searching {self.schema_directory} for schema.')
+            LOG.debug(f"Searching {self.schema_directory} for schema.")
             schemas = load_schema(self.schema_directory)
 
-        if self._schema is not None:
-            schemas.append(maybe_parse(self._schema))
+        for schema in self._schema:
+            schemas.append(maybe_parse(schema))
 
         return schemas
 
     @property
     def query_directory(self) -> str:
-        if not hasattr(self, '_query_dir'):
+        if not hasattr(self, "_query_dir"):
             if os.path.isabs(self._query_directory):
                 self._query_dir: str = self._query_directory
             self._query_dir = os.path.join(self.root_dir, self._query_directory)
@@ -124,35 +125,23 @@ class Resolver:
 
     @functools.lru_cache(maxsize=128)
     def load_query(self, query_name: str) -> DocumentNode:
-        path = os.path.join(self.query_directory, f'{query_name}.graphql')
+        path = os.path.join(self.query_directory, f"{query_name}.graphql")
         assert os.path.isfile(path), f"No query found for {query_name}"
 
         with open(path) as query:
             return parse(query.read())
 
-    def resolver(self, type_name: str = 'Query') -> typing.Any:
+    def resolver(self, type_name: str = "Query") -> typing.Any:
         def decorator(function):
             self.registry[type_name][function.__name__] = function
+
         return decorator
 
     def datasource(self):
         def decorator(klass):
             self.datasources[klass.__name__] = klass
+
         return decorator
-
-    def get_form_query(self, name: str, **kwargs) -> DocumentNode:
-        """Get registered form query document"""
-        form = self.forms.get(name)
-        assert form is not None, f'Form: {name} is not registered!'
-
-        return form.get_query(**kwargs)
-
-    def get_form_mutation(self, name: str, **kwargs) -> DocumentNode:
-        """Get registered form mutation document"""
-        form = self.forms.get(name)
-        assert form is not None, f'Form: {name} is not registered!'
-
-        return form.get_mutation(**kwargs)
 
 
 class API(Resolver):
@@ -188,7 +177,7 @@ class API(Resolver):
 
     @property
     def schema(self) -> GraphQLSchema:
-        if not hasattr(self, '_full_schema'):
+        if not hasattr(self, "_full_schema"):
             self._full_schema = self._build_schema()
         return self._full_schema
 
@@ -200,7 +189,6 @@ class API(Resolver):
             self._merge_registry(resolver.registry)
             self.base_schema.update(resolver.base_schema)
             self.datasources.update(resolver.datasources)
-            self.forms.update(resolver.forms)
             for document_node in resolver.find_schema():
                 yield document_node
 
@@ -212,7 +200,7 @@ class API(Resolver):
 
         schema_validation_errors = validate_schema(schema)
         if schema_validation_errors:
-            raise Exception(f'Invalid schema: {schema_validation_errors}')
+            raise Exception(f"Invalid schema: {schema_validation_errors}")
 
         schema = fix_abstract_resolve_type(schema)
 
@@ -226,13 +214,14 @@ class API(Resolver):
             for field_name, resolver_fn in fields.items():
                 field_definition = object_type.fields.get(field_name)
                 if not field_definition:
-                    raise Exception(f'Invalid field {type_name}.{field_name}')
+                    raise Exception(f"Invalid field {type_name}.{field_name}")
 
                 field_definition.resolve = resolver_fn
 
     def context(self):
         def decorator(klass):
             self._context = klass
+
         return decorator
 
     def get_context(self, request):
@@ -254,7 +243,7 @@ class API(Resolver):
         self,
         document: GraphQLSchema,
         request: typing.Any = None,
-        variables: typing.Dict[str, typing.Any] = None
+        variables: typing.Dict[str, typing.Any] = None,
     ) -> ExecutionResult:
         """Preform a query against the schema.
 
@@ -281,7 +270,7 @@ class API(Resolver):
         self,
         document: GraphQLSchema,
         request: typing.Any = None,
-        variables: typing.Dict[str, typing.Any] = None
+        variables: typing.Dict[str, typing.Any] = None,
     ) -> ExecutionResult:
         loop = asyncio.get_event_loop()
         return loop.run_until_complete(self.call(document, request, variables))
