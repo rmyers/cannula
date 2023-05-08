@@ -5,6 +5,7 @@ from .api import (
 )
 from .errors import format_errors
 from .utils import gql
+from .schema import build_and_extend_schema
 
 __all__ = [
     "API",
@@ -12,6 +13,7 @@ __all__ = [
     "Resolver",
     "format_errors",
     "gql",
+    "build_and_extend_schema",
 ]
 
 __VERSION__ = "0.0.4"

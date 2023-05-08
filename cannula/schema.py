@@ -2,6 +2,7 @@ import logging
 import os
 import pathlib
 import typing
+import itertools
 
 from graphql import (
     GraphQLSchema,
@@ -11,32 +12,21 @@ from graphql import (
     build_ast_schema,
     extend_schema,
     concat_ast,
+    is_type_extension_node,
+    is_type_system_extension_node,
+    is_type_definition_node,
 )
 
 LOG = logging.getLogger(__name__)
 QUERY_TYPE = parse("type Query { _empty: String }")
 MUTATION_TYPE = parse("type Mutation { _empty: String }")
 
-object_definition_kind = "object_type_definition"
-object_extension_kind = "object_type_extension"
-interface_extension_kind = "interface_type_extension"
-input_object_extension_kind = "input_object_type_extension"
-union_extension_kind = "union_type_extension"
-enum_extension_kind = "enum_type_extension"
-
-extension_kinds = [
-    object_extension_kind,
-    interface_extension_kind,
-    input_object_extension_kind,
-    union_extension_kind,
-    enum_extension_kind,
-]
-
 
 def extract_extensions(ast: DocumentNode) -> DocumentNode:
-    extensions = [node for node in ast.definitions if node.kind in extension_kinds]
-
-    return DocumentNode(definitions=extensions)
+    type_extensions = filter(is_type_extension_node, ast.definitions)
+    system_extensions = filter(is_type_system_extension_node, ast.definitions)
+    extensions = itertools.chain(type_extensions, system_extensions)
+    return DocumentNode(definitions=list(extensions))
 
 
 def assert_has_query_and_mutation(ast: DocumentNode) -> DocumentNode:
@@ -45,11 +35,8 @@ def assert_has_query_and_mutation(ast: DocumentNode) -> DocumentNode:
     The schema is pretty much useless without them and rather than causing
     an error we'll just add in an empty one so they can be extended.
     """
-    object_definitions = [
-        node.name.value
-        for node in ast.definitions
-        if node.kind == object_definition_kind
-    ]
+    object_kinds = filter(is_type_definition_node, ast.definitions)
+    object_definitions = [node.name.value for node in object_kinds]
     has_mutation_definition = "Mutation" in object_definitions
     has_query_definition = "Query" in object_definitions
 
@@ -89,7 +76,9 @@ def build_and_extend_schema(
 
     if extension_ast.definitions:
         LOG.debug("Extending schema")
-        schema = extend_schema(schema, extension_ast)
+        schema = extend_schema(
+            schema, extension_ast, assume_valid=True, assume_valid_sdl=True
+        )
 
     return schema
 
