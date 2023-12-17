@@ -40,7 +40,7 @@ $(VIRTUAL_ENV):
 
 # Check for the existence of reqs-(md5) and run pip install if missing.
 $(VIRTUAL_ENV)/.requirements-installed: $(REQUIREMENTS)
-	$(VIRTUAL_ENV)/bin/pip install .[test]
+	$(VIRTUAL_ENV)/bin/pip install -e .[test]
 	touch $(VIRTUAL_ENV)/.requirements-installed
 
 setup: $(VIRTUAL_ENV) $(VIRTUAL_ENV)/.requirements-installed ## Setup local environment
@@ -58,13 +58,7 @@ flake8: setup ## Run flake8 checks
 	$(VIRTUAL_ENV)/bin/flake8 cannula tests
 
 unit: setup ## Run unit tests
-	$(VIRTUAL_ENV)/bin/coverage erase
-	$(VIRTUAL_ENV)/bin/coverage run --branch --source=cannula -m unittest
-	$(VIRTUAL_ENV)/bin/coverage html
-	$(VIRTUAL_ENV)/bin/coverage report -m
-
-pytest: setup
-	$(VIRTUAL_ENV)/bin/pytest -v ./tests
+	$(VIRTUAL_ENV)/bin/pytest
 
 mypy: setup ## Run mypy on code
 	$(VIRTUAL_ENV)/bin/mypy cannula

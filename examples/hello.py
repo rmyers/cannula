@@ -18,7 +18,7 @@ SCHEMA = cannula.gql(
 
 logging.basicConfig(level=logging.DEBUG)
 
-api = cannula.API(__name__, schema=SCHEMA, middleware=[DebugMiddleware()])
+api = cannula.API(__name__, schema=[SCHEMA], middleware=[DebugMiddleware()])
 
 
 class Message(typing.NamedTuple):
