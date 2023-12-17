@@ -18,9 +18,9 @@
 #%   make test
 #%
 
-REQUIREMENTS             := $(shell find . -name 'requirements*.txt')
+REQUIREMENTS             := $(shell find . -name 'setup.cfg')
 SHELL                    := /bin/bash
-VIRTUAL_ENV              ?= .venv
+VIRTUAL_ENV              ?= venv
 PYTHON_MODULES           := $(shell find . -name '*.py')
 DOCKER_COMPOSE           := $(shell which docker-compose)
 
@@ -40,7 +40,7 @@ $(VIRTUAL_ENV):
 
 # Check for the existence of reqs-(md5) and run pip install if missing.
 $(VIRTUAL_ENV)/.requirements-installed: $(REQUIREMENTS)
-	$(VIRTUAL_ENV)/bin/pip install -r requirements-test.txt
+	$(VIRTUAL_ENV)/bin/pip install .[test]
 	touch $(VIRTUAL_ENV)/.requirements-installed
 
 setup: $(VIRTUAL_ENV) $(VIRTUAL_ENV)/.requirements-installed ## Setup local environment
@@ -50,8 +50,7 @@ clean: ## Clean your local workspace
 	rm -rf htmlcov
 	rm -rf .coverage
 	rm -rf *.egg-info
-	find . -name '__pycache__' -delete
-	find . -name '*.pyc' -delete
+	find . -name '*.py[co]' -delete
 
 test: flake8 unit ## Run the tests (flake8, unit)
 
@@ -63,6 +62,9 @@ unit: setup ## Run unit tests
 	$(VIRTUAL_ENV)/bin/coverage run --branch --source=cannula -m unittest
 	$(VIRTUAL_ENV)/bin/coverage html
 	$(VIRTUAL_ENV)/bin/coverage report -m
+
+pytest: setup
+	$(VIRTUAL_ENV)/bin/pytest -v ./tests
 
 mypy: setup ## Run mypy on code
 	$(VIRTUAL_ENV)/bin/mypy cannula
@@ -87,6 +89,9 @@ publish-test: setup  ## Publish the library to test pypi
 publish: setup  ## Publish the library to pypi
 	$(VIRTUAL_ENV)/bin/python setup.py sdist bdist_wheel
 	$(VIRTUAL_ENV)/bin/python -m twine upload dist/*
+
+format:
+	$(VIRTUAL_ENV)/bin/black .
 
 #% Available Commands:
 help: ## Help is on the way

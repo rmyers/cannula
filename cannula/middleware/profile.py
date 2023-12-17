@@ -7,7 +7,6 @@ import typing
 
 
 class ProfileMiddleware:
-
     def __init__(
         self,
         level: int = logging.DEBUG,
@@ -21,13 +20,10 @@ class ProfileMiddleware:
         type_name = _info.parent_type.name  # schema type (Query, Mutation)
         field_name = _info.field_name  # The attribute being resolved
 
-        if type_name not in ['Query', 'Mutation']:
+        if type_name not in ["Query", "Mutation"]:
             return await self.run_it(_next, _resource, _info, **kwargs)
 
-        self.logger.log(
-            self.level,
-            f'Profiling {field_name} on {type_name}'
-        )
+        self.logger.log(self.level, f"Profiling {field_name} on {type_name}")
 
         self.profiler.enable()
 
@@ -36,13 +32,12 @@ class ProfileMiddleware:
         self.profiler.disable()
         s = io.StringIO()
         # TODO(rmyers): Add support for 3.7+
-        ps = pstats.Stats(self.profiler, stream=s).sort_stats('cumulative')
+        ps = pstats.Stats(self.profiler, stream=s).sort_stats("cumulative")
         ps.print_stats()
         self.profiler.clear()
 
         self.logger.log(
-            self.level,
-            f'{type_name}: {field_name} profile:\n{s.getvalue()}'
+            self.level, f"{type_name}: {field_name} profile:\n{s.getvalue()}"
         )
 
         return results

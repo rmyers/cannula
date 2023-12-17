@@ -1,0 +1,18 @@
+[build-system]
+requires = [
+    "setuptools >= 48",
+    "wheel >= 0.29.0",
+]
+build-backend = 'setuptools.build_meta'
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+minversion = "6.0"
+addopts = [
+    "-ra", "-q",
+    "--cov=cannula"
+    ]
+testpaths = [
+    "tests",
+    "integration",
+]

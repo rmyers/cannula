@@ -15,20 +15,20 @@ from graphql import parse
 from starlette.responses import RedirectResponse
 
 SESSION = {}
-SESSION_COOKE_NAME = 'openstack_session_id'
+SESSION_COOKE_NAME = "openstack_session_id"
 LOG = logging.getLogger(__name__)
 
 
 class User(typing.NamedTuple):
     catalog: dict = {}
-    auth_token: str = ''
-    username: str = 'anonymous'
+    auth_token: str = ""
+    username: str = "anonymous"
     roles: typing.List[str] = []
-    session_id: str = ''
+    session_id: str = ""
 
     @property
     def is_admin(self) -> bool:
-        return 'admin' in self.roles
+        return "admin" in self.roles
 
     @property
     def is_authenticated(self) -> bool:
@@ -44,9 +44,10 @@ class User(typing.NamedTuple):
 def flatten_catalog(catalog: typing.List[dict]) -> dict:
     """Turn the raw service catalog into a simple dict."""
     return {
-        service['type']: {
-            endpoint['region']: endpoint['url'] for endpoint in service['endpoints']
-        } for service in catalog
+        service["type"]: {
+            endpoint["region"]: endpoint["url"] for endpoint in service["endpoints"]
+        }
+        for service in catalog
     }
 
 
@@ -67,19 +68,20 @@ def set_user(
 ) -> User:
     session_id = str(uuid.uuid4())
     service_catalog = flatten_catalog(catalog)
-    user_roles = [role['name'] for role in roles]
+    user_roles = [role["name"] for role in roles]
     user = User(
         catalog=service_catalog,
         auth_token=auth_token,
         username=username,
         roles=user_roles,
-        session_id=session_id
+        session_id=session_id,
     )
     SESSION[session_id] = user
     return user
 
 
-LOGIN_MUTATION = parse("""
+LOGIN_MUTATION = parse(
+    """
     mutation token ($username: String!, $password: String!) {
         login(username: $username, password: $password) {
             roles {
@@ -98,7 +100,8 @@ LOGIN_MUTATION = parse("""
             authToken
         }
     }
-""")
+"""
+)
 
 
 async def login(
@@ -110,32 +113,31 @@ async def login(
     resp = await api.call(
         LOGIN_MUTATION,
         variables={
-            'username': username,
-            'password': password,
+            "username": username,
+            "password": password,
         },
-        request=request
+        request=request,
     )
 
     if resp.errors:
-        LOG.error(f'{resp.errors}')
-        raise Exception('Unable to login user')
+        LOG.error(f"{resp.errors}")
+        raise Exception("Unable to login user")
 
-    LOG.info(f'Auth Response: {resp.data}')
-    token = resp.data['login']
+    LOG.info(f"Auth Response: {resp.data}")
+    token = resp.data["login"]
     user = set_user(
-        username=token['user']['name'],
-        auth_token=token['authToken'],
-        catalog=token['catalog'],
-        roles=token['roles']
+        username=token["user"]["name"],
+        auth_token=token["authToken"],
+        catalog=token["catalog"],
+        roles=token["roles"],
     )
 
-    response = RedirectResponse('/dashboard')
+    response = RedirectResponse("/dashboard")
     response.set_cookie(SESSION_COOKE_NAME, user.session_id)
     return response
 
 
 class OpenStackContext(HTTPContext):
-
     def handle_request(self, request):
         session_id = request.cookies.get(SESSION_COOKE_NAME)
         self.user = get_user(session_id)
@@ -146,5 +148,5 @@ class OpenStackContext(HTTPContext):
 def is_authenticated(request) -> bool:
     session_id = request.cookies.get(SESSION_COOKE_NAME)
     user = get_user(session_id)
-    LOG.info(f'{user} {session_id}')
+    LOG.info(f"{user} {session_id}")
     return user.is_authenticated

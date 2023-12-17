@@ -12,8 +12,8 @@ import requests
 
 from ..context import Context
 
-LOG = logging.getLogger('cannula.datasource.http')
-MAX_WORKERS = int(os.getenv('CANNULA_HTTP_MAX_WORKERS', 4))
+LOG = logging.getLogger("cannula.datasource.http")
+MAX_WORKERS = int(os.getenv("CANNULA_HTTP_MAX_WORKERS", 4))
 
 
 class DataSourceError(Exception):
@@ -61,6 +61,7 @@ def cacheable(f):
     def wrapped(*args, **kwargs):
         r = f(*args, **kwargs)
         return ThreadSafeCacheable(r)
+
     return wrapped
 
 
@@ -76,7 +77,6 @@ class Request(typing.NamedTuple):
 
 
 class HTTPDataSource:
-
     # The base url of this resource
     base_url: typing.Optional[str] = None
     # A mapping of requests using the cache_key_for_request. Multiple resolvers
@@ -101,9 +101,9 @@ class HTTPDataSource:
         self.assert_has_resource_name()
 
     def assert_has_http_session(self, context: Context) -> None:
-        if not hasattr(context, 'http_session'):
+        if not hasattr(context, "http_session"):
             raise AttributeError(
-                'Context missing http_session did you subclass HTTPContext?'
+                "Context missing http_session did you subclass HTTPContext?"
             )
 
     def assert_has_resource_name(self) -> None:
@@ -125,17 +125,17 @@ class HTTPDataSource:
         return request.url
 
     def get_request_url(self, path: str) -> str:
-        if path.startswith(('https://', 'http://')):
+        if path.startswith(("https://", "http://")):
             return path
 
         if self.base_url is not None:
-            if path.startswith('/'):
+            if path.startswith("/"):
                 path = path[1:]
 
-            if self.base_url.endswith('/'):
-                return f'{self.base_url}{path}'
+            if self.base_url.endswith("/"):
+                return f"{self.base_url}{path}"
 
-            return f'{self.base_url}/{path}'
+            return f"{self.base_url}/{path}"
 
         return path
 
@@ -143,37 +143,32 @@ class HTTPDataSource:
         raise error
 
     def convert_to_object(self, json_obj):
-        json_obj.update({'__typename__': self.resource_name})
+        json_obj.update({"__typename__": self.resource_name})
         return types.SimpleNamespace(**json_obj)
 
     async def did_receive_response(
-        self,
-        response: requests.Response,
-        request: Request
+        self, response: requests.Response, request: Request
     ) -> typing.Any:
         response.raise_for_status()
         return response.json(object_hook=self.convert_to_object)
 
     async def get(self, path: str) -> typing.Awaitable:
-        return await self.fetch('GET', path)
+        return await self.fetch("GET", path)
 
     async def post(self, path: str, body: typing.Any) -> typing.Awaitable:
-        return await self.fetch('POST', path, body)
+        return await self.fetch("POST", path, body)
 
     async def patch(self, path: str, body: typing.Any) -> typing.Awaitable:
-        return await self.fetch('PATCH', path, body)
+        return await self.fetch("PATCH", path, body)
 
     async def put(self, path: str, body: typing.Any) -> typing.Awaitable:
-        return await self.fetch('PUT', path, body)
+        return await self.fetch("PUT", path, body)
 
     async def delete(self, path: str) -> typing.Awaitable:
-        return await self.fetch('DELETE', path)
+        return await self.fetch("DELETE", path)
 
     async def fetch(
-        self,
-        method: str,
-        path: str,
-        body: typing.Any = None
+        self, method: str, path: str, body: typing.Any = None
     ) -> typing.Awaitable:
         url = self.get_request_url(path)
 
@@ -196,7 +191,7 @@ class HTTPDataSource:
                 await asyncio.sleep(0.005)
                 if inspect.isawaitable(future):
                     response = await future
-                elif hasattr(future, 'result'):
+                elif hasattr(future, "result"):
                     response = future.result()
                 else:
                     response = future
@@ -205,14 +200,14 @@ class HTTPDataSource:
             else:
                 return await self.did_receive_response(response, request)
 
-        if request.method == 'GET':
+        if request.method == "GET":
             promise = self.memoized_requests.get(cache_key)
             if promise is not None:
-                LOG.debug(f'cache found for {self.__class__.__name__}')
+                LOG.debug(f"cache found for {self.__class__.__name__}")
                 return await promise
 
             self.memoized_requests[cache_key] = process_request()
-            LOG.debug(f'I have been cached as {cache_key}')
+            LOG.debug(f"I have been cached as {cache_key}")
 
             return await self.memoized_requests[cache_key]
         else:

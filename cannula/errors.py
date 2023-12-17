@@ -27,14 +27,14 @@ def format_errors(
     for err in errors:
         log_error(err, logger, level)
         error_formatted = err.formatted
-        error_message = error_formatted['message']
+        error_message = error_formatted["message"]
         if err.path is not None:
             for path in err.path:
                 if error_message not in formatted_errors[path]:
                     formatted_errors[path].append(error_message)
 
-        if error_message not in formatted_errors['errors']:
-            formatted_errors['errors'].append(error_message)
+        if error_message not in formatted_errors["errors"]:
+            formatted_errors["errors"].append(error_message)
 
     return formatted_errors
 
@@ -44,8 +44,8 @@ def log_error(
     logger: logging.Logger,
     level: int,
 ):
-    logger.log(level, f'{error}')
+    logger.log(level, f"{error}")
     tb = error.__traceback__
     while tb and tb.tb_next:
         tb = tb.tb_next
-    logger.log(level, f'Excecution Context: {tb.tb_frame.f_locals!r}')
+    logger.log(level, f"Excecution Context: {tb.tb_frame.f_locals!r}")

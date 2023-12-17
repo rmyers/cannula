@@ -11,10 +11,10 @@ class Action:
     attribute: str = None
     allow_role: str = None
     allowed_states: typing.List[str] = []
-    role_message: str = 'You do not have permission to preform this action'
-    state_message: str = 'Action not allowed'
+    role_message: str = "You do not have permission to preform this action"
+    state_message: str = "Action not allowed"
     action_message: str = None
-    state_attribute: str = 'state'
+    state_attribute: str = "state"
     state: str = None
 
     def __init__(self, source, info, **kwargs):
@@ -23,7 +23,7 @@ class Action:
         self.formUrl = self.get_form_url(source, info, **kwargs)
 
     def get_form_url(self, source, info, **kwargs):
-        raise NotImplementedError('Subclasses must define `get_form_url`')
+        raise NotImplementedError("Subclasses must define `get_form_url`")
 
     def is_enabled(self, user) -> bool:
         role_is_set = self.allow_role is not None
@@ -54,6 +54,6 @@ class Action:
         return None
 
 
-@application_resolver.resolver('Action')
+@application_resolver.resolver("Action")
 async def enabled(item, info):
     return item.is_enabled(info.context.user)
