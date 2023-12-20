@@ -15,11 +15,10 @@ network_resolver = WTFormsResolver(__name__)
 
 @network_resolver.datasource()
 class Network(OpenStackBase):
-
-    catalog_name = 'network'
+    catalog_name = "network"
 
     async def fetchNetworks(self, region=None):
-        url = self.get_service_url(region, 'v2.0/networks.json')
+        url = self.get_service_url(region, "v2.0/networks.json")
         resp = await self.get(url)
         networks = resp.networks
         for network in networks:
@@ -33,18 +32,17 @@ class Network(OpenStackBase):
                 return network
 
     async def fetchLimits(self):
-        east_url = self.get_service_url('us-east', 'v2.0/limits.json')
+        east_url = self.get_service_url("us-east", "v2.0/limits.json")
         resp = await self.get(east_url)
         return resp.networks
 
 
 @network_resolver.datasource()
 class Subnet(OpenStackBase):
-
-    catalog_name = 'network'
+    catalog_name = "network"
 
     async def fetchSubnet(self, region, subnet_id):
-        url = self.get_service_url(region, 'v2.0/subnets.json')
+        url = self.get_service_url(region, "v2.0/subnets.json")
         resp = await self.get(url)
         subnets = resp.subnets
         for subnet in subnets:
@@ -52,12 +50,12 @@ class Subnet(OpenStackBase):
                 return subnet
 
 
-@network_resolver.resolver('Query')
+@network_resolver.resolver("Query")
 async def getNetworks(source, info, region):
     return await info.context.Network.fetchNetworks(region)
 
 
-@network_resolver.resolver('Network')
+@network_resolver.resolver("Network")
 async def subnets(network, info):
     awaitables = []
     for _id in network.subnets:
@@ -67,22 +65,21 @@ async def subnets(network, info):
     return itertools.chain(*results)
 
 
-@network_resolver.resolver('Network')
+@network_resolver.resolver("Network")
 async def appStatus(network, info):
     return status.Status(
         label=network.status,
     )
 
 
-@network_resolver.register_form(args=['id', 'region'])
+@network_resolver.register_form(args=["id", "region"])
 class RenameNetwork(wtforms.Form):
     name = wtforms.TextField(
-        'New Name',
-        description="Enter a new name for the network."
+        "New Name", description="Enter a new name for the network."
     )
 
 
-@network_resolver.resolver('Query')
+@network_resolver.resolver("Query")
 async def getRenameNetworkForm(source, info, args):
     # Turn the args list back into a dict
     kwargs = unwrap_args(args)
@@ -99,14 +96,12 @@ class RenameNetworkAction(actions.Action):
     form_class = RenameNetwork
 
     def get_form_url(self, source, info, **kwargs):
-        return f'/network/action/RenameNetwork?id={source.id}&region={source.region}'
+        return f"/network/action/RenameNetwork?id={source.id}&region={source.region}"
 
 
-NETWORK_ACTIONS = [
-    RenameNetworkAction
-]
+NETWORK_ACTIONS = [RenameNetworkAction]
 
 
-@network_resolver.resolver('Network')
+@network_resolver.resolver("Network")
 async def appActions(network, info):
     return [action(network, info) for action in NETWORK_ACTIONS]

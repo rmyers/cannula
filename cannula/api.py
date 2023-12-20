@@ -241,9 +241,9 @@ class API(Resolver):
 
     async def call(
         self,
-        document: GraphQLSchema,
+        document: DocumentNode,
         request: typing.Any = None,
-        variables: typing.Dict[str, typing.Any] = None,
+        variables: typing.Optional[typing.Dict[str, typing.Any]] = None,
     ) -> ExecutionResult:
         """Preform a query against the schema.
 
@@ -268,9 +268,9 @@ class API(Resolver):
 
     def call_sync(
         self,
-        document: GraphQLSchema,
-        request: typing.Any = None,
-        variables: typing.Dict[str, typing.Any] = None,
+        document: DocumentNode,
+        request: typing.Optional[typing.Any] = None,
+        variables: typing.Optional[typing.Dict[str, typing.Any]] = None,
     ) -> ExecutionResult:
         loop = asyncio.get_event_loop()
         return loop.run_until_complete(self.call(document, request, variables))

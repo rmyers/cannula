@@ -5,9 +5,11 @@ import typing
 import itertools
 
 from graphql import (
+    GraphQLResolveInfo,
     GraphQLSchema,
     GraphQLUnionType,
     DocumentNode,
+    TypeDefinitionNode,
     parse,
     build_ast_schema,
     extend_schema,
@@ -35,7 +37,9 @@ def assert_has_query_and_mutation(ast: DocumentNode) -> DocumentNode:
     The schema is pretty much useless without them and rather than causing
     an error we'll just add in an empty one so they can be extended.
     """
-    object_kinds = filter(is_type_definition_node, ast.definitions)
+    object_kinds: typing.List[TypeDefinitionNode] = filter(
+        is_type_definition_node, ast.definitions
+    )  # type: ignore
     object_definitions = [node.name.value for node in object_kinds]
     has_mutation_definition = "Mutation" in object_definitions
     has_query_definition = "Query" in object_definitions
@@ -58,11 +62,7 @@ def maybe_parse(type_def: typing.Union[str, DocumentNode]):
 
 
 def build_and_extend_schema(
-    type_defs: typing.Union[
-        typing.List[str],
-        typing.List[DocumentNode],
-        typing.Iterator[DocumentNode],
-    ],
+    type_defs: typing.Iterator[typing.Union[str, DocumentNode]],
 ) -> GraphQLSchema:
     document_list = [maybe_parse(type_def) for type_def in type_defs]
 
@@ -90,13 +90,18 @@ def fix_abstract_resolve_type(schema: GraphQLSchema) -> GraphQLSchema:
     # `__typename__` attribute which is not mangled.
     # TODO(rmyers): submit PR to fix upstream?
 
-    def custom_resolve_type(source, _info):
+    def custom_resolve_type(
+        source: typing.Any, _info: GraphQLResolveInfo, _name: typing.Any
+    ) -> typing.Optional[str]:
+        if source is None:
+            return None
         if isinstance(source, dict):
             return str(source.get("__typename"))
         return getattr(source, "__typename__", None)
 
-    for _type_name, graphql_type in schema.type_map.items():
+    for type_name, graphql_type in schema.type_map.items():
         if isinstance(graphql_type, GraphQLUnionType):
+            LOG.debug(f"Adding customer resolver for {type_name}")
             graphql_type.resolve_type = custom_resolve_type
 
     return schema

@@ -125,55 +125,55 @@ MockObjectTypes = typing.Union[typing.Callable, str, int, float, bool, dict, lis
 LOG = logging.getLogger(__name__)
 
 ADJECTIVES: typing.List[str] = [
-    'imminent',
-    'perfect',
-    'organic',
-    'elderly',
-    'dapper',
-    'reminiscent',
-    'mysterious',
-    'trashy',
-    'workable',
-    'flaky',
-    'offbeat',
-    'spooky',
-    'thirsty',
-    'stereotyped',
-    'wild',
-    'devilish',
-    'quarrelsome',
-    'dysfunctional',
+    "imminent",
+    "perfect",
+    "organic",
+    "elderly",
+    "dapper",
+    "reminiscent",
+    "mysterious",
+    "trashy",
+    "workable",
+    "flaky",
+    "offbeat",
+    "spooky",
+    "thirsty",
+    "stereotyped",
+    "wild",
+    "devilish",
+    "quarrelsome",
+    "dysfunctional",
 ]
 NOUNS: typing.List[str] = [
-    'note',
-    'yak',
-    'hammer',
-    'cause',
-    'price',
-    'quill',
-    'truck',
-    'glass',
-    'color',
-    'ring',
-    'trees',
-    'window',
-    'letter',
-    'seed',
-    'sponge',
-    'pie',
-    'mass',
-    'table',
-    'plantation',
-    'battle',
+    "note",
+    "yak",
+    "hammer",
+    "cause",
+    "price",
+    "quill",
+    "truck",
+    "glass",
+    "color",
+    "ring",
+    "trees",
+    "window",
+    "letter",
+    "seed",
+    "sponge",
+    "pie",
+    "mass",
+    "table",
+    "plantation",
+    "battle",
 ]
 
-LIST_LENGTH_KEY: str = '__list_length'
+LIST_LENGTH_KEY: str = "__list_length"
 DEFAULT_MOCKS: typing.Dict[str, MockObjectTypes] = {
-    'String': lambda: f'{random.choice(ADJECTIVES)}-{random.choice(NOUNS)}',
-    'Int': lambda: random.randint(4, 999),
-    'Float': lambda: random.randint(5, 999) * random.random(),
-    'Boolean': lambda: random.choice([True, False]),
-    'ID': lambda: str(uuid.uuid4()),
+    "String": lambda: f"{random.choice(ADJECTIVES)}-{random.choice(NOUNS)}",
+    "Int": lambda: random.randint(4, 999),
+    "Float": lambda: random.randint(5, 999) * random.random(),
+    "Boolean": lambda: random.choice([True, False]),
+    "ID": lambda: str(uuid.uuid4()),
     # The default number of mock items to return when results are a list.
     LIST_LENGTH_KEY: lambda: random.randint(3, 6),
 }
@@ -209,7 +209,8 @@ class MockObjectStore:
     mock is callable we want to call it first and if the results or the
     mock are a dict, we need to wrap that in our SuperDict object.
     """
-    __slots__ = ['mock_objects']
+
+    __slots__ = ["mock_objects"]
 
     def __init__(self, mock_objects: typing.Dict[str, MockObjectTypes]):
         self.mock_objects = mock_objects
@@ -222,16 +223,13 @@ class MockObjectStore:
 
     def has_parent_field(self, parent_type_name: str, field_name: str) -> bool:
         return (
-            parent_type_name in self.mock_objects and
-            isinstance(self.mock_objects[parent_type_name], dict) and
-            field_name in typing.cast(typing.Dict, self.mock_objects[parent_type_name])
+            parent_type_name in self.mock_objects
+            and isinstance(self.mock_objects[parent_type_name], dict)
+            and field_name
+            in typing.cast(typing.Dict, self.mock_objects[parent_type_name])
         )
 
-    def get(
-        self,
-        key: str,
-        default: typing.Optional[typing.Any] = None
-    ) -> typing.Any:
+    def get(self, key: str, default: typing.Optional[typing.Any] = None) -> typing.Any:
         mock = self.mock_objects.get(key, default)
         if mock is None:
             return
@@ -253,11 +251,7 @@ class MockObjectStore:
         return self.return_results(mock)
 
     def return_results(self, mock: MockObjectTypes) -> typing.Any:
-        results = (
-            mock()
-            if callable(mock)
-            else mock
-        )
+        results = mock() if callable(mock) else mock
 
         if isinstance(results, list):
             return [self.maybe_wrap(r) for r in results]
@@ -286,7 +280,7 @@ class MockMiddleware:
         self,
         mock_objects: typing.Dict[str, MockObjectTypes] = {},
         mock_all: bool = True,
-        mock_object_header: str = 'X-Mock-Objects',
+        mock_object_header: str = "X-Mock-Objects",
     ):
         self.mock_all = mock_all
         self.mock_object_header = mock_object_header
@@ -294,8 +288,7 @@ class MockMiddleware:
         self._mock_objects.update(mock_objects)
 
     def get_mocks(
-        self,
-        extra: typing.Dict[str, MockObjectTypes]
+        self, extra: typing.Dict[str, MockObjectTypes]
     ) -> typing.Optional[MockObjectStore]:
         mock_objects = self._mock_objects.copy()
         mock_objects.update(extra)
@@ -340,9 +333,9 @@ class MockMiddleware:
         parent_type_name = _info.parent_type.name
 
         resolver_is_mocked = (
-            self.mock_all or
-            mock_objects.has_named_type(named_type.name) or
-            mock_objects.has_parent_field(parent_type_name, field_name)
+            self.mock_all
+            or mock_objects.has_named_type(named_type.name)
+            or mock_objects.has_parent_field(parent_type_name, field_name)
         )
 
         if not resolver_is_mocked:
@@ -367,7 +360,9 @@ class MockMiddleware:
             # Special case for list types return a random length list of type.
             if isinstance(schema_type, GraphQLList):
                 list_length = mock_objects.get(LIST_LENGTH_KEY, 3)
-                return [resolve_return_type(schema_type.of_type) for x in range(list_length)]
+                return [
+                    resolve_return_type(schema_type.of_type) for x in range(list_length)
+                ]
 
             named_type_name = get_named_type(schema_type).name
             if named_type_name in mock_objects:
@@ -377,6 +372,6 @@ class MockMiddleware:
             # explicitly overridden in the mock_objects. Just return a dict
             # with a `__typename` set to the type name to assist in resolving
             # Unions and Interfaces.
-            return SuperDict({'__typename': named_type_name})
+            return SuperDict({"__typename": named_type_name})
 
         return resolve_return_type(return_type)

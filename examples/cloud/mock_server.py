@@ -9,7 +9,7 @@ from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse, Re
 
 logging.basicConfig(level=logging.DEBUG)
 
-LOG = logging.getLogger('mock-openstack')
+LOG = logging.getLogger("mock-openstack")
 
 
 HOST = "openstack"
@@ -25,46 +25,46 @@ TENANTS = dict()
 USERS = dict()
 SERVER_IDS = ["server3", "server2", "server1"]
 ADJECTIVES = [
-  'imminent',
-  'perfect',
-  'organic',
-  'elderly',
-  'dapper',
-  'reminiscent',
-  'mysterious',
-  'trashy',
-  'workable',
-  'flaky',
-  'offbeat',
-  'spooky',
-  'thirsty',
-  'stereotyped',
-  'wild',
-  'devilish',
-  'quarrelsome',
-  'dysfunctional',
+    "imminent",
+    "perfect",
+    "organic",
+    "elderly",
+    "dapper",
+    "reminiscent",
+    "mysterious",
+    "trashy",
+    "workable",
+    "flaky",
+    "offbeat",
+    "spooky",
+    "thirsty",
+    "stereotyped",
+    "wild",
+    "devilish",
+    "quarrelsome",
+    "dysfunctional",
 ]
 NOUNS = [
-  'note',
-  'yak',
-  'hammer',
-  'cause',
-  'price',
-  'quill',
-  'truck',
-  'glass',
-  'color',
-  'ring',
-  'trees',
-  'window',
-  'letter',
-  'seed',
-  'sponge',
-  'pie',
-  'mass',
-  'table',
-  'plantation',
-  'battle',
+    "note",
+    "yak",
+    "hammer",
+    "cause",
+    "price",
+    "quill",
+    "truck",
+    "glass",
+    "color",
+    "ring",
+    "trees",
+    "window",
+    "letter",
+    "seed",
+    "sponge",
+    "pie",
+    "mass",
+    "table",
+    "plantation",
+    "battle",
 ]
 
 
@@ -73,7 +73,7 @@ app = Starlette(debug=True)
 
 def name():
     """Generate a random name"""
-    return f'{random.choice(ADJECTIVES)} {random.choice(NOUNS)}'
+    return f"{random.choice(ADJECTIVES)} {random.choice(NOUNS)}"
 
 
 def get_id():
@@ -83,9 +83,11 @@ def get_id():
 
 def get_ip():
     """Generate a random ip"""
+
     def bit():
         return random.randint(0, 255)
-    return f'{bit()}.{bit()}.{bit()}.{bit()}'
+
+    return f"{bit()}.{bit()}.{bit()}.{bit()}"
 
 
 def catalog(project_id):
@@ -100,19 +102,19 @@ def catalog(project_id):
                     "interface": "public",
                     "region": "us-east",
                     "region_id": "us-east",
-                    "id": "41e9e3c05091494d83e471a9bf06f3ac"
+                    "id": "41e9e3c05091494d83e471a9bf06f3ac",
                 },
                 {
                     "url": compute_url,
                     "interface": "public",
                     "region": "us-west",
                     "region_id": "us-west",
-                    "id": "4ad8904c486c407b9ebbc379c58ea432"
-                }
+                    "id": "4ad8904c486c407b9ebbc379c58ea432",
+                },
             ],
             "type": "compute",
             "id": "4a1bd1ae55854833870ad35fdf1f9be1",
-            "name": "nova"
+            "name": "nova",
         },
         {
             "endpoints": [
@@ -121,19 +123,19 @@ def catalog(project_id):
                     "interface": "public",
                     "region": "us-east",
                     "region_id": "us-east",
-                    "id": "c5a338861d2b4a609be30fdbf189b5c7"
+                    "id": "c5a338861d2b4a609be30fdbf189b5c7",
                 },
                 {
                     "url": neutron_url,
                     "interface": "public",
                     "region": "us-west",
                     "region_id": "us-west",
-                    "id": "dd3877984b2e4d49a951aa376c7580b2"
-                }
+                    "id": "dd3877984b2e4d49a951aa376c7580b2",
+                },
             ],
             "type": "network",
             "id": "d78d372c287a4681a0003819c0f97177",
-            "name": "neutron"
+            "name": "neutron",
         },
         {
             "endpoints": [
@@ -142,20 +144,20 @@ def catalog(project_id):
                     "interface": "public",
                     "region": "us-east",
                     "region_id": "us-east",
-                    "id": "8861d2c5a33b4a609be30fdbf189b5c7"
+                    "id": "8861d2c5a33b4a609be30fdbf189b5c7",
                 },
                 {
                     "url": cinder_url,
                     "interface": "public",
                     "region": "us-west",
                     "region_id": "us-west",
-                    "id": "2e4d49a9dd3877984b51aa376c7580b2"
-                }
+                    "id": "2e4d49a9dd3877984b51aa376c7580b2",
+                },
             ],
             "type": "volume",
             "id": "000381d78d372c287a4681a9c0f97177",
-            "name": "cinder"
-        }
+            "name": "cinder",
+        },
     ]
 
 
@@ -165,12 +167,12 @@ def expires():
     expires_at = "{0}Z".format(expires.isoformat())
     issued_at = "{0}Z".format(now.isoformat())
     return {
-        'expires': expires_at,
-        'issued': issued_at,
+        "expires": expires_at,
+        "issued": issued_at,
     }
 
 
-@app.route('/v3')
+@app.route("/v3")
 async def v3(request):
     return {
         "version": {
@@ -179,35 +181,28 @@ async def v3(request):
             "media-types": [
                 {
                     "base": "application/json",
-                    "type": "application/vnd.openstack.identity-v3+json"
+                    "type": "application/vnd.openstack.identity-v3+json",
                 }
             ],
             "id": "v3.6",
-            "links": [
-                {
-                    "href": KEYSTONE_V3,
-                    "rel": "self"
-                }
-            ]
+            "links": [{"href": KEYSTONE_V3, "rel": "self"}],
         }
     }
 
 
-@app.route('/v3/auth/catalog', methods=['GET'])
+@app.route("/v3/auth/catalog", methods=["GET"])
 async def v3_catalog(request):
-    auth_token = request.headers.get('X-Auth-Token')
-    _, project_id = auth_token.split(':')
+    auth_token = request.headers.get("X-Auth-Token")
+    _, project_id = auth_token.split(":")
     _catalog = catalog(project_id)
-    return {
-        "catalog": _catalog
-    }
+    return {"catalog": _catalog}
 
 
-@app.route('/v3/auth/tokens', methods=['POST'])
+@app.route("/v3/auth/tokens", methods=["POST"])
 async def v3_auth_tokens(request):
-    LOG.info('Identity Log Request')
+    LOG.info("Identity Log Request")
     payload = await request.json()
-    user = payload['auth']['identity']['password']['user']['name']
+    user = payload["auth"]["identity"]["password"]["user"]["name"]
     project_id = USERS.get(user)
     if project_id is None:
         project_id = get_id()
@@ -223,31 +218,23 @@ async def v3_auth_tokens(request):
                     "name": "admin",
                 }
             ],
-            "expires_at": ex['expires'],  # "2017-01-17T05:20:17.000000Z",
+            "expires_at": ex["expires"],  # "2017-01-17T05:20:17.000000Z",
             "project": {
-                "domain": {
-                    "id": "default",
-                    "name": "Default"
-                },
+                "domain": {"id": "default", "name": "Default"},
                 "id": project_id,
-                "name": "admin"
+                "name": "admin",
             },
             "catalog": _catalog,
             "user": {
-                "domain": {
-                    "id": "default",
-                    "name": "Default"
-                },
+                "domain": {"id": "default", "name": "Default"},
                 "id": get_id(),
-                "name": user
+                "name": user,
             },
-            "audit_ids": [
-                "DriuAdgyRoWcZG95-qpakw"
-            ],
-            "issued_at": ex['issued'],
+            "audit_ids": ["DriuAdgyRoWcZG95-qpakw"],
+            "issued_at": ex["issued"],
         }
     }
-    return JSONResponse(resp, headers={'X-Subject-Token': f'{user}:{project_id}'})
+    return JSONResponse(resp, headers={"X-Subject-Token": f"{user}:{project_id}"})
 
 
 IMAGES = [
@@ -261,7 +248,7 @@ IMAGES = [
         "minDisk": random.randint(20, 200),
         "progress": 100,
         "minRam": 1024,
-        "metadata": {"architecture": "amd64"}
+        "metadata": {"architecture": "amd64"},
     },
     {
         "status": "ACTIVE",
@@ -273,7 +260,7 @@ IMAGES = [
         "minDisk": random.randint(20, 200),
         "progress": 100,
         "minRam": 2048,
-        "metadata": {"architecture": "amd64"}
+        "metadata": {"architecture": "amd64"},
     },
     {
         "status": "ACTIVE",
@@ -285,7 +272,7 @@ IMAGES = [
         "minDisk": random.randint(20, 200),
         "progress": 100,
         "minRam": 1024,
-        "metadata": {"architecture": "amd64"}
+        "metadata": {"architecture": "amd64"},
     },
     {
         "status": "ACTIVE",
@@ -297,76 +284,76 @@ IMAGES = [
         "minDisk": 20,
         "progress": 100,
         "minRam": 3196,
-        "metadata": {"architecture": "amd64"}
-    }
+        "metadata": {"architecture": "amd64"},
+    },
 ]
 
 
-@app.route('/nova/v2.1/{project_id}/images/detail', methods=['GET'])
+@app.route("/nova/v2.1/{project_id}/images/detail", methods=["GET"])
 async def nova_images_details(request):
     resp = {"images": IMAGES}
     return JSONResponse(resp)
 
 
-@app.route('/nova/v2.1/{project_id}/images/{image_id}', methods=['GET'])
+@app.route("/nova/v2.1/{project_id}/images/{image_id}", methods=["GET"])
 async def nova_image_get(request):
-    image_id = request.path_params['image_id']
+    image_id = request.path_params["image_id"]
     for image in IMAGES:
-        if image['id'] == image_id:
+        if image["id"] == image_id:
             return JSONResponse({"image": image})
 
 
 FLAVORS = [
-  {
-    "name": name(),
-    "ram": 1024,
-    "OS-FLV-DISABLED:disabled": False,
-    "vcpus": 1,
-    "swap": "",
-    "os-flavor-access:is_public": True,
-    "rxtx_factor": 1.0,
-    "OS-FLV-EXT-DATA:ephemeral": 0,
-    "disk": 20,
-    "id": get_id()
-  },
-  {
-    "name": name(),
-    "ram": 2048,
-    "OS-FLV-DISABLED:disabled": False,
-    "vcpus": 1,
-    "swap": "",
-    "os-flavor-access:is_public": True,
-    "rxtx_factor": 1.0,
-    "OS-FLV-EXT-DATA:ephemeral": 0,
-    "disk": 20,
-    "id": get_id()
-  },
-  {
-    "name": name(),
-    "ram": 4096,
-    "OS-FLV-DISABLED:disabled": False,
-    "vcpus": 1,
-    "swap": "",
-    "os-flavor-access:is_public": True,
-    "rxtx_factor": 1.0,
-    "OS-FLV-EXT-DATA:ephemeral": 0,
-    "disk": 20,
-    "id": get_id()
-  }
+    {
+        "name": name(),
+        "ram": 1024,
+        "OS-FLV-DISABLED:disabled": False,
+        "vcpus": 1,
+        "swap": "",
+        "os-flavor-access:is_public": True,
+        "rxtx_factor": 1.0,
+        "OS-FLV-EXT-DATA:ephemeral": 0,
+        "disk": 20,
+        "id": get_id(),
+    },
+    {
+        "name": name(),
+        "ram": 2048,
+        "OS-FLV-DISABLED:disabled": False,
+        "vcpus": 1,
+        "swap": "",
+        "os-flavor-access:is_public": True,
+        "rxtx_factor": 1.0,
+        "OS-FLV-EXT-DATA:ephemeral": 0,
+        "disk": 20,
+        "id": get_id(),
+    },
+    {
+        "name": name(),
+        "ram": 4096,
+        "OS-FLV-DISABLED:disabled": False,
+        "vcpus": 1,
+        "swap": "",
+        "os-flavor-access:is_public": True,
+        "rxtx_factor": 1.0,
+        "OS-FLV-EXT-DATA:ephemeral": 0,
+        "disk": 20,
+        "id": get_id(),
+    },
 ]
 
 
-@app.route('/nova/v2.1/{project_id}/flavors/detail', methods=['GET'])
+@app.route("/nova/v2.1/{project_id}/flavors/detail", methods=["GET"])
 async def flavor_list_detail(request):
     resp = {"flavors": FLAVORS}
     return JSONResponse(resp)
 
 
-@app.route('/nova/v2.1/{project_id}/flavors/{flavor_id}', methods=['GET'])
+@app.route("/nova/v2.1/{project_id}/flavors/{flavor_id}", methods=["GET"])
 async def flavor_get(request):
-    flavor_id = request.path_params['flavor_id']
+    flavor_id = request.path_params["flavor_id"]
     for flavor in FLAVORS:
-        if flavor['id'] == flavor_id:
+        if flavor["id"] == flavor_id:
             return JSONResponse({"flavor": flavor})
     raise
 
@@ -374,9 +361,7 @@ async def flavor_get(request):
 NETWORKS = [
     {
         "status": "ACTIVE",
-        "subnets": [
-            "private-subnet"
-        ],
+        "subnets": ["private-subnet"],
         "name": "private-network",
         "provider:physical_network": None,
         "admin_state_up": True,
@@ -388,26 +373,19 @@ NETWORKS = [
         "mtu": 0,
         "shared": True,
         "id": "d32019d3-bc6e-4319-9c1d-6722fc136a22",
-        "provider:segmentation_id": None
+        "provider:segmentation_id": None,
     }
 ]
 
 
-@app.route('/neutron/v2.0/networks.json', methods=['GET'])
+@app.route("/neutron/v2.0/networks.json", methods=["GET"])
 async def network_list(request):
-    return JSONResponse({
-        "networks": NETWORKS
-    })
+    return JSONResponse({"networks": NETWORKS})
 
 
-@app.route('/neutron/v2.0/limits.json', methods=['GET'])
+@app.route("/neutron/v2.0/limits.json", methods=["GET"])
 async def network_limits(request):
-    return JSONResponse({
-        'networks': {
-            'used': len(NETWORKS),
-            'limit': 3
-        }
-    })
+    return JSONResponse({"networks": {"used": len(NETWORKS), "limit": 3}})
 
 
 SUBNETS = [
@@ -419,12 +397,7 @@ SUBNETS = [
         "project_id": "26a7980765d0414dbc1fc1f88cdb7e6e",
         "tenant_id": "26a7980765d0414dbc1fc1f88cdb7e6e",
         "dns_nameservers": [],
-        "allocation_pools": [
-            {
-                "start": get_ip(),
-                "end": get_ip()
-            }
-        ],
+        "allocation_pools": [{"start": get_ip(), "end": get_ip()}],
         "host_routes": [],
         "ip_version": 4,
         "gateway_ip": get_ip(),
@@ -437,70 +410,83 @@ SUBNETS = [
         "revision_number": 2,
         "service_types": [],
         "subnetpool_id": None,
-        "updated_at": "2016-10-10T14:35:34Z"
+        "updated_at": "2016-10-10T14:35:34Z",
     }
 ]
 
 
-@app.route('/neutron/v2.0/subnets.json', methods=['GET'])
+@app.route("/neutron/v2.0/subnets.json", methods=["GET"])
 async def subnet_list(request):
-    return JSONResponse({
-        "subnets": SUBNETS
-    })
+    return JSONResponse({"subnets": SUBNETS})
 
 
-@app.route('/nova/v2.1/{project_id}/servers', methods=['POST'])
+@app.route("/nova/v2.1/{project_id}/servers", methods=["POST"])
 async def server_create(request):
-    project_id = request.path_params['project_id']
+    project_id = request.path_params["project_id"]
     body = await request.json()
-    image_id = body['server']['imageRef']
-    flavor_id = body['server']['flavorRef']
-    name = body['server']['name']
+    image_id = body["server"]["imageRef"]
+    flavor_id = body["server"]["flavorRef"]
+    name = body["server"]["name"]
     return create_new_server(project_id, image_id, flavor_id, name)
 
 
 def create_new_server(project_id, image_id, flavor_id, name):
     server_id = get_id()
-    new_server = {"server": {
-        "status": "ACTIVE",
-        "updated": "2017-01-23T17:25:40Z",
-        "hostId": "8e1376bbeee19c6fb07e29eb7876ac26ac81905200a10d3dfac6840c",
-        "OS-EXT-SRV-ATTR:host": "saturn-rpc",
-        "addresses": {
-            "private-net": [{"OS-EXT-IPS-MAC:mac_addr": "fa:16:3e:58:ad:d4", "version": 4, "addr": get_ip(), "OS-EXT-IPS:type": "fixed"}],
-            "external-net": [{"OS-EXT-IPS-MAC:mac_addr": "fa:16:3e:b0:a3:13", "version": 4, "addr": get_ip(), "OS-EXT-IPS:type": "fixed"}]},
-        "key_name": None,
-        "image": {
-            "id": image_id
-        },
-        "OS-EXT-STS:task_state": None,
-        "OS-EXT-STS:vm_state": "active",
-        "OS-EXT-SRV-ATTR:instance_name": "instance-00000157",
-        "OS-SRV-USG:launched_at": "2017-01-23T17:25:40.000000",
-        "OS-EXT-SRV-ATTR:hypervisor_hostname": "saturn-rpc",
-        "flavor": {"id": flavor_id},
-        "id": server_id,
-        "security_groups": [{"name": "default"}, {"name": "default"}],
-        "OS-SRV-USG:terminated_at": None,
-        "OS-EXT-AZ:availability_zone": "nova",
-        "user_id": "c95c5f5773864aacb5c09498a4e4ad0c",
-        "name": name,
-        "created": "2017-01-23T17:25:27Z",
-        "tenant_id": project_id,
-        "OS-DCF:diskConfig": "MANUAL",
-        "os-extended-volumes:volumes_attached": [],
-        "accessIPv4": get_ip(),
-        "accessIPv6": "",
-        "progress": 0,
-        "OS-EXT-STS:power_state": 1,
-        "config_drive": "",
-        "metadata": {}}
+    new_server = {
+        "server": {
+            "status": "ACTIVE",
+            "updated": "2017-01-23T17:25:40Z",
+            "hostId": "8e1376bbeee19c6fb07e29eb7876ac26ac81905200a10d3dfac6840c",
+            "OS-EXT-SRV-ATTR:host": "saturn-rpc",
+            "addresses": {
+                "private-net": [
+                    {
+                        "OS-EXT-IPS-MAC:mac_addr": "fa:16:3e:58:ad:d4",
+                        "version": 4,
+                        "addr": get_ip(),
+                        "OS-EXT-IPS:type": "fixed",
+                    }
+                ],
+                "external-net": [
+                    {
+                        "OS-EXT-IPS-MAC:mac_addr": "fa:16:3e:b0:a3:13",
+                        "version": 4,
+                        "addr": get_ip(),
+                        "OS-EXT-IPS:type": "fixed",
+                    }
+                ],
+            },
+            "key_name": None,
+            "image": {"id": image_id},
+            "OS-EXT-STS:task_state": None,
+            "OS-EXT-STS:vm_state": "active",
+            "OS-EXT-SRV-ATTR:instance_name": "instance-00000157",
+            "OS-SRV-USG:launched_at": "2017-01-23T17:25:40.000000",
+            "OS-EXT-SRV-ATTR:hypervisor_hostname": "saturn-rpc",
+            "flavor": {"id": flavor_id},
+            "id": server_id,
+            "security_groups": [{"name": "default"}, {"name": "default"}],
+            "OS-SRV-USG:terminated_at": None,
+            "OS-EXT-AZ:availability_zone": "nova",
+            "user_id": "c95c5f5773864aacb5c09498a4e4ad0c",
+            "name": name,
+            "created": "2017-01-23T17:25:27Z",
+            "tenant_id": project_id,
+            "OS-DCF:diskConfig": "MANUAL",
+            "os-extended-volumes:volumes_attached": [],
+            "accessIPv4": get_ip(),
+            "accessIPv6": "",
+            "progress": 0,
+            "OS-EXT-STS:power_state": 1,
+            "config_drive": "",
+            "metadata": {},
+        }
     }
     SERVERS[server_id] = new_server
     return JSONResponse(new_server)
 
 
-@app.route('/nova/v2.1/{project_id}/servers/detail')
+@app.route("/nova/v2.1/{project_id}/servers/detail")
 async def server_list(request):
     resp = {"servers": []}
     for server in SERVERS.values():
@@ -509,43 +495,34 @@ async def server_list(request):
 
 
 # Note: May also need /nova/v2.1/{project_id/servers?name={server_name} someday
-@app.route('/nova/v2.1/{project_id}/servers/{server_id}', methods=['GET'])
+@app.route("/nova/v2.1/{project_id}/servers/{server_id}", methods=["GET"])
 async def server_get(request):
-    server_id = request.path_params['server_id']
+    server_id = request.path_params["server_id"]
     return JSONResponse(SERVERS.get(server_id))
 
 
-@app.route('/nova/v2.1/{project_id}/servers/{server_id}', methods=['DELETE'])
+@app.route("/nova/v2.1/{project_id}/servers/{server_id}", methods=["DELETE"])
 async def server_delete(request):
-    server_id = request.path_params['server_id']
+    server_id = request.path_params["server_id"]
     del SERVERS[server_id]
     SERVER_IDS.insert(0, server_id)
     return JSONResponse(None, status=202)
 
 
-@app.route('/nova/v2.1/{project_id}/os-availability-zone')
+@app.route("/nova/v2.1/{project_id}/os-availability-zone")
 async def availability_zone(request):
-    return JSONResponse({
-        "availabilityZoneInfo": [
-            {
-                "hosts": None,
-                "zoneName": "nova",
-                "zoneState": {
-                    "available": True
-                }
-            }
-        ]
-    })
-
-
-@app.route('/nova/v2.1/{project_id}/limits', methods=['GET'])
-async def server_quota_get(request):
-    return JSONResponse({
-        'servers': {
-            'used': len(SERVERS),
-            'limit': 10
+    return JSONResponse(
+        {
+            "availabilityZoneInfo": [
+                {"hosts": None, "zoneName": "nova", "zoneState": {"available": True}}
+            ]
         }
-    })
+    )
+
+
+@app.route("/nova/v2.1/{project_id}/limits", methods=["GET"])
+async def server_quota_get(request):
+    return JSONResponse({"servers": {"used": len(SERVERS), "limit": 10}})
 
 
 VOLUMES = [
@@ -571,7 +548,7 @@ VOLUMES = [
         "bootable": "false",
         "created_at": "2015-11-29T03:01:44.000000",
         "volume_type": "lvmdriver-1",
-        "group_id": "8fbe5733-eb03-4c88-9ef9-f32b7d03a5e4"
+        "group_id": "8fbe5733-eb03-4c88-9ef9-f32b7d03a5e4",
     },
     {
         "migration_status": None,
@@ -597,87 +574,95 @@ VOLUMES = [
         "bootable": "true",
         "created_at": "2015-11-29T02:25:18.000000",
         "volume_type": "lvmdriver-1",
-        "group_id": "8fbe5733-eb03-4c88-9ef9-f32b7d03a5e4"
-    }
+        "group_id": "8fbe5733-eb03-4c88-9ef9-f32b7d03a5e4",
+    },
 ]
 
 
-@app.route('/cinder/v3/{project_id}/volumes/detail')
+@app.route("/cinder/v3/{project_id}/volumes/detail")
 async def cinder_volumes(request):
-    return JSONResponse({
-        "volumes": VOLUMES
-    })
+    return JSONResponse({"volumes": VOLUMES})
 
 
-@app.route('/cinder/v3/{project_id}/limits')
+@app.route("/cinder/v3/{project_id}/limits")
 async def cinder_limits(request):
-    return JSONResponse({
-        "limits": {
-            "absolute": {
-                "totalSnapshotsUsed": 0,
-                "maxTotalBackups": 10,
-                "maxTotalVolumeGigabytes": 1000,
-                "totalVolumesUsed": 0,
-                "totalBackupsUsed": 0,
-                "totalGigabytesUsed": sum(map(lambda vol: vol['size'], VOLUMES))
+    return JSONResponse(
+        {
+            "limits": {
+                "absolute": {
+                    "totalSnapshotsUsed": 0,
+                    "maxTotalBackups": 10,
+                    "maxTotalVolumeGigabytes": 1000,
+                    "totalVolumesUsed": 0,
+                    "totalBackupsUsed": 0,
+                    "totalGigabytesUsed": sum(map(lambda vol: vol["size"], VOLUMES)),
+                }
             }
         }
-    })
+    )
 
 
-@app.route('/')
+@app.route("/")
 async def root(request):
-    return JSONResponse({
-      "versions": {
-        "values": [
-          {
-            "status": "stable",
-            "updated": "2016-04-04T00:00:00Z",
-            "media-types": [
-              {
-                "base": "application/json",
-                "type": "application/vnd.openstack.identity-v3+json"
-              }
-            ],
-            "id": "v3.6",
-            "links": [
-              {
-                "href": "http://{host}:{port}/v3/".format(host=HOST, port=PORT),
-                "rel": "self"
-              }
-            ]
-          },
-          {
-            "status": "stable",
-            "updated": "2014-04-17T00:00:00Z",
-            "media-types": [
-              {
-                "base": "application/json",
-                "type": "application/vnd.openstack.identity-v2.0+json"
-              }
-            ],
-            "id": "v2.0",
-            "links": [
-              {
-                "href": "http://{host}:{port}/v2.0/".format(host=HOST, port=PORT),
-                "rel": "self"
-              },
-              {
-                "href": "http://docs.openstack.org/",
-                "type": "text/html", "rel": "describedby"
-              }
-            ]
-          }
-        ]
-      }
-    })
+    return JSONResponse(
+        {
+            "versions": {
+                "values": [
+                    {
+                        "status": "stable",
+                        "updated": "2016-04-04T00:00:00Z",
+                        "media-types": [
+                            {
+                                "base": "application/json",
+                                "type": "application/vnd.openstack.identity-v3+json",
+                            }
+                        ],
+                        "id": "v3.6",
+                        "links": [
+                            {
+                                "href": "http://{host}:{port}/v3/".format(
+                                    host=HOST, port=PORT
+                                ),
+                                "rel": "self",
+                            }
+                        ],
+                    },
+                    {
+                        "status": "stable",
+                        "updated": "2014-04-17T00:00:00Z",
+                        "media-types": [
+                            {
+                                "base": "application/json",
+                                "type": "application/vnd.openstack.identity-v2.0+json",
+                            }
+                        ],
+                        "id": "v2.0",
+                        "links": [
+                            {
+                                "href": "http://{host}:{port}/v2.0/".format(
+                                    host=HOST, port=PORT
+                                ),
+                                "rel": "self",
+                            },
+                            {
+                                "href": "http://docs.openstack.org/",
+                                "type": "text/html",
+                                "rel": "describedby",
+                            },
+                        ],
+                    },
+                ]
+            }
+        }
+    )
 
 
 for server_id in SERVER_IDS:
-    create_new_server('fake', IMAGES[0].get('id'), FLAVORS[0].get('id'), server_id)
+    create_new_server("fake", IMAGES[0].get("id"), FLAVORS[0].get("id"), server_id)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import uvicorn
-    LOG.info(f'starting mock openstack server on {PORT}')
-    uvicorn.run(app, host='0.0.0.0', port=8080, debug=True, log_level=logging.INFO)
+
+    LOG.info(f"starting mock openstack server on {PORT}")
+    uvicorn.run(app, host="0.0.0.0", port=8080, debug=True, log_level=logging.INFO)

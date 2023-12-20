@@ -2,6 +2,7 @@
 coverage==7.2.3
 flake8==6.0.0
 mypy==1.2.0
+black
 
 # Sphinx Documentation
 Sphinx==2.0.1

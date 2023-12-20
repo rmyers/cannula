@@ -10,7 +10,7 @@ def get_root_path(import_name):
     """
     # Module already imported and has a file attribute. Use that first.
     mod = sys.modules.get(import_name)
-    if mod is not None and hasattr(mod, '__file__'):
+    if mod is not None and hasattr(mod, "__file__"):
         return os.path.dirname(os.path.abspath(mod.__file__))
 
     # Next attempt: check the loader.
@@ -19,7 +19,7 @@ def get_root_path(import_name):
     # Loader does not exist or we're referring to an unloaded main module
     # or a main module without path (interactive sessions), go with the
     # current working directory.
-    if loader is None or import_name == '__main__':
+    if loader is None or import_name == "__main__":
         return os.getcwd()
 
     filepath = loader.get_filename(import_name)
