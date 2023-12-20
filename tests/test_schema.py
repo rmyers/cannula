@@ -63,6 +63,7 @@ async def test_union_types():
     )
     fixed = cannula.schema.fix_abstract_resolve_type(with_union)
     thing_type = fixed.get_type("Thing")
+    assert thing_type is not None
 
     class MockSender:
         __typename__ = "Sender"

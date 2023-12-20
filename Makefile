@@ -18,7 +18,7 @@
 #%   make test
 #%
 
-REQUIREMENTS             := $(shell find . -name 'setup.cfg')
+REQUIREMENTS             := $(shell find . -name 'pyproject.toml')
 SHELL                    := /bin/bash
 VIRTUAL_ENV              ?= venv
 PYTHON_MODULES           := $(shell find . -name '*.py')
