@@ -62,7 +62,7 @@ def maybe_parse(type_def: typing.Union[str, DocumentNode]):
 
 
 def build_and_extend_schema(
-    type_defs: typing.Iterator[typing.Union[str, DocumentNode]],
+    type_defs: typing.Iterable[typing.Union[str, DocumentNode]],
 ) -> GraphQLSchema:
     document_list = [maybe_parse(type_def) for type_def in type_defs]
 
@@ -101,7 +101,7 @@ def fix_abstract_resolve_type(schema: GraphQLSchema) -> GraphQLSchema:
 
     for type_name, graphql_type in schema.type_map.items():
         if isinstance(graphql_type, GraphQLUnionType):
-            LOG.debug(f"Adding customer resolver for {type_name}")
+            LOG.debug(f"Adding custom resolver for {type_name}")
             graphql_type.resolve_type = custom_resolve_type
 
     return schema
