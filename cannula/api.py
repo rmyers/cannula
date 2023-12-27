@@ -16,6 +16,7 @@ import typing
 
 from graphql import (
     DocumentNode,
+    GraphQLError,
     GraphQLObjectType,
     execute,
     ExecutionResult,
@@ -246,6 +247,10 @@ class API(Resolver):
         for type_name, value in registry.items():
             self.registry[type_name].update(value)
 
+    @functools.lru_cache(maxsize=128)
+    def validate(self, document: DocumentNode) -> typing.List[GraphQLError]:
+        return validate(self.schema, document)
+
     async def call(
         self,
         document: DocumentNode,
@@ -257,8 +262,7 @@ class API(Resolver):
         This is meant to be called in an asyncio.loop, if you are using a
         web framework that is synchronous use the `call_sync` method.
         """
-        validation_errors = validate(self.schema, document)
-        if validation_errors:
+        if validation_errors := self.validate(document):
             return ExecutionResult(data=None, errors=validation_errors)
 
         context = self.get_context(request)

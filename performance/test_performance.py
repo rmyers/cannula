@@ -11,6 +11,8 @@ import httpx
 import fastapi
 import pydantic
 
+NUM_RUNS = 1000
+
 
 class Widget(pydantic.BaseModel):
     name: str
@@ -76,6 +78,7 @@ def resolve_get_widgets(_, _info, use: str) -> typing.List[dict]:
 exe_schema = ariadne.make_executable_schema(schema, query)
 ariadne_app = ariadne.asgi.GraphQL(exe_schema)
 cannula_app = cannula.API(__name__, schema=[schema])
+document_ast = cannula.gql(document)
 
 
 @cannula_app.resolver("Query")
@@ -91,7 +94,7 @@ async def get_ariadne_app(request: fastapi.Request) -> typing.Any:
 @api.get("/api/cannula")
 async def get_cannula_app(request: fastapi.Request) -> typing.Any:
     results = await cannula_app.call(
-        cannula.gql(document), request, variables={"use": "tighten"}
+        document_ast, request, variables={"use": "tighten"}
     )
     return {"data": results.data, "errors": results.errors}
 
@@ -100,9 +103,14 @@ async def test_performance():
     client = httpx.AsyncClient(app=api, base_url="http://localhost")
 
     start = time.perf_counter()
-    for x in range(1000):
+    for x in range(NUM_RUNS):
         resp = await client.get("/api/fastapi?use=tighten")
         assert resp.status_code == 200
+        assert resp.json() == [
+            {"name": "screw driver", "quantity": 10, "use": "tighten"},
+            {"name": "wrench", "quantity": 20, "use": "tighten"},
+        ]
+
     stop = time.perf_counter()
     fast_results = stop - start
 
@@ -110,13 +118,17 @@ async def test_performance():
     print(f"fastapi: {fast_results}")
 
     start = time.perf_counter()
-    for _x in range(1000):
+    for _x in range(NUM_RUNS):
         resp = await client.post(
             "/api/ariadne",
             json={"query": document, "variables": {"use": "tighten"}},
             headers={"Content-Type": "application/json"},
         )
         assert resp.status_code == 200
+        assert resp.json()["data"]["get_widgets"] == [
+            {"name": "screw driver", "quantity": 10, "use": "tighten"},
+            {"name": "wrench", "quantity": 20, "use": "tighten"},
+        ]
 
     stop = time.perf_counter()
     ariadne_results = stop - start
@@ -124,11 +136,15 @@ async def test_performance():
     print(f"ariadne results: {ariadne_results}")
 
     start = time.perf_counter()
-    for _x in range(1000):
+    for _x in range(NUM_RUNS):
         resp = await client.get(
             "/api/cannula",
         )
         assert resp.status_code == 200
+        assert resp.json()["data"]["get_widgets"] == [
+            {"name": "screw driver", "quantity": 10, "use": "tighten"},
+            {"name": "wrench", "quantity": 20, "use": "tighten"},
+        ]
 
     stop = time.perf_counter()
     cannula_results = stop - start
