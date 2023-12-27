@@ -39,6 +39,16 @@ test = [
     "twine==4.0.2",
     "types-requests",
 ]
+performance = [
+    "pytest<8",
+    "pytest-asyncio",
+    "pytest-httpx",
+    "pytest-cov",
+    "pytest-mock",
+    "fastapi",
+    "ariadne",
+    "httpx",
+]
 
 [project.urls]
 Homepage = "https://github.com/rmyers/cannula"
