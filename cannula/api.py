@@ -16,6 +16,7 @@ import typing
 
 from graphql import (
     DocumentNode,
+    GraphQLObjectType,
     execute,
     ExecutionResult,
     GraphQLSchema,
@@ -79,6 +80,7 @@ class Resolver:
     base_schema: typing.Dict[str, DocumentNode] = {}
     registry: typing.Dict[str, dict]
     datasources: typing.Dict[str, typing.Any]
+    _schema_dir: str
 
     def __init__(
         self,
@@ -211,6 +213,11 @@ class API(Resolver):
     def _make_executable(self, schema: GraphQLSchema):
         for type_name, fields in self.registry.items():
             object_type = schema.get_type(type_name)
+            if object_type is None:
+                raise Exception(f"Invalid type {type_name}")
+
+            # Need to cast this to object_type to satisfy mypy checks
+            object_type = typing.cast(GraphQLObjectType, object_type)
             for field_name, resolver_fn in fields.items():
                 field_definition = object_type.fields.get(field_name)
                 if not field_definition:
@@ -264,7 +271,7 @@ class API(Resolver):
         )
         if inspect.isawaitable(result):
             return await result
-        return result
+        return typing.cast(ExecutionResult, result)
 
     def call_sync(
         self,
