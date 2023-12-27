@@ -37,6 +37,10 @@ jobs:
           name: run tests
           command: make test
 
+      - run:
+          name: check types
+          command: make mypy
+
       - store_artifacts:
           path: test-reports
           destination: test-reports
