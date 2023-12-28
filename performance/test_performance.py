@@ -7,6 +7,7 @@ import typing
 import ariadne
 import ariadne.asgi
 import cannula
+import cannula.contrib.asgi
 import httpx
 import fastapi
 import pydantic
@@ -50,6 +51,18 @@ document = """
     }
 """
 
+invalid_document = """
+    query blah ( { }
+"""
+
+invalid_query = """
+    query widgets ($use: String) {
+        get_nonexistent(use: $use) {
+            foo
+        }
+    }
+"""
+
 
 query = ariadne.QueryType()
 api = fastapi.FastAPI()
@@ -78,7 +91,6 @@ def resolve_get_widgets(_, _info, use: str) -> typing.List[dict]:
 exe_schema = ariadne.make_executable_schema(schema, query)
 ariadne_app = ariadne.asgi.GraphQL(exe_schema)
 cannula_app = cannula.API(__name__, schema=[schema])
-document_ast = cannula.gql(document)
 
 
 @cannula_app.resolver("Query")
@@ -91,12 +103,15 @@ async def get_ariadne_app(request: fastapi.Request) -> typing.Any:
     return await ariadne_app.handle_request(request)
 
 
-@api.get("/api/cannula")
-async def get_cannula_app(request: fastapi.Request) -> typing.Any:
+@api.post("/api/cannula")
+async def get_cannula_app(
+    request: fastapi.Request, payload: cannula.contrib.asgi.GraphQLPayload
+) -> typing.Any:
     results = await cannula_app.call(
-        document_ast, request, variables={"use": "tighten"}
+        payload.query, request, variables=payload.variables
     )
-    return {"data": results.data, "errors": results.errors}
+    errors = [e.formatted for e in results.errors] if results.errors else None
+    return {"data": results.data, "errors": errors}
 
 
 async def test_performance():
@@ -105,7 +120,7 @@ async def test_performance():
     start = time.perf_counter()
     for x in range(NUM_RUNS):
         resp = await client.get("/api/fastapi?use=tighten")
-        assert resp.status_code == 200
+        assert resp.status_code == 200, resp.text
         assert resp.json() == [
             {"name": "screw driver", "quantity": 10, "use": "tighten"},
             {"name": "wrench", "quantity": 20, "use": "tighten"},
@@ -124,7 +139,7 @@ async def test_performance():
             json={"query": document, "variables": {"use": "tighten"}},
             headers={"Content-Type": "application/json"},
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 200, resp.text
         assert resp.json()["data"]["get_widgets"] == [
             {"name": "screw driver", "quantity": 10, "use": "tighten"},
             {"name": "wrench", "quantity": 20, "use": "tighten"},
@@ -137,14 +152,120 @@ async def test_performance():
 
     start = time.perf_counter()
     for _x in range(NUM_RUNS):
-        resp = await client.get(
+        resp = await client.post(
             "/api/cannula",
+            json={"query": document, "variables": {"use": "tighten"}},
+            headers={"Content-Type": "application/json"},
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 200, resp.text
         assert resp.json()["data"]["get_widgets"] == [
             {"name": "screw driver", "quantity": 10, "use": "tighten"},
             {"name": "wrench", "quantity": 20, "use": "tighten"},
         ]
+
+    stop = time.perf_counter()
+    cannula_results = stop - start
+
+    print(f"cannula results: {cannula_results}")
+
+
+async def test_performance_invalid_request():
+    client = httpx.AsyncClient(app=api, base_url="http://localhost")
+
+    start = time.perf_counter()
+    for x in range(NUM_RUNS):
+        resp = await client.get("/api/fastapi")
+        assert resp.status_code == 422, resp.text
+
+    stop = time.perf_counter()
+    fast_results = stop - start
+
+    print("\nperformance test results:")
+    print(f"fastapi: {fast_results}")
+
+    start = time.perf_counter()
+    for _x in range(NUM_RUNS):
+        resp = await client.post(
+            "/api/ariadne",
+            json={"query": invalid_document, "variables": {"use": "tighten"}},
+            headers={"Content-Type": "application/json"},
+        )
+        assert resp.status_code == 400, resp.text
+        errors = resp.json()["errors"]
+        assert len(errors) == 1
+        assert errors[0]["message"] == "Syntax Error: Expected '$', found '{'."
+
+    stop = time.perf_counter()
+    ariadne_results = stop - start
+
+    print(f"ariadne results: {ariadne_results}")
+
+    start = time.perf_counter()
+    for _x in range(NUM_RUNS):
+        resp = await client.post(
+            "/api/cannula",
+            json={"query": invalid_document, "variables": {"use": "tighten"}},
+            headers={"Content-Type": "application/json"},
+        )
+        assert resp.status_code == 200, resp.text
+        errors = resp.json()["errors"]
+        assert len(errors) == 1
+        assert errors[0]["message"] == "Syntax Error: Expected '$', found '{'."
+
+    stop = time.perf_counter()
+    cannula_results = stop - start
+
+    print(f"cannula results: {cannula_results}")
+
+
+async def test_performance_invalid_query():
+    client = httpx.AsyncClient(app=api, base_url="http://localhost")
+
+    start = time.perf_counter()
+    for x in range(NUM_RUNS):
+        resp = await client.get("/api/fastapi")
+        assert resp.status_code == 422, resp.text
+
+    stop = time.perf_counter()
+    fast_results = stop - start
+
+    print("\nperformance test results:")
+    print(f"fastapi: {fast_results}")
+
+    start = time.perf_counter()
+    for _x in range(NUM_RUNS):
+        resp = await client.post(
+            "/api/ariadne",
+            json={"query": invalid_query, "variables": {"use": "tighten"}},
+            headers={"Content-Type": "application/json"},
+        )
+        assert resp.status_code == 400, resp.text
+        errors = resp.json()["errors"]
+        assert len(errors) == 1
+        assert (
+            errors[0]["message"]
+            == "Cannot query field 'get_nonexistent' on type 'Query'."
+        )
+
+    stop = time.perf_counter()
+    ariadne_results = stop - start
+
+    print(f"ariadne results: {ariadne_results}")
+
+    start = time.perf_counter()
+    for _x in range(NUM_RUNS):
+        resp = await client.post(
+            "/api/cannula",
+            json={"query": invalid_query, "variables": {"use": "tighten"}},
+            headers={"Content-Type": "application/json"},
+        )
+        assert resp.status_code == 200, resp.text
+        errors = resp.json()["errors"]
+        assert len(errors) == 1
+        assert (
+            errors[0]["message"]
+            == "Cannot query field 'get_nonexistent' on type 'Query'."
+        )
 
     stop = time.perf_counter()
     cannula_results = stop - start
