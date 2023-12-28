@@ -16,6 +16,7 @@ import typing
 
 from graphql import (
     DocumentNode,
+    GraphQLError,
     GraphQLObjectType,
     execute,
     ExecutionResult,
@@ -35,6 +36,11 @@ from .schema import (
 )
 
 LOG = logging.getLogger(__name__)
+
+
+class ParseResults(typing.NamedTuple):
+    document_ast: DocumentNode
+    errors: typing.List[GraphQLError] = []
 
 
 class Resolver:
@@ -130,7 +136,7 @@ class Resolver:
         path = os.path.join(self.query_directory, f"{query_name}.graphql")
         assert os.path.isfile(path), f"No query found for {query_name}"
 
-        with open(path) as query:
+        with open(path, "r") as query:
             return parse(query.read())
 
     def resolver(self, type_name: str = "Query") -> typing.Any:
@@ -246,9 +252,23 @@ class API(Resolver):
         for type_name, value in registry.items():
             self.registry[type_name].update(value)
 
+    @functools.lru_cache(maxsize=128)
+    def validate(self, document: DocumentNode) -> typing.List[GraphQLError]:
+        """Validate the document against the schema and store results in lru_cache."""
+        return validate(self.schema, document)
+
+    @functools.lru_cache(maxsize=128)
+    def parse_document(self, document: str) -> ParseResults:
+        """Parse and store the document in lru_cache."""
+        try:
+            document_ast = parse(document)
+            return ParseResults(document_ast, [])
+        except GraphQLError as err:
+            return ParseResults(DocumentNode(), [err])
+
     async def call(
         self,
-        document: DocumentNode,
+        document: typing.Union[DocumentNode, str],
         request: typing.Any = None,
         variables: typing.Optional[typing.Dict[str, typing.Any]] = None,
     ) -> ExecutionResult:
@@ -257,8 +277,12 @@ class API(Resolver):
         This is meant to be called in an asyncio.loop, if you are using a
         web framework that is synchronous use the `call_sync` method.
         """
-        validation_errors = validate(self.schema, document)
-        if validation_errors:
+        if isinstance(document, str):
+            document, errors = self.parse_document(document)
+            if errors:
+                return ExecutionResult(data=None, errors=errors)
+
+        if validation_errors := self.validate(document):
             return ExecutionResult(data=None, errors=validation_errors)
 
         context = self.get_context(request)

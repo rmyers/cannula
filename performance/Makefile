@@ -25,7 +25,7 @@ setup: $(VIRTUAL_ENV) $(VIRTUAL_ENV)/.requirements-installed ## Setup local envi
 clean: ## Clean your local workspace
 	rm -rf $(VIRTUAL_ENV)
 
-test: ## run performance test
+test: setup ## run performance test
 	$(VIRTUAL_ENV)/bin/pytest --no-cov -s test_performance.py
 
 #% Available Commands:
