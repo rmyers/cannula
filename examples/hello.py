@@ -55,8 +55,13 @@ SAMPLE_QUERY = cannula.gql(
 )
 
 
-who = "world"
-if len(sys.argv) > 1:
-    who = sys.argv[1]
+def run_hello(who: str = "world"):
+    return api.call_sync(SAMPLE_QUERY, variables={"who": who})
 
-print(api.call_sync(SAMPLE_QUERY, variables={"who": who}))
+
+if __name__ == "__main__":
+    who = "world"
+    if len(sys.argv) > 1:
+        who = sys.argv[1]
+
+    print(run_hello(who))

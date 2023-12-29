@@ -3,41 +3,40 @@ from cannula.middleware import MockMiddleware
 
 schema = cannula.gql(
     """
-  type Brocoli {
-    taste: String
-  }
-  type Message {
-    text: String
-    number: Int
-    float: Float
-    isOn: Boolean
-    id: ID
-    brocoli: Brocoli
-  }
-  type Query {
-    mockity: [Message]
-  }
+    type Brocoli {
+        taste: String
+    }
+    type Message {
+        text: String
+        number: Int
+        float: Float
+        isOn: Boolean
+        id: ID
+        brocoli: Brocoli
+    }
+    type Query {
+        mockity: [Message]
+    }
 """
 )
 
 sample_query = cannula.gql(
     """{
-  mockity {
-    text
-    number
-    float
-    isOn
-    id
-    brocoli {
-      taste
+    mockity {
+      text
+      number
+      float
+      isOn
+      id
+      brocoli {
+        taste
+      }
     }
-  }
 }
 """
 )
 
 default = cannula.API(
-    __name__,
     schema=schema,
     middleware=[MockMiddleware()],
 )
@@ -61,7 +60,6 @@ custom_mocks = {
 }
 
 custom = cannula.API(
-    __name__,
     schema=schema,
     middleware=[
         MockMiddleware(mock_objects=custom_mocks, mock_all=True),
@@ -77,7 +75,6 @@ print(
 )
 
 limited_mocks = cannula.API(
-    __name__,
     schema=schema,
     middleware=[
         MockMiddleware(mock_objects=custom_mocks, mock_all=False),

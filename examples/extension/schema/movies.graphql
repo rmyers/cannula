@@ -1,0 +1,13 @@
+type Movie {
+    name: String
+    director: String
+    book: Book
+}
+
+extend type Book {
+    movies: [Movie]
+}
+
+extend type Query {
+    movies: [Movie]
+}

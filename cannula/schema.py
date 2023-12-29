@@ -1,5 +1,4 @@
 import logging
-import os
 import pathlib
 import typing
 import itertools
@@ -110,14 +109,20 @@ def fix_abstract_resolve_type(schema: GraphQLSchema) -> GraphQLSchema:
 def load_schema(
     directory: typing.Union[str, pathlib.Path]
 ) -> typing.List[DocumentNode]:
-    path = pathlib.Path(directory)
-    if path.is_file():
-        with open(path.absolute()) as graphfile:
+    if isinstance(directory, str):
+        LOG.debug(f"Converting str {directory} to path object")
+        directory = pathlib.Path(directory)
+
+    if directory.is_file():
+        LOG.debug(f"loading schema from file: {directory}")
+        with open(directory.absolute()) as graphfile:
             return [parse(graphfile.read())]
 
     def find_graphql_files():
-        for graph in path.glob("**/*.graphql"):
-            with open(os.path.join(directory, graph)) as graphfile:
+        LOG.debug(f"Checking for graphql files to load in: '{directory}'")
+        for graph in directory.glob("**/*.graphql"):
+            LOG.debug(f"loading discovered file: {graph}")
+            with open(graph) as graphfile:
                 yield graphfile.read()
 
     return [parse(schema) for schema in find_graphql_files()]

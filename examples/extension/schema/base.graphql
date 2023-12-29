@@ -1,0 +1,7 @@
+type GenericThing {
+    name: String
+}
+
+type Query {
+    generic: [GenericThing]
+}
