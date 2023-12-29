@@ -312,10 +312,7 @@ class MockMiddleware:
             return {}
 
     async def run_next(self, _next, _resource, _info, **kwargs):
-        if inspect.isawaitable(_next):
-            results = await _next(_resource, _info, **kwargs)
-        else:
-            results = _next(_resource, _info, **kwargs)
+        results = _next(_resource, _info, **kwargs)
 
         if inspect.isawaitable(results):
             return await results

@@ -90,10 +90,10 @@ def resolve_get_widgets(_, _info, use: str) -> typing.List[dict]:
 # Create executable schema instance
 exe_schema = ariadne.make_executable_schema(schema, query)
 ariadne_app = ariadne.asgi.GraphQL(exe_schema)
-cannula_app = cannula.API(__name__, schema=[schema])
+cannula_app = cannula.API(schema=schema)
 
 
-@cannula_app.resolver("Query")
+@cannula_app.resolver("Query", "get_widgets")
 def get_widgets(_, _info, use: str) -> typing.Any:
     return _get_widgets(use)
 

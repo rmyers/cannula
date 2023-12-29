@@ -1,6 +1,0 @@
-
-union Resource = ComputeServer | Network | Volume
-
-extend type Query {
-  resources(region: String): [ Resource ]
-}

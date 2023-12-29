@@ -24,7 +24,7 @@ VIRTUAL_ENV              ?= venv
 PYTHON_MODULES           := $(shell find . -name '*.py')
 DOCKER_COMPOSE           := $(shell which docker-compose)
 
-export TWINE_NON_INTERACTIVE=1
+export HATCH_INDEX_USER = __token__
 
 .SILENT: help
 .PHONY: setup docs clean
@@ -77,8 +77,8 @@ docs: setup  ## Build the documentation
 	$(VIRTUAL_ENV)/bin/sphinx-build -a docs docs/_build
 
 publish-test: setup  ## Publish the library to test pypi
-	$(VIRTUAL_ENV)/bin/python setup.py sdist bdist_wheel
-	$(VIRTUAL_ENV)/bin/python -m twine upload --repository-url https://test.pypi.org/legacy/ dist/*
+	$(VIRTUAL_ENV)/bin/hatch build -t sdist -t wheel
+	$(VIRTUAL_ENV)/bin/hatch publish --repo https://test.pypi.org/legacy/ dist/*
 
 publish: setup  ## Publish the library to pypi
 	$(VIRTUAL_ENV)/bin/python setup.py sdist bdist_wheel

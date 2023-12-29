@@ -24,8 +24,8 @@ Installation
 
 Requirements:
 
-* Python 3.6+
-* `graphql-core-next <https://graphql-core-next.readthedocs.io/en/latest/>`_
+* Python 3.8+
+* `graphql-core <https://graphql-core-3.readthedocs.io/en/latest/>`_
 
 Use pip::
 
