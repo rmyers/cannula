@@ -107,9 +107,13 @@ def fix_abstract_resolve_type(schema: GraphQLSchema) -> GraphQLSchema:
     return schema
 
 
-def load_schema(directory: str) -> typing.List[DocumentNode]:
-    assert os.path.isdir(directory), f"Directory not found: {directory}"
+def load_schema(
+    directory: typing.Union[str, pathlib.Path]
+) -> typing.List[DocumentNode]:
     path = pathlib.Path(directory)
+    if path.is_file():
+        with open(path.absolute()) as graphfile:
+            return [parse(graphfile.read())]
 
     def find_graphql_files():
         for graph in path.glob("**/*.graphql"):

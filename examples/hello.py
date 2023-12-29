@@ -4,21 +4,25 @@ import sys
 
 import cannula
 from cannula.middleware import DebugMiddleware
+from graphql import GraphQLResolveInfo
 
 SCHEMA = cannula.gql(
     """
-  type Message {
-    text: String
-  }
-  type Query {
-    hello(who: String): Message
-  }
+    type Message {
+        text: String
+    }
+    type Query {
+        hello(who: String): Message
+    }
 """
 )
 
 logging.basicConfig(level=logging.DEBUG)
 
-api = cannula.API(__name__, schema=[SCHEMA], middleware=[DebugMiddleware()])
+api = cannula.API(
+    schema=SCHEMA,
+    middleware=[DebugMiddleware()],
+)
 
 
 class Message(typing.NamedTuple):
@@ -28,8 +32,12 @@ class Message(typing.NamedTuple):
 # The query resolver takes a source and info objects
 # and any arguments defined by the schema. Here we
 # only accept a single argument `who`.
-@api.resolver("Query")
-async def hello(source, info, who):
+@api.resolver("Query", "hello")
+async def hello(
+    source: typing.Any,
+    info: GraphQLResolveInfo,
+    who: str,
+) -> Message:
     return Message(f"Hello, {who}!")
 
 
@@ -38,11 +46,11 @@ async def hello(source, info, who):
 # query functions.
 SAMPLE_QUERY = cannula.gql(
     """
-  query HelloWorld ($who: String!) {
-    hello(who: $who) {
-      text
+    query HelloWorld ($who: String!) {
+        hello(who: $who) {
+            text
+        }
     }
-  }
 """
 )
 

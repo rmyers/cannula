@@ -35,9 +35,12 @@ test = [
     "pytest-cov",
     "pytest-mock",
     "pytest<8",
-    "Sphinx==2.0.1",
+    "Sphinx==7.2.6",
+    "sphinx-autodoc-typehints",
+    "sphinx-material",
     "twine==4.0.2",
     "types-requests",
+    "hatch",
 ]
 performance = [
     "pytest<8",

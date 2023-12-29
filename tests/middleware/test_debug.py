@@ -41,15 +41,14 @@ async def test_debug_middleware(mocker):
 
     logger = mock.Mock(spec=logging.Logger)
     api = cannula.API(
-        __name__,
-        schema=[SCHEMA],
+        schema=SCHEMA,
         middleware=[DebugMiddleware(logger=logger)],
     )
 
     # The query resolver takes a source and info objects
     # and any arguments defined by the schema. Here we
     # only accept a single argument `who`.
-    @api.resolver("Query")
+    @api.resolver("Query", "hello")
     async def hello(_source, _info, who):
         return Message(f"Hello, {who}!")
 

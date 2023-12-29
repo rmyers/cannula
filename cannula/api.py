@@ -11,7 +11,7 @@ import copy
 import functools
 import logging
 import inspect
-import os
+import pathlib
 import typing
 
 from graphql import (
@@ -27,7 +27,6 @@ from graphql import (
 )
 
 from .context import Context
-from .helpers import get_root_path
 from .schema import (
     build_and_extend_schema,
     fix_abstract_resolve_type,
@@ -44,104 +43,68 @@ class ParseResults(typing.NamedTuple):
 
 
 class Resolver:
-    """Resolver Registry
+    """
+    Resolver Registry
+    -----------------
 
     This class is a helper to organize your project as it grows. It allows you
     to put your resolver modules and schema in different packages. For example::
 
         app/
-            api.py  # `api = cannula.API(__name__)`
+            api.py     # `api = cannula.API(args)`
         resolvers/
-            subpackage/
-                app.py  # `app = cannula.Resolver(__name__)`
-                schema/
-                   myschema.graphql
+            books.py   # `books = cannula.Resolver(args)`
+            movies.py  # `movies = cannula.Resolver(args)`
 
-    You then register resolvers and dataloaders in the same way::
 
-        app.py:
+    You then register resolvers and dataloaders in the same way:
+
+    resolvers/books.py::
+
         import cannula
 
-        app = cannula.Resolver(__name__)
+        books = cannula.Resolver()
 
-        @app.resolver('Query')
-        def my_query(source, info):
+        @books.resolver('Query', 'books')
+        def get_books(source, info, args):
             return 'Hello'
 
-        api.py:
+    resolvers/moives.py::
+
         import cannula
 
-        from resolvers.subpackage.app import app
+        movies = cannula.Resolver()
 
-        api = cannula.API(__name__)
-        api.register_resolver(app)
+        @movies.resolver('Query', 'movies')
+        def get_movies(source, info, args):
+            return 'Hello'
 
-    :param name: The import name of the resolver, typically `__name__`
-    :param schema: GraphQL Schema for this resolver.
-    :param schema_directory: Directory name to search for schema files.
-    :param query_directory: Directory name to search for query docs.
+    app/api.py::
+
+        import cannula
+
+        from resolvers.books import books
+        from resolvers.movies import movies
+
+        api = cannula.API(schema=SCHEMA)
+        api.include_resolver(books)
+        api.include_resolver(movies)
+
+
     """
 
-    # Allow sub-resolvers to apply a base schema before applying custom schema.
-    base_schema: typing.Dict[str, DocumentNode] = {}
     registry: typing.Dict[str, dict]
     datasources: typing.Dict[str, typing.Any]
-    _schema_dir: str
 
     def __init__(
         self,
-        name: str,
-        schema: typing.List[typing.Union[str, DocumentNode]] = [],
-        schema_directory: str = "schema",
-        query_directory: str = "queries",
     ):
         self.registry = collections.defaultdict(dict)
         self.datasources = {}
-        self._schema_directory = schema_directory
-        self._query_directory = query_directory
-        self.root_dir = get_root_path(name)
-        self._schema = schema
 
-    @property
-    def schema_directory(self):
-        if not hasattr(self, "_schema_dir"):
-            if os.path.isabs(self._schema_directory):
-                setattr(self, "_schema_dir", self._schema_directory)
-            setattr(
-                self, "_schema_dir", os.path.join(self.root_dir, self._schema_directory)
-            )
-        return self._schema_dir
-
-    def find_schema(self) -> typing.List[DocumentNode]:
-        schemas: typing.List[DocumentNode] = []
-        if os.path.isdir(self.schema_directory):
-            LOG.debug(f"Searching {self.schema_directory} for schema.")
-            schemas = load_schema(self.schema_directory)
-
-        for schema in self._schema:
-            schemas.append(maybe_parse(schema))
-
-        return schemas
-
-    @property
-    def query_directory(self) -> str:
-        if not hasattr(self, "_query_dir"):
-            if os.path.isabs(self._query_directory):
-                self._query_dir: str = self._query_directory
-            self._query_dir = os.path.join(self.root_dir, self._query_directory)
-        return self._query_dir
-
-    @functools.lru_cache(maxsize=128)
-    def load_query(self, query_name: str) -> DocumentNode:
-        path = os.path.join(self.query_directory, f"{query_name}.graphql")
-        assert os.path.isfile(path), f"No query found for {query_name}"
-
-        with open(path, "r") as query:
-            return parse(query.read())
-
-    def resolver(self, type_name: str = "Query") -> typing.Any:
+    def resolver(self, type_name: str, field_name: str) -> typing.Any:
         def decorator(function):
-            self.registry[type_name][function.__name__] = function
+            self.registry[type_name][field_name] = function
 
         return decorator
 
@@ -153,13 +116,19 @@ class Resolver:
 
 
 class API(Resolver):
-    """Cannula API
+    """
+    :param schema: GraphQL Schema for this resolver.
+    :param context: Context class to hold shared state, added to GraphQLResolveInfo object.
+    :param middleware: List of middleware to enable.
+
+    Cannula API
+    -----------
 
     Your entry point into the fun filled world of graphql. Just dive right in::
 
         import cannula
 
-        api = cannula.API(__name__, schema='''
+        api = cannula.API(schema='''
             extend type Query {
                 hello(who: String): String
             }
@@ -170,18 +139,35 @@ class API(Resolver):
             return f'Hello {who}!'
     """
 
+    _schema: typing.Union[str, DocumentNode, pathlib.Path]
+    _resolvers: typing.List[Resolver]
+
     def __init__(
         self,
-        *args,
-        resolvers: typing.List[Resolver] = [],
-        context: typing.Any = Context,
+        schema: typing.Union[str, DocumentNode, pathlib.Path],
+        context: typing.Optional[Context] = None,
         middleware: typing.List[typing.Any] = [],
         **kwargs,
     ):
-        super().__init__(*args, **kwargs)
-        self._context = context
-        self._resolvers = resolvers
+        super().__init__(**kwargs)
+        self._context = context or Context
+        self._resolvers = []
+        self._schema = schema
         self.middleware = middleware
+
+    def include_resolver(self, resolver: Resolver):
+        self._merge_registry(resolver.registry)
+        self.datasources.update(resolver.datasources)
+
+    def _find_schema(self) -> typing.List[DocumentNode]:
+        schemas: typing.List[DocumentNode] = []
+
+        if isinstance(self._schema, pathlib.Path):
+            schemas.extend(load_schema(self._schema))
+        else:
+            schemas.append(maybe_parse(self._schema))
+
+        return schemas
 
     @property
     def schema(self) -> GraphQLSchema:
@@ -189,22 +175,8 @@ class API(Resolver):
             self._full_schema = self._build_schema()
         return self._full_schema
 
-    def _all_schema(self) -> typing.Iterator[DocumentNode]:
-        for document_node in self.find_schema():
-            yield document_node
-
-        for resolver in self._resolvers:
-            self._merge_registry(resolver.registry)
-            self.base_schema.update(resolver.base_schema)
-            self.datasources.update(resolver.datasources)
-            for document_node in resolver.find_schema():
-                yield document_node
-
-        for document_node in self.base_schema.values():
-            yield document_node
-
     def _build_schema(self) -> GraphQLSchema:
-        schema = build_and_extend_schema(self._all_schema())
+        schema = build_and_extend_schema(self._find_schema())
 
         schema_validation_errors = validate_schema(schema)
         if schema_validation_errors:
@@ -238,7 +210,7 @@ class API(Resolver):
         return decorator
 
     def get_context(self, request):
-        context = self._context(request)
+        context = self._context.init(request)
         # Initialize the datasources with a copy of the context without
         # any of the datasource attributes set. It may work just fine but
         # if you change the order the code may stop working. So discourage
@@ -253,12 +225,12 @@ class API(Resolver):
             self.registry[type_name].update(value)
 
     @functools.lru_cache(maxsize=128)
-    def validate(self, document: DocumentNode) -> typing.List[GraphQLError]:
+    def _validate(self, document: DocumentNode) -> typing.List[GraphQLError]:
         """Validate the document against the schema and store results in lru_cache."""
         return validate(self.schema, document)
 
     @functools.lru_cache(maxsize=128)
-    def parse_document(self, document: str) -> ParseResults:
+    def _parse_document(self, document: str) -> ParseResults:
         """Parse and store the document in lru_cache."""
         try:
             document_ast = parse(document)
@@ -278,11 +250,11 @@ class API(Resolver):
         web framework that is synchronous use the `call_sync` method.
         """
         if isinstance(document, str):
-            document, errors = self.parse_document(document)
+            document, errors = self._parse_document(document)
             if errors:
                 return ExecutionResult(data=None, errors=errors)
 
-        if validation_errors := self.validate(document):
+        if validation_errors := self._validate(document):
             return ExecutionResult(data=None, errors=validation_errors)
 
         context = self.get_context(request)

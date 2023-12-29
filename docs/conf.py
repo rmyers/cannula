@@ -15,6 +15,7 @@ import sys
 
 sys.path.insert(0, os.path.abspath(".."))
 
+import cannula
 
 # -- Project information -----------------------------------------------------
 
@@ -23,7 +24,7 @@ copyright = "2019, Robert Myers"
 author = "Robert Myers"
 
 # The full version, including alpha/beta/rc tags
-release = "0.0.2"
+release = cannula.__VERSION__
 
 
 # -- General configuration ---------------------------------------------------
