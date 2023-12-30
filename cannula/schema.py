@@ -4,9 +4,7 @@ import typing
 import itertools
 
 from graphql import (
-    GraphQLResolveInfo,
     GraphQLSchema,
-    GraphQLUnionType,
     DocumentNode,
     TypeDefinitionNode,
     parse,
@@ -78,30 +76,6 @@ def build_and_extend_schema(
         schema = extend_schema(
             schema, extension_ast, assume_valid=True, assume_valid_sdl=True
         )
-
-    return schema
-
-
-def fix_abstract_resolve_type(schema: GraphQLSchema) -> GraphQLSchema:
-    # We need to provide a custom 'resolve_type' since the default
-    # in method only checks for __typename if the source is a dict.
-    # Python mangles the variable name if it starts with `__` so we add
-    # `__typename__` attribute which is not mangled.
-    # TODO(rmyers): submit PR to fix upstream?
-
-    def custom_resolve_type(
-        source: typing.Any, _info: GraphQLResolveInfo, _name: typing.Any
-    ) -> typing.Optional[str]:
-        if source is None:
-            return None
-        if isinstance(source, dict):
-            return str(source.get("__typename"))
-        return getattr(source, "__typename__", None)
-
-    for type_name, graphql_type in schema.type_map.items():
-        if isinstance(graphql_type, GraphQLUnionType):
-            LOG.debug(f"Adding custom resolver for {type_name}")
-            graphql_type.resolve_type = custom_resolve_type
 
     return schema
 

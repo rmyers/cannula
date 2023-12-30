@@ -2,9 +2,11 @@ import tempfile
 import os
 import pathlib
 
-from typing import cast
-from unittest import mock
-from graphql import DocumentNode, GraphQLUnionType, GraphQLResolveInfo, parse
+from graphql import (
+    DocumentNode,
+    parse,
+    validate_schema,
+)
 
 import cannula
 
@@ -61,31 +63,11 @@ async def test_extentions_are_correct():
     }
 
 
-async def test_union_types():
-    with_union = cannula.schema.build_and_extend_schema(
-        [SCHEMA, "union Thing = Sender | Message"]
-    )
-    fixed = cannula.schema.fix_abstract_resolve_type(with_union)
-    thing_type = fixed.get_type("Thing")
-    assert thing_type is not None
-
-    # Cast to union for type checking
-    thing_union = cast(GraphQLUnionType, thing_type)
-    assert thing_union.resolve_type is not None
-
-    class MockSender:
-        __typename__ = "Sender"
-
-    resolve_info = mock.MagicMock(spec=GraphQLResolveInfo)
-
-    obj_type_name = thing_union.resolve_type(MockSender(), resolve_info, thing_union)
-    assert obj_type_name == "Sender"
-    dict_type = thing_union.resolve_type(
-        {"__typename": "Message"}, resolve_info, thing_union
-    )
-    assert dict_type == "Message"
-    none_type_name = thing_union.resolve_type(None, resolve_info, thing_union)
-    assert none_type_name is None
+async def test_extension_without_base_query():
+    schema = cannula.gql("type Sender {name: String}")
+    extended = cannula.build_and_extend_schema([schema, EXTENTIONS])
+    errors = validate_schema(extended)
+    assert errors == []
 
 
 async def test_directives():
