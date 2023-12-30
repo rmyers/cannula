@@ -182,6 +182,5 @@ your team and your use case.
 
 * [hello world](examples/hello.py)
 * [using mocks](examples/mocks.py)
-* [Real World Example](examples/cloud)
 
 [Documentation](https://cannula.readthedocs.io/)
