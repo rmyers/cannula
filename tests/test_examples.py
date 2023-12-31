@@ -60,3 +60,14 @@ def test_mocks_work_properly():
         "isOn": False,
         "brocoli": {"taste": "Delicious"},
     }
+
+
+async def test_http_datasource():
+    from tests.fixtures.examples import http_datasource
+
+    results = await http_datasource.main()
+    assert results is not None
+    assert results == {
+        "widgets": [{"name": "hammer", "type": "tool"}],
+        "another": [{"name": "hammer", "type": "tool"}],
+    }

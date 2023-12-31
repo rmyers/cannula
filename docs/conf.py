@@ -20,7 +20,7 @@ import cannula
 # -- Project information -----------------------------------------------------
 
 project = "Cannula"
-copyright = "2019, Robert Myers"
+copyright = "2024, Robert Myers"
 author = "Robert Myers"
 
 # The full version, including alpha/beta/rc tags
