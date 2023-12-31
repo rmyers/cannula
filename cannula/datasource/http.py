@@ -1,72 +1,22 @@
 import asyncio
-import functools
-import inspect
 import logging
-import os
-import threading
 import types
 import typing
-from concurrent.futures import ThreadPoolExecutor
 
-import requests
+import httpx
 
 from ..context import Context
 
 LOG = logging.getLogger("cannula.datasource.http")
-MAX_WORKERS = int(os.getenv("CANNULA_HTTP_MAX_WORKERS", 4))
 
 
-class DataSourceError(Exception):
-    pass
-
-
-class FutureSession(requests.Session):
-    """Wrap requests session to allow requests to be async"""
-
-    def __init__(self, max_workers=MAX_WORKERS, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.executor = ThreadPoolExecutor(max_workers=max_workers)
-
-    def request(self, *args, **kwargs):
-        function = functools.partial(requests.Session.request, self)
-        return self.executor.submit(function, *args, **kwargs)
-
-    def close(self):
-        super().close()
-        self.executor.shutdown()
-
-
-class ThreadSafeCacheable:
-    # see: https://stackoverflow.com/a/46723144
-
-    def __init__(self, coroutine):
-        self.coroutine = coroutine
-        self.done = False
-        self.result = None
-        self.lock = threading.Lock()
-
-    def __await__(self):
-        while True:
-            if self.done:
-                return self.result
-            if self.lock.acquire(blocking=False):
-                self.result = yield from self.coroutine.__await__()
-                self.done = True
-                return self.result
-            else:
-                yield from asyncio.sleep(0.005)
-
-
+# solves the issue of `cannot reuse already awaited coroutine`
 def cacheable(f):
     def wrapped(*args, **kwargs):
         r = f(*args, **kwargs)
-        return ThreadSafeCacheable(r)
+        return asyncio.ensure_future(r)
 
     return wrapped
-
-
-class HTTPContext(Context):
-    http_session = FutureSession()
 
 
 class Request(typing.NamedTuple):
@@ -84,9 +34,6 @@ class HTTPDataSource:
     # most one request per cache key.
     memoized_requests: typing.Dict[str, typing.Awaitable]
 
-    # Max number of worker argument to ThreadPoolExecutor
-    max_workers: int = 4
-
     # Timeout for an individual request in seconds.
     timeout: int = 5
 
@@ -94,17 +41,22 @@ class HTTPDataSource:
     # will use the class name of the datasource.
     resource_name: typing.Optional[str] = None
 
-    def __init__(self, context: typing.Any):
+    def __init__(
+        self,
+        context: Context,
+        client: typing.Optional[httpx.AsyncClient] = None,
+    ):
+        self.client = client or httpx.AsyncClient()
+        # close the client if this instance opened it
+        self._should_close_client = client is None
         self.context = context
         self.memoized_requests = {}
-        self.assert_has_http_session(context)
         self.assert_has_resource_name()
 
-    def assert_has_http_session(self, context: Context) -> None:
-        if not hasattr(context, "http_session"):
-            raise AttributeError(
-                "Context missing http_session did you subclass HTTPContext?"
-            )
+    def __del__(self):
+        if self._should_close_client:
+            LOG.debug(f"Closing httpx session for {self.resource_name}")
+            asyncio.ensure_future(self.client.aclose())
 
     def assert_has_resource_name(self) -> None:
         if self.resource_name is None:
@@ -143,11 +95,11 @@ class HTTPDataSource:
         raise error
 
     def convert_to_object(self, json_obj):
-        json_obj.update({"__typename__": self.resource_name})
+        json_obj.update({"__typename": self.resource_name})
         return types.SimpleNamespace(**json_obj)
 
     async def did_receive_response(
-        self, response: requests.Response, request: Request
+        self, response: httpx.Response, request: Request
     ) -> typing.Any:
         response.raise_for_status()
         return response.json(object_hook=self.convert_to_object)
@@ -181,20 +133,13 @@ class HTTPDataSource:
         @cacheable
         async def process_request():
             try:
-                future = self.context.http_session.request(
+                response = await self.client.request(
                     request.method,
                     request.url,
                     json=request.body,
                     headers=request.headers,
                     timeout=self.timeout,
                 )
-                await asyncio.sleep(0.005)
-                if inspect.isawaitable(future):
-                    response = await future
-                elif hasattr(future, "result"):
-                    response = future.result()
-                else:
-                    response = future
             except Exception as exc:
                 return self.did_receive_error(exc, request)
             else:

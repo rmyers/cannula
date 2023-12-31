@@ -25,6 +25,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+httpx = [
+    "httpx",
+    "fastapi",
+]
 test = [
     "black",
     "coverage==7.2.3",
