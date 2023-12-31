@@ -2,7 +2,6 @@ import httpx
 import fastapi
 
 from cannula.datasource import http
-from cannula import Context
 
 
 class MockDB:
@@ -30,7 +29,7 @@ async def test_http_datasource(mocker):
 
     get_widget_spy = mocker.spy(mockDB, "get_widgets")
     mocked_client = httpx.AsyncClient(app=fake_app)
-    widget = Widget(context=Context(mocker.Mock()), client=mocked_client)
+    widget = Widget(request=mocker.Mock(), client=mocked_client)
 
     results_one = await widget.get_widgets()
     results_two = await widget.get_widgets()

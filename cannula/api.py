@@ -7,7 +7,6 @@ Using the API
 
 import asyncio
 import collections
-import copy
 import functools
 import logging
 import inspect
@@ -100,11 +99,9 @@ class Resolver:
     """
 
     registry: typing.Dict[str, dict]
-    datasources: typing.Dict[str, typing.Any]
 
     def __init__(self):
         self.registry = collections.defaultdict(dict)
-        self.datasources = {}
 
     def query(self, field_name: typing.Optional[str] = None) -> typing.Any:
         """Query Resolver
@@ -174,12 +171,6 @@ class Resolver:
 
         return decorator
 
-    def datasource(self):
-        def decorator(klass):
-            self.datasources[klass.__name__] = klass
-
-        return decorator
-
 
 class API:
     """
@@ -202,14 +193,13 @@ class API:
     :param middleware: List of middleware to enable.
     """
 
-    datasources: typing.Dict[str, typing.Any]
     _schema: typing.Union[str, DocumentNode, pathlib.Path]
     _resolvers: typing.List[Resolver]
 
     def __init__(
         self,
         schema: typing.Union[str, DocumentNode, pathlib.Path],
-        context: typing.Optional[Context] = None,
+        context: typing.Optional[typing.Any] = None,
         middleware: typing.List[typing.Any] = [],
         **kwargs,
     ):
@@ -217,7 +207,6 @@ class API:
         self._resolvers = []
         self._schema = schema
         self.middleware = middleware
-        self.datasources = {}
 
     def query(self, field_name: typing.Optional[str] = None) -> typing.Any:
         """Query Resolver
@@ -320,7 +309,6 @@ class API:
 
         """
         self._merge_registry(resolver.registry)
-        self.datasources.update(resolver.datasources)
 
     def _find_schema(self) -> typing.List[DocumentNode]:
         schemas: typing.List[DocumentNode] = []
@@ -367,16 +355,8 @@ class API:
 
         return decorator
 
-    def get_context(self, request):
-        context = self._context.init(request)
-        # Initialize the datasources with a copy of the context without
-        # any of the datasource attributes set. It may work just fine but
-        # if you change the order the code may stop working. So discourage
-        # people from this anti-pattern.
-        context_copy = copy.copy(context)
-        for name, datasource in self.datasources.items():
-            setattr(context, name, datasource(context_copy))
-        return context
+    def get_context(self, request) -> typing.Any:
+        return self._context.init(request)
 
     def _merge_registry(self, registry: dict):
         for type_name, value in registry.items():
