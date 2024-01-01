@@ -68,9 +68,6 @@ Testing Your Code
 Since GraphQL is typed it is trivial to mock the responses to any Query or
 Mutation. Cannula provides a :ref:`mock-middleware` which can mock all
 types or only select few to provide flexibility when writing your tests.
-Here is a small example:
-
-.. literalinclude:: examples/mocks.py
 
 Read More About It
 ------------------
@@ -79,6 +76,7 @@ Read More About It
    :maxdepth: 2
 
    schema
+   context
    datasources
    middleware
 

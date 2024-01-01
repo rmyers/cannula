@@ -1,8 +1,8 @@
-def test_hello_world():
+async def test_hello_world():
     from tests.fixtures.examples import hello
 
-    results = hello.run_hello("sammy")
-    assert results.data == {"hello": {"text": "Hello, sammy!"}}
+    results = await hello.run_hello("sammy")
+    assert results == {"hello": "hello sammy!"}
 
 
 def test_extension_works_properly_from_multiple_file():

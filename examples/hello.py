@@ -1,62 +1,47 @@
-import logging
+import asyncio
 import typing
 import sys
 
 import cannula
-from cannula.middleware import DebugMiddleware
-from graphql import GraphQLResolveInfo
 
-SCHEMA = cannula.gql(
-    """
-    type Message {
-        text: String
-    }
+SCHEMA = """
     type Query {
-        hello(who: String): Message
+        hello(who: String!): String
     }
 """
-)
 
-logging.basicConfig(level=logging.DEBUG)
-
-api = cannula.API(
-    schema=SCHEMA,
-    middleware=[DebugMiddleware()],
-)
+# Basic API setup with the schema we defined
+api = cannula.API(schema=SCHEMA)
 
 
-class Message(typing.NamedTuple):
-    text: str
-
-
-# The query resolver takes a source and info objects
+# The query resolver takes a `source` and `info` objects
 # and any arguments defined by the schema. Here we
 # only accept a single argument `who`.
-@api.resolver("Query", "hello")
+@api.query()
 async def hello(
     source: typing.Any,
-    info: GraphQLResolveInfo,
+    info: cannula.ResolveInfo,
     who: str,
-) -> Message:
-    return Message(f"Hello, {who}!")
+) -> str:
+    # Here the field_name is 'hello' so we'll
+    # return 'hello {who}!'
+    return f"{info.field_name} {who}!"
 
 
 # Pre-parse your query to speed up your requests.
-# Here is an example of how to pass arguments to your
-# query functions.
 SAMPLE_QUERY = cannula.gql(
     """
     query HelloWorld ($who: String!) {
-        hello(who: $who) {
-            text
-        }
+        hello(who: $who)
     }
 """
 )
 
 
-def run_hello(who: str = "world"):
-    return api.call_sync(SAMPLE_QUERY, variables={"who": who})
+async def run_hello(who: str = "world"):
+    results = await api.call(SAMPLE_QUERY, variables={"who": who})
+    print(results.data)
+    return results.data
 
 
 if __name__ == "__main__":
@@ -64,4 +49,5 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         who = sys.argv[1]
 
-    print(run_hello(who))
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(run_hello(who))
