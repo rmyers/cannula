@@ -78,11 +78,11 @@ docs: setup  ## Build the documentation
 
 publish-test: setup  ## Publish the library to test pypi
 	$(VIRTUAL_ENV)/bin/hatch build -t sdist -t wheel
-	$(VIRTUAL_ENV)/bin/hatch publish --repo https://test.pypi.org/legacy/ dist/*
+	$(VIRTUAL_ENV)/bin/hatch publish --repo https://test.pypi.org/legacy/
 
 publish: setup  ## Publish the library to pypi
-	$(VIRTUAL_ENV)/bin/python setup.py sdist bdist_wheel
-	$(VIRTUAL_ENV)/bin/python -m twine upload dist/*
+	$(VIRTUAL_ENV)/bin/hatch build -t sdist -t wheel
+	$(VIRTUAL_ENV)/bin/hatch publish
 
 format:
 	$(VIRTUAL_ENV)/bin/black .
