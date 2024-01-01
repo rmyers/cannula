@@ -22,12 +22,14 @@ Listen to me talk about `GraphQL`:
 Installation
 ------------
 
-Requirements:
+.. note::
 
-* Python 3.8+
-* `graphql-core <https://graphql-core-3.readthedocs.io/en/latest/>`_
+    Basic Requirements:
 
-Use pip::
+    * Python 3.8+
+    * `graphql-core <https://graphql-core-3.readthedocs.io/en/latest/>`_
+
+Using pip::
 
     $ pip3 install cannula
 
@@ -79,10 +81,3 @@ Read More About It
    context
    datasources
    middleware
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`

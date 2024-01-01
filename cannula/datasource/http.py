@@ -4,9 +4,12 @@
 HTTP Data Source
 ================
 
-First install the extras::
+.. note::
 
-    pip install cannula[http]
+    This requires the http extras to be installed::
+
+        pip install cannula[http]
+
 """
 
 import asyncio
@@ -87,7 +90,7 @@ class HTTPDataSource:
     def will_send_request(self, request: Request) -> Request:
         """Hook for subclasses to modify the request before it is sent.
 
-        For example setting Authorization headers:
+        For example setting Authorization headers::
 
             def will_send_request(self, request):
                 request.headers = self.request.headers
