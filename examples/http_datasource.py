@@ -4,8 +4,8 @@ import typing
 import cannula
 import fastapi
 import httpx
+from cannula.context import Context, ResolveInfo
 from cannula.datasource import http
-from graphql import GraphQLResolveInfo
 
 
 logging.basicConfig(level=logging.DEBUG)
@@ -47,8 +47,8 @@ class WidgetDatasource(http.HTTPDataSource):
         return await self.get("/widgets")
 
 
-# Add the datasource to our context
-class CustomContext(cannula.Context):
+# Create a custom context and add the datasource
+class CustomContext(Context):
     widget_datasource: WidgetDatasource
 
     def handle_request(self, request: typing.Any) -> typing.Any:
@@ -62,10 +62,8 @@ api = cannula.API(schema=SCHEMA, context=CustomContext)
 
 
 @api.query("widgets")
-async def list_widgets(parent, info: GraphQLResolveInfo):
-    # casting this allows type checking the datasource
-    context = typing.cast(CustomContext, info.context)
-    return await context.widget_datasource.get_widgets()
+async def list_widgets(parent, info: ResolveInfo[CustomContext]):
+    return await info.context.widget_datasource.get_widgets()
 
 
 async def main():
@@ -86,7 +84,7 @@ async def main():
     )
 
     results = await api.call(query)
-    print(results.data)
+    print(results.data, results.errors)
     return results.data
 
 

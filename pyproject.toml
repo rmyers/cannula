@@ -41,7 +41,7 @@ test = [
     "pytest<8",
     "Sphinx==7.2.6",
     "sphinx-autodoc-typehints",
-    "sphinx-material",
+    "pydata-sphinx-theme",
     "twine==4.0.2",
     "types-requests",
     "hatch",
@@ -74,7 +74,7 @@ include = [
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 minversion = "6.0"
-addopts = [ 
+addopts = [
     "-vvv",
     "--cov=cannula",
     "--cov-report=term-missing:skip-covered",

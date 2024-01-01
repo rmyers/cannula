@@ -22,12 +22,14 @@ Listen to me talk about `GraphQL`:
 Installation
 ------------
 
-Requirements:
+.. note::
 
-* Python 3.8+
-* `graphql-core <https://graphql-core-3.readthedocs.io/en/latest/>`_
+    Basic Requirements:
 
-Use pip::
+    * Python 3.8+
+    * `graphql-core <https://graphql-core-3.readthedocs.io/en/latest/>`_
+
+Using pip::
 
     $ pip3 install cannula
 
@@ -68,9 +70,6 @@ Testing Your Code
 Since GraphQL is typed it is trivial to mock the responses to any Query or
 Mutation. Cannula provides a :ref:`mock-middleware` which can mock all
 types or only select few to provide flexibility when writing your tests.
-Here is a small example:
-
-.. literalinclude:: examples/mocks.py
 
 Read More About It
 ------------------
@@ -79,12 +78,6 @@ Read More About It
    :maxdepth: 2
 
    schema
+   context
    datasources
    middleware
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
