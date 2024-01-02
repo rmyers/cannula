@@ -4,6 +4,9 @@
 #
 version: 2.1
 
+orbs:
+  codecov: codecov/codecov@3.2.4
+
 executors:
   default:
     docker:
@@ -30,12 +33,15 @@ jobs:
 
       - save_cache:
           paths:
-            - ./.venv
+            - ./venv
           key: v1-dependencies-{{ checksum "pyproject.toml" }}
 
       - run:
           name: run tests
           command: make test
+
+      - codecov/upload:
+          file: "./.coverage"
 
       - run:
           name: check types
