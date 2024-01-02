@@ -33,7 +33,7 @@ jobs:
 
       - save_cache:
           paths:
-            - ./.venv
+            - ./venv
           key: v1-dependencies-{{ checksum "pyproject.toml" }}
 
       - run:
@@ -41,7 +41,7 @@ jobs:
           command: make test
 
       - codecov/upload:
-          file: ".coverage"
+          file: "./.coverage"
 
       - run:
           name: check types
