@@ -41,7 +41,7 @@ jobs:
           command: make test
 
       - codecov/upload
-          file: .coverage
+          file: ".coverage"
 
       - run:
           name: check types
