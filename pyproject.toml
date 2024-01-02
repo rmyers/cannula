@@ -77,8 +77,6 @@ minversion = "6.0"
 addopts = [
     "-vvv",
     "--cov=cannula",
-    "--cov-report=term-missing:skip-covered",
-    "--cov-report=html",
     "--junit-xml=reports/junit.xml"
 ]
 testpaths = [
