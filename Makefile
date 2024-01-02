@@ -59,6 +59,7 @@ flake8: setup ## Run flake8 checks
 
 unit: setup ## Run unit tests
 	$(VIRTUAL_ENV)/bin/pytest
+	@cp .coverage reports/.coverage
 
 mypy: setup ## Run mypy on code
 	$(VIRTUAL_ENV)/bin/mypy cannula

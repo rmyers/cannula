@@ -48,8 +48,8 @@ jobs:
           command: make mypy
 
       - store_artifacts:
-          path: test-reports
-          destination: test-reports
+          path: reports
+          destination: reports
 
   deploy:
     executor: default
