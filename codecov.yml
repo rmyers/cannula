@@ -1,2 +1,5 @@
-fixes:
-   - "/home/circleci/repo/::"
+
+cli:
+  plugins:
+    pycoverage:
+      report_type: "json"
