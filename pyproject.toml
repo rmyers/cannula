@@ -18,7 +18,7 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
-    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.8",
 ]
 dependencies = [
     "graphql-core==3.2.3",
@@ -79,6 +79,8 @@ addopts = [
     "--cov=cannula",
     "--cov-report=term-missing:skip-covered",
     "--cov-report=html",
+    "--cov-report=json:reports/coverage.json",
+    "--junit-xml=reports/junit.xml"
 ]
 testpaths = [
     "tests",

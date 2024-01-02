@@ -41,15 +41,15 @@ jobs:
           command: make test
 
       - codecov/upload:
-          file: "./.coverage"
+          file: reports/coverage.json
 
       - run:
           name: check types
           command: make mypy
 
       - store_artifacts:
-          path: test-reports
-          destination: test-reports
+          path: reports
+          destination: reports
 
   deploy:
     executor: default

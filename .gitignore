@@ -5,5 +5,7 @@ dist
 .mypy_cache
 venv
 .coverage
+coverage.json
 htmlcov
 .DS_Store
+reports
