@@ -1,3 +1,7 @@
+"""
+Schema Utilities
+----------------
+"""
 import logging
 import pathlib
 import typing
@@ -61,6 +65,35 @@ def maybe_parse(type_def: typing.Union[str, DocumentNode]):
 def build_and_extend_schema(
     type_defs: typing.Iterable[typing.Union[str, DocumentNode]],
 ) -> GraphQLSchema:
+    """
+    Build and Extend Schema
+
+    When splitting schema into multiple files it is helpful to be able to
+    extend an existing type. This is most commonly done with the `Query`
+    and `Mutation` types.
+
+    For example in one schema file you add a `Query` type::
+
+        type Book {
+            name: String
+        }
+
+        type Query {
+            books: [Books]
+        }
+
+    Now in another schema file you can extend the `Query`::
+
+        type Movie {
+            name: String
+        }
+
+        extend type Query {
+            movies: [Movie]
+        }
+
+    :param type_defs: list of schema or document nodes
+    """
     document_list = [maybe_parse(type_def) for type_def in type_defs]
 
     ast_document = concat_ast(document_list)
@@ -83,6 +116,13 @@ def build_and_extend_schema(
 def load_schema(
     directory: typing.Union[str, pathlib.Path]
 ) -> typing.List[DocumentNode]:
+    """
+    Load Schema
+
+    This utility will load schema from a directory or a single pathlib.Path
+
+    :param directory: Directory to load schema files from
+    """
     if isinstance(directory, str):
         LOG.debug(f"Converting str {directory} to path object")
         directory = pathlib.Path(directory)
