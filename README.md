@@ -1,7 +1,7 @@
 # Cannula
 
 [![CircleCI](https://circleci.com/gh/rmyers/cannula.svg?style=shield)](https://circleci.com/gh/rmyers/cannula)
-[![Documentation Status](https://readthedocs.org/projects/cannula/badge/?version=latest)](https://cannula.readthedocs.io/en/latest/?badge=latest)
+[![Documentation Status](https://readthedocs.org/projects/cannula/badge/?version=main)](https://cannula.readthedocs.io/en/main/?badge=main)
 
 > GraphQL for people who like Python!
 
@@ -28,8 +28,8 @@ library you like.
 
 Using GraphQL you can simplify your web application stack and reduce
 dependencies to achieve the same customer experience without regret. By using
-just a few core libraries you can increase productivity and make your
-application easier to maintain.
+a schema to define your application you can auto generate much of the code
+you need to interact with it.
 
 Our Philosophy:
 1. Make your site easy to maintain.
@@ -39,7 +39,7 @@ Our Philosophy:
 
 <h2 id="install">Installation</h2>
 
-Requires Python 3.6 or greater! The only dependency is
+Requires Python 3.8 or greater! The only dependency is
 [graphql-core-next](https://graphql-core-next.readthedocs.io/en/latest/).
 
 ```bash
@@ -51,132 +51,73 @@ pip3 install cannula
 Here is a small [hello world example](examples/hello.py):
 
 ```python
-import logging
 import typing
 import sys
 
 import cannula
-from cannula.middleware import DebugMiddleware
 
-SCHEMA = cannula.gql("""
-  type Message {
-    text: String
-  }
-  type Query {
-    hello(who: String): Message
-  }
-""")
+SCHEMA = """
+    type Query {
+        hello(who: String!): String
+    }
+"""
 
-logging.basicConfig(level=logging.DEBUG)
+# Basic API setup with the schema we defined
+api = cannula.API(schema=SCHEMA)
 
-api = cannula.API(
-  __name__,
-  schema=SCHEMA,
-  middleware=[
-    DebugMiddleware()
-  ]
+
+# The query resolver takes a `source` and `info` objects
+# and any arguments defined by the schema. Here we
+# only accept a single argument `who`.
+@api.query()
+async def hello(
+    source: typing.Any,
+    info: cannula.ResolveInfo,
+    who: str,
+) -> str:
+    # Here the field_name is 'hello' so we'll
+    # return 'hello {who}!'
+    return f"{info.field_name} {who}!"
+
+
+# Pre-parse your query to speed up your requests.
+SAMPLE_QUERY = cannula.gql(
+    """
+    query HelloWorld ($who: String!) {
+        hello(who: $who)
+    }
+"""
 )
 
 
-class Message(typing.NamedTuple):
-    text: str
+def run_hello(who: str = "world"):
+    return api.call_sync(SAMPLE_QUERY, variables={"who": who})
 
 
-# The query resolver takes a source and info objects
-# and any arguments defined by the schema. Here we
-# only accept a single argument `who`.
-@api.resolver('Query')
-async def hello(source, info, who):
-    return Message(f"Hello, {who}!")
+if __name__ == "__main__":
+    who = "world"
+    if len(sys.argv) > 1:
+        who = sys.argv[1]
 
-# Pre-parse your query to speed up your requests.
-# Here is an example of how to pass arguments to your
-# query functions.
-SAMPLE_QUERY = cannula.gql("""
-  query HelloWorld ($who: String!) {
-    hello(who: $who) {
-      text
-    }
-  }
-""")
+    print(run_hello(who))
 
-
-who = 'world'
-if len(sys.argv) > 1:
-    who = sys.argv[1]
-
-print(api.call_sync(SAMPLE_QUERY, variables={'who': who}))
 ```
 
 Now you should see the results if you run the sample on the command line:
 
-```bash
+```
 $ python3 examples/hello.py
-DEBUG:asyncio:Using selector: KqueueSelector
-DEBUG:cannula.schema:Adding default empty Mutation type
-DEBUG:cannula.middleware.debug:Resolving Query.hello expecting type Message
-DEBUG:cannula.middleware.debug:Field Query.hello resolved: Message(text='Hello, world!') in 0.000108 seconds
-DEBUG:cannula.middleware.debug:Resolving Message.text expecting type String
-DEBUG:cannula.middleware.debug:Field Message.text resolved: 'Hello, world!' in 0.000067 seconds
 ExecutionResult(
-  data={'hello': {'text': 'Hello, world!'}},
+  data={'hello': "hello world!"},
   errors=None
 )
 
 $ python3 examples/hello.py Bob
-DEBUG:asyncio:Using selector: KqueueSelector
-DEBUG:cannula.schema:Adding default empty Mutation type
-DEBUG:cannula.middleware.debug:Resolving Query.hello expecting type Message
-DEBUG:cannula.middleware.debug:Field Query.hello resolved: Message(text='Hello, Bob!') in 0.000104 seconds
-DEBUG:cannula.middleware.debug:Resolving Message.text expecting type String
-DEBUG:cannula.middleware.debug:Field Message.text resolved: 'Hello, Bob!' in 0.000101 seconds
 ExecutionResult(
-  data={'hello': {'text': 'Hello, Bob!'}},
+  data={"hello": "hello Bob!"},
   errors=None
 )
 ```
-
-But what about Django integration or flask?
-
-```python
-# pip install channels, Django
-import cannula
-from channels.db import database_sync_to_async
-from django.contrib.auth.models import User
-
-schema = cannula.gql("""
-  type User {
-    username: String   # Only expose the fields you actually use
-    first_name: String
-    last_name: String
-    made_up_field: String
-  }
-  extend type Query {
-    getUserById(user_id: String): User
-  }
-""")
-
-@api.query()
-async def getUserById(source, info, user_id):
-    return await get_user(user_id)
-
-@database_sync_to_async
-def get_user(user_id):
-    return User.objects.get(pk=user_id)
-
-@api.resolve('User')
-async def made_up_field(source, info):
-    return f"{source.get_full_name()} is a lying lier there is no 'made_up_field'"
-```
-
-Since GraphQL is agnostic about where or how you store your data all you need
-to do is provide a function to resolve a query. The results you return just
-need to match the schema and you are done.
-
-Django and sqlalchemy already provide tools to query the database. And they
-work quite well. Or you may choose to use an async database library to make
-concurrent requests work even better. Try them all and see what works best for
-your team and your use case.
 
 <h2 id="examples">Examples and Documentation</h2>
 

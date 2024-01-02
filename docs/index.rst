@@ -78,6 +78,7 @@ Read More About It
    :maxdepth: 2
 
    schema
+   resolvers
    context
    datasources
    middleware
