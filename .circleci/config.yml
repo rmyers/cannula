@@ -40,7 +40,8 @@ jobs:
           name: run tests
           command: make test
 
-      - codecov/upload
+      - codecov/upload:
+          file: reports/coverage.json
 
       - run:
           name: check types
