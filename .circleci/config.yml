@@ -39,8 +39,8 @@ jobs:
       - run:
           name: run tests
           command: make test
-          post-steps:
-            - codecov/upload
+
+      - codecov/upload
 
       - run:
           name: check types
