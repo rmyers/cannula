@@ -55,6 +55,11 @@ source_suffix = [".rst"]
 html_theme = "pydata_sphinx_theme"
 
 html_theme_options = {
+    "logo": {
+        "text": "Cannula Documentation",
+        "image_light": "_static/mind-map.png",
+        "image_dark": "_static/mind-map.png",
+    },
     "primary_sidebar_end": ["indices.html", "sidebar-ethical-ads.html"],
     "external_links": [
         {
