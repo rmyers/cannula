@@ -77,8 +77,9 @@ Read More About It
 .. toctree::
    :maxdepth: 2
 
-   schema
-   resolvers
-   context
-   datasources
-   middleware
+   tutorial/index
+   ref/schema
+   ref/resolvers
+   ref/context
+   ref/datasources
+   ref/middleware
