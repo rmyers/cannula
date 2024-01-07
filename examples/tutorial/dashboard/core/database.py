@@ -1,6 +1,6 @@
 from sqlalchemy import MetaData, Table, Column, Integer, String
 
-from dashboard.config import config
+from dashboard.core.config import config
 
 
 metadata = MetaData()

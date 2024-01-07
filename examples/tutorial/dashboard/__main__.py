@@ -3,8 +3,8 @@ import asyncio
 import click
 import uvicorn
 
-from dashboard.app import app
-from dashboard.database import create_tables
+from dashboard.core.app import app
+from dashboard.core.database import create_tables
 
 
 @click.group()

@@ -2,8 +2,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 
-from dashboard.config import config
-from dashboard.database import create_tables
+from dashboard.core.config import config
+from dashboard.core.database import create_tables
 
 
 @asynccontextmanager

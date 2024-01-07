@@ -5,7 +5,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic_settings import BaseSettings
 from sqlalchemy.ext.asyncio import create_async_engine
 
-CWD = pathlib.Path(__file__).parent
+DASHBOARD_ROOT = pathlib.Path(__file__).parent.parent
 
 
 class Config(BaseSettings):
@@ -15,7 +15,7 @@ class Config(BaseSettings):
 
     @functools.cached_property
     def root(self):
-        return CWD
+        return DASHBOARD_ROOT
 
     @functools.cached_property
     def templates(self):
