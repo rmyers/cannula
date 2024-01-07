@@ -1,14 +1,26 @@
-import pathlib
+from contextlib import asynccontextmanager
 
-import fastapi
-from fastapi.templating import Jinja2Templates
+from fastapi import FastAPI, Request
 
-root = pathlib.Path(__file__).parent
+from dashboard.config import config
+from dashboard.database import create_tables
 
-templates = Jinja2Templates(root / "templates")
-app = fastapi.FastAPI(debug=True)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Make sure the database has been created
+    await create_tables()
+    # Run the app
+    yield
+    # tear down things right now there is nothing to do
+
+
+app = FastAPI(
+    debug=config.debug,
+    lifespan=lifespan,
+)
 
 
 @app.get("/")
-def home(request: fastapi.Request):
-    return templates.TemplateResponse(request, "index.html")
+def home(request: Request):
+    return config.templates.TemplateResponse(request, "index.html")

@@ -24,16 +24,20 @@ clean: ## Clean your local workspace
 	rm -rf htmlcov
 	rm -rf .coverage
 	rm -rf *.egg-info
+	rm -f db.sqlite
 	find . -name '*.py[co]' -delete
 
-test: setup
-	$(VIRTUAL_ENV)/bin/pytest
+test: setup  ## Test the code
+	DATABASE_URI="sqlite+aiosqlite:///:memory:" $(VIRTUAL_ENV)/bin/pytest --cov dashboard
 
-format:
+format:  ## Format the code with black
 	$(VIRTUAL_ENV)/bin/black .
 
-run: setup
-	$(VIRTUAL_ENV)/bin/python -m dashboard
+run: setup  ## Run the application
+	$(VIRTUAL_ENV)/bin/python -m dashboard run
+
+initdb: setup  ## Create database tables
+	$(VIRTUAL_ENV)/bin/python -m dashboard initdb
 
 help: ## Show the available commands
 	@grep '^[a-zA-Z]' $(MAKEFILE_LIST) | awk -F ':.*?## ' 'NF==2 {printf "   %-20s%s\n", $$1, $$2}' | sort

@@ -1,9 +1,31 @@
+import asyncio
+
+import click
 import uvicorn
+
 from dashboard.app import app
-
-def main():
-    uvicorn.run(app, )
+from dashboard.database import create_tables
 
 
-if __name__ == "__main__":
-    main()
+@click.group()
+def cli():  # pragma: no cover
+    pass
+
+
+@click.command()
+def initdb():  # pragma: no cover
+    click.echo("Initialized the database")
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(create_tables())
+
+
+@click.command()
+def run():  # pragma: no cover
+    uvicorn.run(app)
+
+
+cli.add_command(initdb)
+cli.add_command(run)
+
+if __name__ == "__main__":  # pragma: no cover
+    cli()
