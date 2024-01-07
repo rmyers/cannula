@@ -28,7 +28,7 @@ clean: ## Clean your local workspace
 	find . -name '*.py[co]' -delete
 
 test: setup  ## Test the code
-	DATABASE_URI="sqlite+aiosqlite:///:memory:" $(VIRTUAL_ENV)/bin/pytest --cov dashboard
+	DATABASE_URI="sqlite+aiosqlite:///:memory:" $(VIRTUAL_ENV)/bin/pytest --cov dashboard --cov-config=pytest.ini
 
 format:  ## Format the code with black
 	$(VIRTUAL_ENV)/bin/black .
