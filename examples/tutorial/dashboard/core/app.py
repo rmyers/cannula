@@ -24,3 +24,8 @@ app = FastAPI(
 @app.get("/")
 def home(request: Request):
     return config.templates.TemplateResponse(request, "index.html")
+
+
+@app.get("/part5/")
+def part5(request: Request):
+    return config.templates.TemplateResponse("part5/index.html", {"request": request})
