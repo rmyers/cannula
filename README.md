@@ -8,6 +8,7 @@
 * [Why Cannula](#why)
 * [Installation](#install)
 * [Quick Start](#start)
+* [Performance](#performance)
 * [Examples](#examples)
 * [Documentation](https://cannula.readthedocs.io/)
 
@@ -118,6 +119,37 @@ ExecutionResult(
   errors=None
 )
 ```
+
+<h2 id="performance">Performance</h2>
+
+We try to make sure cannula is as fast as possible. While real world benchmarks are always difficult we do have a simple test that attempts to show how cannula performs against other setups.
+
+You can view the tests in [performance](performance/test_performance.py). We have a simple function that returns data then compare the time it takes to return those results with a plan FastAPI app vs a GraphQL request. Then we try the same GraphQL request in both Cannula and Ariadne. Here is a sample of the output:
+
+```
+1000 iterations (lower is better)
+
+test_performance.py::test_performance
+performance test results:
+fastapi: 0.41961031800019555
+ariadne results: 1.8639117470011115
+cannula results: 0.5465521310106851
+PASSED
+test_performance.py::test_performance_invalid_request
+performance test results:
+fastapi: 0.375848950992804
+ariadne results: 0.8494849189883098
+cannula results: 0.4427280649833847
+PASSED
+test_performance.py::test_performance_invalid_query
+performance test results:
+fastapi: 0.37241295698913746
+ariadne results: 2.1828249279933516
+cannula results: 0.4591125229781028
+PASSED
+```
+
+As you can see Cannula is close to the raw performance of FastAPI. Granted real world results might be different as the way Cannula achieves it speed is by caching query validation results. This works best if you have a relatively fixed set of queries that are performed such as a UI that you or another team manages. If the requests are completely ad hoc like a public api then the results will not be as great.
 
 <h2 id="examples">Examples and Documentation</h2>
 

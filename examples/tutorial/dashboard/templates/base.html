@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    {% block head %}{% endblock %}
+    <title>Dashboard</title>
+</head>
+
+<body class="text-blueGray-700 antialiased">
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root">
+        <nav
+            class="md:left-0 md:block md:fixed md:top-0 md:bottom-0 md:overflow-y-auto md:flex-row md:flex-nowrap md:overflow-hidden shadow-xl bg-white flex flex-wrap items-center justify-between relative md:w-64 z-10 py-4 px-6">
+            <div
+                class="md:flex-col md:items-stretch md:min-h-full md:flex-nowrap px-0 flex flex-wrap items-center justify-between w-full mx-auto">
+                <ul class="md:flex-col md:min-w-full flex flex-col list-none">
+                    <li class="items-center"><a
+                            class="text-indigo-600 hover:text-indigo-400 text-xs uppercase py-3 font-bold block"
+                            href="/part1/">Part One: Schema and Resolvers</a></li>
+                    <li class="items-center"><a
+                            class="text-indigo-600 hover:text-indigo-400 text-xs uppercase py-3 font-bold block"
+                            href="/part2/">Part Two: GraphQL Code Gen</a></li>
+                    <li class="items-center"><a
+                            class="text-indigo-600 hover:text-indigo-400 text-xs uppercase py-3 font-bold block"
+                            href="/part3/">Part Three: Datasources</a></li>
+                    <li class="items-center"><a
+                            class="text-indigo-600 hover:text-indigo-400 text-xs uppercase py-3 font-bold block"
+                            href="/part4/">Part Four: Templated UI</a></li>
+                    <li class="items-center"><a
+                            class="text-indigo-600 hover:text-indigo-400 text-xs uppercase py-3 font-bold block"
+                            href="/part5/">Part Five: Dynamic UI</a></li>
+                </ul>
+                <a class="bottom-end md:min-w-full text-blueGray-500 hover:text-indigo-400 text-xs uppercase font-bold block pt-1 pb-4 no-underline"
+                    href="/">Tutorial Start
+                </a>
+            </div>
+        </nav>
+        <div class="relative md:ml-64 bg-blueGray-50">
+            <div class="relative bg-indigo-100 md:pt-32 pb-32 pt-12">
+                <main role="main" class="px-4 md:px-10 mx-auto w-full overflow-auto">
+                    {% block content %}{% endblock %}
+                </main>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -80,7 +80,8 @@ addopts = [
     "--cov-report=term-missing:skip-covered",
     "--cov-report=html",
     "--cov-report=json:reports/coverage.json",
-    "--junit-xml=reports/junit.xml"
+    "--junit-xml=reports/junit.xml",
+    "--ignore=tests/fixtures/examples",
 ]
 testpaths = [
     "tests",

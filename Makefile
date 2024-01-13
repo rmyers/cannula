@@ -47,10 +47,11 @@ setup: $(VIRTUAL_ENV) $(VIRTUAL_ENV)/.requirements-installed ## Setup local envi
 
 clean: ## Clean your local workspace
 	rm -rf $(VIRTUAL_ENV)
-	rm -rf htmlcov
-	rm -rf .coverage
+	rm -rf htmlcov .coverage
 	rm -rf *.egg-info
+	rm -rf build dist .*_cache *.egg-info
 	find . -name '*.py[co]' -delete
+	find . -name '__pycache__' -delete
 
 test: flake8 unit ## Run the tests (flake8, unit)
 

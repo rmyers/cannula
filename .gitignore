@@ -9,3 +9,4 @@ coverage.json
 htmlcov
 .DS_Store
 reports
+db.sqlite
