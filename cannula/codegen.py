@@ -24,6 +24,11 @@ TYPES = {
     "Int": "int",
     "String": "str",
 }
+VALUE_FUNCS = {
+    "boolean_value": lambda value: value in ["true", "True"],
+    "int_value": lambda value: int(value),
+    "float_value": lambda value: float(value),
+}
 
 
 @dataclasses.dataclass
@@ -38,7 +43,6 @@ class Field:
 @dataclasses.dataclass
 class FieldType:
     value: typing.Any
-    default: typing.Any = None
     required: bool = False
 
 
@@ -57,7 +61,6 @@ def parse_description(obj: dict) -> typing.Optional[str]:
 def parse_type(type_obj: dict) -> FieldType:
     required = False
     value = None
-    default = type_obj.get("default_value")
 
     if type_obj["kind"] == "non_null_type":
         required = True
@@ -75,24 +78,41 @@ def parse_type(type_obj: dict) -> FieldType:
         else:
             value = f'"{value}"'
 
-    return FieldType(value=value, required=required, default=default)
+    return FieldType(value=value, required=required)
+
+
+def parse_default(field: typing.Dict[str, typing.Any]) -> typing.Any:
+    default_value = field.get("default_value")
+    LOG.debug(default_value)
+    if not default_value:
+        return None
+
+    kind = default_value.get("kind")
+    value = default_value.get("value")
+
+    if func := VALUE_FUNCS.get(kind):
+        return func(value)
+
+    return value
 
 
 def parse_field(field: typing.Dict[str, typing.Any]) -> Field:
     name = field["name"]["value"]
     field_type = parse_type(field["type"])
+    default = parse_default(field)
 
     return Field(
         name=name,
         value=field_type.value,
         description=parse_description(field),
-        default=field_type.default,
+        default=default,
         required=field_type.required,
     )
 
 
 def parse_node(node: Node):
     details = node.to_dict()
+    LOG.debug(node.kind)
     LOG.debug("\n%s", pprint.pformat(details))
     name = details.get("name", {}).get("value", "Unknown")
     raw_fields = details.get("fields", [])
@@ -122,28 +142,20 @@ def parse_schema(
     return types
 
 
-required_field_template = """
-        (
-            "{field.name}",
-            {field.value},
-        ),"""
+required_field_template = """\
+    {field.name}: {field.value}
+"""
 
 
-optional_field_template = """
-        (
-            "{field.name}",
-            typing.Optional[{field.value}],
-            dataclasses.field(default={field.default})
-        ),"""
+optional_field_template = """\
+    {field.name}: typing.Optional[{field.value}] = {field.default!r}
+"""
 
 
 object_template = """\
-{obj.name} = dataclasses.make_dataclass(
-    "{obj.name}",
-    fields=[{rendered_fields}
-    ],
-)
-"""
+@dataclasses.dataclass
+class {obj.name}:
+{rendered_fields}"""
 
 base_template = """\
 import typing

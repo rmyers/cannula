@@ -35,6 +35,9 @@ EXTENTIONS = """
     input EmailSearch {
         "email to search"
         email: String!
+        limit: Int = 100
+        other: String = "blah"
+        include: Boolean = false
     }
     extend type Query {
         get_sender_by_email(input: EmailSearch): Sender
@@ -46,65 +49,30 @@ import typing
 import dataclasses
 
 
-Sender = dataclasses.make_dataclass(
-    "Sender",
-    fields=[
-        (
-            "name",
-            typing.Optional[str],
-            dataclasses.field(default=None)
-        ),
-        (
-            "email",
-            str,
-        ),
-    ],
-)
+@dataclasses.dataclass
+class Sender:
+    name: typing.Optional[str] = None
+    email: str
 
 
-Message = dataclasses.make_dataclass(
-    "Message",
-    fields=[
-        (
-            "text",
-            typing.Optional[str],
-            dataclasses.field(default=None)
-        ),
-        (
-            "sender",
-            typing.Optional["Sender"],
-            dataclasses.field(default=None)
-        ),
-    ],
-)
+@dataclasses.dataclass
+class Message:
+    text: typing.Optional[str] = None
+    sender: typing.Optional["Sender"] = None
 
 
-Query = dataclasses.make_dataclass(
-    "Query",
-    fields=[
-        (
-            "messages",
-            typing.Optional[typing.List["Message"]],
-            dataclasses.field(default=None)
-        ),
-        (
-            "get_sender_by_email",
-            typing.Optional["Sender"],
-            dataclasses.field(default=None)
-        ),
-    ],
-)
+@dataclasses.dataclass
+class Query:
+    messages: typing.Optional[typing.List["Message"]] = None
+    get_sender_by_email: typing.Optional["Sender"] = None
 
 
-EmailSearch = dataclasses.make_dataclass(
-    "EmailSearch",
-    fields=[
-        (
-            "email",
-            str,
-        ),
-    ],
-)
+@dataclasses.dataclass
+class EmailSearch:
+    email: str
+    limit: typing.Optional[int] = 100
+    other: typing.Optional[str] = 'blah'
+    include: typing.Optional[bool] = False
 """
 
 
