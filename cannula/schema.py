@@ -62,6 +62,14 @@ def maybe_parse(type_def: typing.Union[str, DocumentNode]):
     return type_def
 
 
+def concat_documents(
+    type_defs: typing.Iterable[typing.Union[str, DocumentNode]],
+) -> DocumentNode:
+    document_list = [maybe_parse(type_def) for type_def in type_defs]
+
+    return concat_ast(document_list)
+
+
 def build_and_extend_schema(
     type_defs: typing.Iterable[typing.Union[str, DocumentNode]],
 ) -> GraphQLSchema:
@@ -94,9 +102,7 @@ def build_and_extend_schema(
 
     :param type_defs: list of schema or document nodes
     """
-    document_list = [maybe_parse(type_def) for type_def in type_defs]
-
-    ast_document = concat_ast(document_list)
+    ast_document = concat_documents(type_defs)
 
     ast_document = assert_has_query_and_mutation(ast_document)
 
