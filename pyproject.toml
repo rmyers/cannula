@@ -57,6 +57,9 @@ performance = [
     "httpx",
 ]
 
+[project.scripts]
+cannula = "cannula.cli:main"
+
 [project.urls]
 Homepage = "https://github.com/rmyers/cannula"
 
