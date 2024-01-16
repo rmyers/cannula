@@ -30,7 +30,7 @@ parser.add_argument(
 )
 
 # Sub Commands parser
-subparsers = parser.add_subparsers(help="sub-command --help", dest="command")
+subparsers = parser.add_subparsers(help="sub-command --help", dest="command")  # type: ignore
 
 # create the parser for the "codegen" command
 codegen_parser = subparsers.add_parser(

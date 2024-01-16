@@ -3,7 +3,7 @@ import pathlib
 
 import pytest
 
-from cannula.codegen import parse_schema, render_file, Field
+from cannula.codegen import parse_schema, render_file, Field, Directive
 
 
 SCHEMA = '''
@@ -48,27 +48,41 @@ expected_output = """\
 import typing
 import dataclasses
 
+import cannula
+
 
 @dataclasses.dataclass
-class Sender:
+class SenderType(cannula.BaseMixin):
+    __typename = "Sender"
+    __directives__ = {'name': [Directive(name='deprecated', args={'reason': 'Use `email`.'})]}
+
     name: typing.Optional[str] = None
     email: str
 
 
 @dataclasses.dataclass
-class Message:
+class MessageType(cannula.BaseMixin):
+    __typename = "Message"
+    __directives__ = {}
+
     text: typing.Optional[str] = None
-    sender: typing.Optional["Sender"] = None
+    sender: typing.Optional["SenderType"] = None
 
 
 @dataclasses.dataclass
-class Query:
-    messages: typing.Optional[typing.List["Message"]] = None
-    get_sender_by_email: typing.Optional["Sender"] = None
+class QueryType(cannula.BaseMixin):
+    __typename = "Query"
+    __directives__ = {}
+
+    messages: typing.Optional[typing.List["MessageType"]] = None
+    get_sender_by_email: typing.Optional["SenderType"] = None
 
 
 @dataclasses.dataclass
-class EmailSearch:
+class EmailSearchType(cannula.BaseMixin):
+    __typename = "EmailSearch"
+    __directives__ = {}
+
     email: str
     limit: typing.Optional[int] = 100
     other: typing.Optional[str] = 'blah'
@@ -77,7 +91,7 @@ class EmailSearch:
 
 
 async def test_parse_schema_dict():
-    schema = 'type Test { name: String @deprecated(reason: "not valid")}'
+    schema = 'type Test { "name field" name: String @deprecated(reason: "not valid")}'
     actual = parse_schema([schema])
 
     assert actual is not None
@@ -88,7 +102,13 @@ async def test_parse_schema_dict():
         Field(
             name="name",
             value="str",
-            description=None,
+            description="name field",
+            directives=[
+                Directive(
+                    name="deprecated",
+                    args={"reason": "not valid"},
+                ),
+            ],
             default=None,
             required=False,
         )

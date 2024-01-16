@@ -14,6 +14,7 @@ from graphql import (
 )
 
 from cannula.schema import concat_documents
+from cannula.utils import Directive
 
 LOG = logging.getLogger(__name__)
 
@@ -36,6 +37,7 @@ class Field:
     name: str
     value: str
     description: typing.Optional[str]
+    directives: typing.List[Directive]
     default: typing.Any = None
     required: bool = False
 
@@ -50,12 +52,39 @@ class FieldType:
 class ObjectType:
     name: str
     fields: typing.List[Field]
+    directives: typing.Dict[str, Directive]
     description: typing.Optional[str] = None
 
 
 def parse_description(obj: dict) -> typing.Optional[str]:
     raw_description = obj.get("description") or {}
     return raw_description.get("value")
+
+
+def parse_name(obj: dict) -> str:
+    raw_name = obj.get("name") or {}
+    return raw_name.get("value", "unknown")
+
+
+def parse_value(obj: dict) -> typing.Any:
+    kind = obj["kind"]
+    value = obj["value"]
+
+    if func := VALUE_FUNCS.get(kind):
+        return func(value)
+
+    return value
+
+
+def parse_args(obj: dict) -> typing.Dict[str, typing.Any]:
+    args = {}
+    raw_args = obj.get("arguments") or []
+    for arg in raw_args:
+        name = parse_name(arg)
+        value = parse_value(arg["value"])
+        args[name] = value
+
+    return args
 
 
 def parse_type(type_obj: dict) -> FieldType:
@@ -76,9 +105,18 @@ def parse_type(type_obj: dict) -> FieldType:
         if value in TYPES:
             value = TYPES[value]
         else:
-            value = f'"{value}"'
+            value = f'"{value}Type"'
 
     return FieldType(value=value, required=required)
+
+
+def parse_directives(field: typing.Dict[str, typing.Any]) -> typing.List[Directive]:
+    directives: typing.List[Directive] = []
+    for directive in field.get("directives", []):
+        name = parse_name(directive)
+        args = parse_args(directive)
+        directives.append(Directive(name=name, args=args))
+    return directives
 
 
 def parse_default(field: typing.Dict[str, typing.Any]) -> typing.Any:
@@ -87,24 +125,20 @@ def parse_default(field: typing.Dict[str, typing.Any]) -> typing.Any:
     if not default_value:
         return None
 
-    kind = default_value.get("kind")
-    value = default_value.get("value")
-
-    if func := VALUE_FUNCS.get(kind):
-        return func(value)
-
-    return value
+    return parse_value(default_value)
 
 
 def parse_field(field: typing.Dict[str, typing.Any]) -> Field:
     name = field["name"]["value"]
     field_type = parse_type(field["type"])
     default = parse_default(field)
+    directives = parse_directives(field)
 
     return Field(
         name=name,
         value=field_type.value,
         description=parse_description(field),
+        directives=directives,
         default=default,
         required=field_type.required,
     )
@@ -118,12 +152,18 @@ def parse_node(node: Node):
     raw_fields = details.get("fields", [])
     raw_description = details.get("description") or {}
     description = raw_description.get("value")
+    directives = {}
 
     fields: typing.List[Field] = []
     for field in raw_fields:
-        fields.append(parse_field(field))
+        parsed = parse_field(field)
+        fields.append(parsed)
+        if parsed.directives:
+            directives[parsed.name] = parsed.directives
 
-    return ObjectType(name=name, fields=fields, description=description)
+    return ObjectType(
+        name=name, fields=fields, directives=directives, description=description
+    )
 
 
 def parse_schema(
@@ -154,12 +194,17 @@ optional_field_template = """\
 
 object_template = """\
 @dataclasses.dataclass
-class {obj.name}:
+class {obj.name}Type(cannula.BaseMixin):
+    __typename = "{obj.name}"
+    __directives__ = {obj.directives!r}
+
 {rendered_fields}"""
 
 base_template = """\
 import typing
 import dataclasses
+
+import cannula
 
 
 {rendered_items}"""
