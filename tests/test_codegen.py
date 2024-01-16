@@ -3,7 +3,7 @@ import pathlib
 
 import pytest
 
-from cannula.codegen import parse_schema, render_file, Field
+from cannula.codegen import parse_schema, render_file, Field, Directive
 
 
 SCHEMA = '''
@@ -35,6 +35,9 @@ EXTENTIONS = """
     input EmailSearch {
         "email to search"
         email: String!
+        limit: Int = 100
+        other: String = "blah"
+        include: Boolean = false
     }
     extend type Query {
         get_sender_by_email(input: EmailSearch): Sender
@@ -45,71 +48,50 @@ expected_output = """\
 import typing
 import dataclasses
 
-
-Sender = dataclasses.make_dataclass(
-    "Sender",
-    fields=[
-        (
-            "name",
-            typing.Optional[str],
-            dataclasses.field(default=None)
-        ),
-        (
-            "email",
-            str,
-        ),
-    ],
-)
+import cannula
 
 
-Message = dataclasses.make_dataclass(
-    "Message",
-    fields=[
-        (
-            "text",
-            typing.Optional[str],
-            dataclasses.field(default=None)
-        ),
-        (
-            "sender",
-            typing.Optional["Sender"],
-            dataclasses.field(default=None)
-        ),
-    ],
-)
+@dataclasses.dataclass
+class SenderType(cannula.BaseMixin):
+    __typename = "Sender"
+    __directives__ = {'name': [Directive(name='deprecated', args={'reason': 'Use `email`.'})]}
+
+    name: typing.Optional[str] = None
+    email: str
 
 
-Query = dataclasses.make_dataclass(
-    "Query",
-    fields=[
-        (
-            "messages",
-            typing.Optional[typing.List["Message"]],
-            dataclasses.field(default=None)
-        ),
-        (
-            "get_sender_by_email",
-            typing.Optional["Sender"],
-            dataclasses.field(default=None)
-        ),
-    ],
-)
+@dataclasses.dataclass
+class MessageType(cannula.BaseMixin):
+    __typename = "Message"
+    __directives__ = {}
+
+    text: typing.Optional[str] = None
+    sender: typing.Optional["SenderType"] = None
 
 
-EmailSearch = dataclasses.make_dataclass(
-    "EmailSearch",
-    fields=[
-        (
-            "email",
-            str,
-        ),
-    ],
-)
+@dataclasses.dataclass
+class QueryType(cannula.BaseMixin):
+    __typename = "Query"
+    __directives__ = {}
+
+    messages: typing.Optional[typing.List["MessageType"]] = None
+    get_sender_by_email: typing.Optional["SenderType"] = None
+
+
+@dataclasses.dataclass
+class EmailSearchType(cannula.BaseMixin):
+    __typename = "EmailSearch"
+    __directives__ = {}
+
+    email: str
+    limit: typing.Optional[int] = 100
+    other: typing.Optional[str] = 'blah'
+    include: typing.Optional[bool] = False
 """
 
 
 async def test_parse_schema_dict():
-    schema = 'type Test { name: String @deprecated(reason: "not valid")}'
+    schema = 'type Test { "name field" name: String @deprecated(reason: "not valid")}'
     actual = parse_schema([schema])
 
     assert actual is not None
@@ -120,7 +102,13 @@ async def test_parse_schema_dict():
         Field(
             name="name",
             value="str",
-            description=None,
+            description="name field",
+            directives=[
+                Directive(
+                    name="deprecated",
+                    args={"reason": "not valid"},
+                ),
+            ],
             default=None,
             required=False,
         )
