@@ -52,7 +52,7 @@ class FieldType:
 class ObjectType:
     name: str
     fields: typing.List[Field]
-    directives: typing.Dict[str, Directive]
+    directives: typing.Dict[str, typing.List[Directive]]
     description: typing.Optional[str] = None
 
 
@@ -152,7 +152,7 @@ def parse_node(node: Node):
     raw_fields = details.get("fields", [])
     raw_description = details.get("description") or {}
     description = raw_description.get("value")
-    directives = {}
+    directives: typing.Dict[str, typing.List[Directive]] = {}
 
     fields: typing.List[Field] = []
     for field in raw_fields:
