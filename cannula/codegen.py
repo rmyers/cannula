@@ -105,7 +105,7 @@ def parse_type(type_obj: dict) -> FieldType:
         if value in TYPES:
             value = TYPES[value]
         else:
-            value = f'"{value}Type"'
+            value = f"{value}Type"
 
     return FieldType(value=value, required=required)
 
@@ -146,8 +146,7 @@ def parse_field(field: typing.Dict[str, typing.Any]) -> Field:
 
 def parse_node(node: Node):
     details = node.to_dict()
-    LOG.debug(node.kind)
-    LOG.debug("\n%s", pprint.pformat(details))
+    LOG.debug("%s: %s", node.kind, pprint.pformat(details))
     name = details.get("name", {}).get("value", "Unknown")
     raw_fields = details.get("fields", [])
     raw_description = details.get("description") or {}
@@ -176,6 +175,7 @@ def parse_schema(
         node = parse_node(definition)
         if node.name in types:
             types[node.name].fields.extend(node.fields)
+            types[node.name].directives.update(node.directives)
         else:
             types[node.name] = node
 
@@ -194,17 +194,26 @@ optional_field_template = """\
 
 object_template = """\
 @dataclasses.dataclass
-class {obj.name}Type(cannula.BaseMixin):
+class {obj.name}Type:
     __typename = "{obj.name}"
-    __directives__ = {obj.directives!r}
+    __directives__: DirectiveType = {obj.directives!r}
 
 {rendered_fields}"""
 
 base_template = """\
+from __future__ import annotations
+
 import typing
 import dataclasses
 
-import cannula
+
+@dataclasses.dataclass
+class Directive:
+    name: str
+    args: typing.Dict[str, typing.Any]
+
+
+DirectiveType = typing.Dict[str, typing.List[Directive]]
 
 
 {rendered_items}"""

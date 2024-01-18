@@ -45,43 +45,52 @@ EXTENTIONS = """
 """
 
 expected_output = """\
+from __future__ import annotations
+
 import typing
 import dataclasses
 
-import cannula
+
+@dataclasses.dataclass
+class Directive:
+    name: str
+    args: typing.Dict[str, typing.Any]
+
+
+DirectiveType = typing.Dict[str, typing.List[Directive]]
 
 
 @dataclasses.dataclass
-class SenderType(cannula.BaseMixin):
+class SenderType:
     __typename = "Sender"
-    __directives__ = {'name': [Directive(name='deprecated', args={'reason': 'Use `email`.'})]}
+    __directives__: DirectiveType = {'name': [Directive(name='deprecated', args={'reason': 'Use `email`.'})]}
 
     name: typing.Optional[str] = None
     email: str
 
 
 @dataclasses.dataclass
-class MessageType(cannula.BaseMixin):
+class MessageType:
     __typename = "Message"
-    __directives__ = {}
+    __directives__: DirectiveType = {}
 
     text: typing.Optional[str] = None
-    sender: typing.Optional["SenderType"] = None
+    sender: typing.Optional[SenderType] = None
 
 
 @dataclasses.dataclass
-class QueryType(cannula.BaseMixin):
+class QueryType:
     __typename = "Query"
-    __directives__ = {}
+    __directives__: DirectiveType = {}
 
-    messages: typing.Optional[typing.List["MessageType"]] = None
-    get_sender_by_email: typing.Optional["SenderType"] = None
+    messages: typing.Optional[typing.List[MessageType]] = None
+    get_sender_by_email: typing.Optional[SenderType] = None
 
 
 @dataclasses.dataclass
-class EmailSearchType(cannula.BaseMixin):
+class EmailSearchType:
     __typename = "EmailSearch"
-    __directives__ = {}
+    __directives__: DirectiveType = {}
 
     email: str
     limit: typing.Optional[int] = 100
