@@ -3,7 +3,8 @@ import pathlib
 
 import pytest
 
-from cannula.codegen import parse_schema, render_file, Field, Directive
+from cannula.codegen import parse_schema, render_file
+from cannula.types import Argument, Directive, Field
 
 
 SCHEMA = '''
@@ -24,7 +25,11 @@ type Message {
 }
 
 type Query {
-    messages(limit: Int): [Message]
+    messages(limit: Int!): [Message]
+}
+
+type Mutation {
+    message(text: String!, sender: String!): Message
 }
 '''
 
@@ -50,20 +55,22 @@ from __future__ import annotations
 import typing
 import dataclasses
 
+from typing_extensions import NotRequired
+
+import cannula
+
 
 @dataclasses.dataclass
-class Directive:
+class Argument:
     name: str
-    args: typing.Dict[str, typing.Any]
-
-
-DirectiveType = typing.Dict[str, typing.List[Directive]]
+    type: typing.Any = None
+    value: typing.Any = None
+    default: typing.Any = None
 
 
 @dataclasses.dataclass
 class SenderType:
     __typename = "Sender"
-    __directives__: DirectiveType = {'name': [Directive(name='deprecated', args={'reason': 'Use `email`.'})]}
 
     name: typing.Optional[str] = None
     email: str
@@ -72,30 +79,59 @@ class SenderType:
 @dataclasses.dataclass
 class MessageType:
     __typename = "Message"
-    __directives__: DirectiveType = {}
 
     text: typing.Optional[str] = None
     sender: typing.Optional[SenderType] = None
 
 
 @dataclasses.dataclass
-class QueryType:
-    __typename = "Query"
-    __directives__: DirectiveType = {}
-
-    messages: typing.Optional[typing.List[MessageType]] = None
-    get_sender_by_email: typing.Optional[SenderType] = None
-
-
-@dataclasses.dataclass
 class EmailSearchType:
     __typename = "EmailSearch"
-    __directives__: DirectiveType = {}
 
     email: str
     limit: typing.Optional[int] = 100
     other: typing.Optional[str] = 'blah'
     include: typing.Optional[bool] = False
+
+
+class Query__messages(typing.Protocol):
+    def __call__(
+        self,
+        root: typing.Any,
+        info: cannula.ResolveInfo,
+        limit: int,
+    ) -> typing.Awaitable[typing.List[MessageType]]:
+        ...
+
+
+class Query__get_sender_by_email(typing.Protocol):
+    def __call__(
+        self,
+        root: typing.Any,
+        info: cannula.ResolveInfo,
+        input: typing.Optional[EmailSearchType] = None,
+    ) -> typing.Awaitable[SenderType]:
+        ...
+
+
+class Mutation__message(typing.Protocol):
+    def __call__(
+        self,
+        root: typing.Any,
+        info: cannula.ResolveInfo,
+        text: str,
+        sender: str,
+    ) -> typing.Awaitable[MessageType]:
+        ...
+
+
+class QueryType(typing.TypedDict):
+    messages: NotRequired[Query__messages]
+    get_sender_by_email: NotRequired[Query__get_sender_by_email]
+
+
+class MutationType(typing.TypedDict):
+    message: NotRequired[Mutation__message]
 """
 
 
@@ -115,9 +151,11 @@ async def test_parse_schema_dict():
             directives=[
                 Directive(
                     name="deprecated",
-                    args={"reason": "not valid"},
+                    args=[Argument(name="reason", value="not valid", default=None)],
                 ),
             ],
+            args=[],
+            func_name="Test__name",
             default=None,
             required=False,
         )
