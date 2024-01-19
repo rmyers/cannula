@@ -230,14 +230,6 @@ from typing_extensions import NotRequired
 import cannula
 
 
-@dataclasses.dataclass
-class Argument:
-    name: str
-    type: typing.Any = None
-    value: typing.Any = None
-    default: typing.Any = None
-
-
 {rendered_items}"""
 
 

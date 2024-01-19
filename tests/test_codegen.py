@@ -61,14 +61,6 @@ import cannula
 
 
 @dataclasses.dataclass
-class Argument:
-    name: str
-    type: typing.Any = None
-    value: typing.Any = None
-    default: typing.Any = None
-
-
-@dataclasses.dataclass
 class SenderType:
     __typename = "Sender"
 
