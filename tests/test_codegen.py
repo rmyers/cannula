@@ -3,7 +3,7 @@ import pathlib
 
 import pytest
 
-from cannula.codegen import parse_schema, render_file
+from cannula.codegen import parse_schema, render_file, render_object
 from cannula.types import Argument, Directive, Field
 
 
@@ -191,3 +191,35 @@ async def test_render_file(dry_run: bool, expected: str):
             content = rendered.read()
 
             assert content == expected
+
+
+EXPECTED_OBJECT = """\
+@dataclasses.dataclass
+class TestTypeBase(abc.ABC):
+    __typename = "Test"
+
+
+    @abc.abstractmethod
+    async def name(
+        self,
+        info: cannula.ResolveInfo,
+    ) -> typing.Awaitable[str]:
+        ...
+
+
+class TestTypeDict(typing.TypedDict):
+    name: NotRequired[str]
+
+
+TestType = typing.Union[TestTypeBase, TestTypeDict]
+"""
+
+
+async def test_render_object_handles_computed_directive():
+    schema = "type Test { name: String @computed}"
+    actual = parse_schema([schema])
+
+    assert actual is not None
+    obj = actual["Test"]
+    rendered = render_object(obj)
+    assert rendered == EXPECTED_OBJECT
