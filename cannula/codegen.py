@@ -125,7 +125,7 @@ def parse_field(field: typing.Dict[str, typing.Any], parent: str) -> Field:
     default = parse_default(field)
     directives = parse_directives(field)
     args = parse_args(field)
-    func_name = f"{parent}__{name}"
+    func_name = f"{name}{parent}"
 
     return Field(
         name=name,
@@ -186,13 +186,23 @@ optional_field_template = """\
     {field.name}: typing.Optional[{field.value}] = {field.default!r}
 """
 
+object_dict_fields = """\
+    {field.name}: {field_type}
+"""
+
 
 object_template = """\
 @dataclasses.dataclass
-class {obj.name}Type:
+class {obj.name}TypeBase(abc.ABC):
     __typename = "{obj.name}"
 
-{rendered_fields}"""
+{rendered_base_fields}
+
+class {obj.name}TypeDict(typing.TypedDict):
+{rendered_dict_fields}
+
+{obj.name}Type = typing.Union[{obj.name}TypeBase, {obj.name}TypeDict]
+"""
 
 
 function_args_template = """\
@@ -203,7 +213,6 @@ function_template = """\
 class {field.func_name}(typing.Protocol):
     def __call__(
         self,
-        root: typing.Any,
         info: cannula.ResolveInfo,
 {rendered_args}) -> typing.Awaitable[{field.value}]:
         ...
@@ -215,15 +224,16 @@ operation_field_template = """\
 
 
 operation_template = """\
-class {obj.name}Type(typing.TypedDict):
+class RootType(typing.TypedDict):
 {rendered_fields}"""
 
 
 base_template = """\
 from __future__ import annotations
 
-import typing
+import abc
 import dataclasses
+import typing
 
 from typing_extensions import NotRequired
 
@@ -239,11 +249,18 @@ def render_field(field: Field) -> str:
     return optional_field_template.format(field=field)
 
 
+def render_dict_field(field: Field) -> str:
+    field_type = field.value if field.required else f"NotRequired[{field.value}]"
+    return object_dict_fields.format(field=field, field_type=field_type)
+
+
 def render_object(obj: ObjectType) -> str:
-    rendered_fields = "".join([render_field(f) for f in obj.fields])
+    rendered_base_fields = "".join([render_field(f) for f in obj.fields])
+    rendered_dict_fields = "".join([render_dict_field(f) for f in obj.fields])
     return object_template.format(
         obj=obj,
-        rendered_fields=rendered_fields,
+        rendered_base_fields=rendered_base_fields,
+        rendered_dict_fields=rendered_dict_fields,
     )
 
 
@@ -270,10 +287,9 @@ def render_operation_field(field: Field) -> str:
     return operation_field_template.format(field=field)
 
 
-def render_operation(obj: ObjectType) -> str:
-    rendered_fields = "".join([render_operation_field(f) for f in obj.fields])
+def render_operation(fields: typing.List[Field]) -> str:
+    rendered_fields = "".join([render_operation_field(f) for f in fields])
     return operation_template.format(
-        obj=obj,
         rendered_fields=rendered_fields,
     )
 
@@ -285,18 +301,24 @@ def render_file(
 ) -> None:
     parsed = parse_schema(type_defs)
 
-    objects: typing.List[str] = []
-    operations: typing.List[str] = []
-    functions: typing.List[str] = []
+    object_types: typing.List[ObjectType] = []
+    operation_fields: typing.List[Field] = []
     for obj in parsed.values():
         if obj.name in ["Query", "Mutation", "Subscription"]:
-            operations.append(render_operation(obj))
             for field in obj.fields:
-                functions.append(render_function(field))
+                operation_fields.append(field)
         else:
-            objects.append(render_object(obj))
+            object_types.append(obj)
 
-    rendered_items = "\n\n".join(objects + functions + operations)
+    object_types.sort(key=lambda o: o.name)
+    objects = [render_object(obj) for obj in object_types]
+
+    operation_fields.sort(key=lambda f: f.name)
+    operations = render_operation(operation_fields)
+    functions = [render_function(field) for field in operation_fields]
+
+    rendered_objects = "\n\n".join(objects + functions)
+    rendered_items = f"{rendered_objects}\n\n{operations}"
     content = base_template.format(
         rendered_items=rendered_items,
     )
