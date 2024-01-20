@@ -110,6 +110,14 @@ def parse_directives(field: typing.Dict[str, typing.Any]) -> typing.List[Directi
     return directives
 
 
+def has_computed_directive(field: Field) -> bool:
+    for directive in field.directives:
+        if directive.name == "computed":
+            return True
+
+    return False
+
+
 def parse_default(obj: typing.Dict[str, typing.Any]) -> typing.Any:
     default_value = obj.get("default_value")
     LOG.debug(default_value)
@@ -177,10 +185,18 @@ def parse_schema(
     return types
 
 
+computed_field_template = """\
+    @abc.abstractmethod
+    async def {field.name}(
+        self,
+        info: cannula.ResolveInfo,
+{rendered_args}) -> typing.Awaitable[{field.value}]:
+        ...
+"""
+
 required_field_template = """\
     {field.name}: {field.value}
 """
-
 
 optional_field_template = """\
     {field.name}: typing.Optional[{field.value}] = {field.default!r}
@@ -190,20 +206,19 @@ object_dict_fields = """\
     {field.name}: {field_type}
 """
 
-
 object_template = """\
 @dataclasses.dataclass
 class {obj.name}TypeBase(abc.ABC):
     __typename = "{obj.name}"
 
 {rendered_base_fields}
+{rendered_computed}
 
 class {obj.name}TypeDict(typing.TypedDict):
 {rendered_dict_fields}
 
 {obj.name}Type = typing.Union[{obj.name}TypeBase, {obj.name}TypeDict]
 """
-
 
 function_args_template = """\
         {arg.name}: {arg_type}{default},
@@ -222,11 +237,9 @@ operation_field_template = """\
     {field.name}: NotRequired[{field.func_name}]
 """
 
-
 operation_template = """\
 class RootType(typing.TypedDict):
 {rendered_fields}"""
-
 
 base_template = """\
 from __future__ import annotations
@@ -243,6 +256,12 @@ import cannula
 {rendered_items}"""
 
 
+def render_computed_field(field: Field) -> str:
+    rendered_args = "".join(render_function_args(arg) for arg in field.args)
+    rendered_args = f"{rendered_args}    "
+    return computed_field_template.format(field=field, rendered_args=rendered_args)
+
+
 def render_field(field: Field) -> str:
     if field.required:
         return required_field_template.format(field=field)
@@ -255,10 +274,20 @@ def render_dict_field(field: Field) -> str:
 
 
 def render_object(obj: ObjectType) -> str:
-    rendered_base_fields = "".join([render_field(f) for f in obj.fields])
+    non_computed: typing.List[Field] = []
+    computed: typing.List[Field] = []
+    for field in obj.fields:
+        if field.args or has_computed_directive(field):
+            computed.append(field)
+        else:
+            non_computed.append(field)
+
+    rendered_computed = "".join([render_computed_field(f) for f in computed])
+    rendered_base_fields = "".join([render_field(f) for f in non_computed])
     rendered_dict_fields = "".join([render_dict_field(f) for f in obj.fields])
     return object_template.format(
         obj=obj,
+        rendered_computed=rendered_computed,
         rendered_base_fields=rendered_base_fields,
         rendered_dict_fields=rendered_dict_fields,
     )
