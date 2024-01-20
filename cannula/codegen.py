@@ -192,6 +192,7 @@ computed_field_template = """\
         info: cannula.ResolveInfo,
 {rendered_args}) -> typing.Awaitable[{field.value}]:
         ...
+
 """
 
 required_field_template = """\
@@ -213,7 +214,6 @@ class {obj.name}TypeBase(abc.ABC):
 
 {rendered_base_fields}
 {rendered_computed}
-
 class {obj.name}TypeDict(typing.TypedDict):
 {rendered_dict_fields}
 
