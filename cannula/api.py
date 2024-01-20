@@ -36,6 +36,8 @@ from .schema import (
 
 LOG = logging.getLogger(__name__)
 
+RootType = typing.TypeVar("RootType", dict, typing.Mapping, covariant=True)
+
 
 class ParseResults(typing.NamedTuple):
     document_ast: DocumentNode
@@ -172,7 +174,7 @@ class Resolver:
         return decorator
 
 
-class API:
+class API(typing.Generic[RootType]):
     """
     Your entry point into the fun filled world of graphql. Just dive right in::
 
@@ -191,22 +193,29 @@ class API:
     :param schema: GraphQL Schema for this resolver. This can either be a str or `pathlib.Path` object.
     :param context: Context class to hold shared state, added to GraphQLResolveInfo object.
     :param middleware: List of middleware to enable.
+    :param root_value: Mapping of operation names to resolver functions.
+    :param kwargs: Any extra kwargs passed directly to graphql.execute function.
     """
 
     _schema: typing.Union[str, DocumentNode, pathlib.Path]
     _resolvers: typing.List[Resolver]
+    _root_value: typing.Optional[RootType]
+    _kwargs: typing.Dict[str, typing.Any]
 
     def __init__(
         self,
         schema: typing.Union[str, DocumentNode, pathlib.Path],
         context: typing.Optional[typing.Any] = None,
         middleware: typing.List[typing.Any] = [],
+        root_value: typing.Optional[RootType] = None,
         **kwargs,
     ):
         self._context = context or Context
         self._resolvers = []
         self._schema = schema
         self.middleware = middleware
+        self._root_value = root_value
+        self._kwargs = kwargs
 
     def query(self, field_name: typing.Optional[str] = None) -> typing.Any:
         """Query Resolver
@@ -404,6 +413,8 @@ class API:
             context_value=context,
             variable_values=variables,
             middleware=self.middleware,
+            root_value=self._root_value,
+            **self._kwargs,
         )
         if inspect.isawaitable(result):
             return await result

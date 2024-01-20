@@ -52,8 +52,9 @@ EXTENTIONS = """
 expected_output = """\
 from __future__ import annotations
 
-import typing
+import abc
 import dataclasses
+import typing
 
 from typing_extensions import NotRequired
 
@@ -61,23 +62,7 @@ import cannula
 
 
 @dataclasses.dataclass
-class SenderType:
-    __typename = "Sender"
-
-    name: typing.Optional[str] = None
-    email: str
-
-
-@dataclasses.dataclass
-class MessageType:
-    __typename = "Message"
-
-    text: typing.Optional[str] = None
-    sender: typing.Optional[SenderType] = None
-
-
-@dataclasses.dataclass
-class EmailSearchType:
+class EmailSearchTypeBase(abc.ABC):
     __typename = "EmailSearch"
 
     email: str
@@ -86,30 +71,60 @@ class EmailSearchType:
     include: typing.Optional[bool] = False
 
 
-class Query__messages(typing.Protocol):
-    def __call__(
-        self,
-        root: typing.Any,
-        info: cannula.ResolveInfo,
-        limit: int,
-    ) -> typing.Awaitable[typing.List[MessageType]]:
-        ...
+class EmailSearchTypeDict(typing.TypedDict):
+    email: str
+    limit: NotRequired[int]
+    other: NotRequired[str]
+    include: NotRequired[bool]
 
 
-class Query__get_sender_by_email(typing.Protocol):
+EmailSearchType = typing.Union[EmailSearchTypeBase, EmailSearchTypeDict]
+
+
+@dataclasses.dataclass
+class MessageTypeBase(abc.ABC):
+    __typename = "Message"
+
+    text: typing.Optional[str] = None
+    sender: typing.Optional[SenderType] = None
+
+
+class MessageTypeDict(typing.TypedDict):
+    text: NotRequired[str]
+    sender: NotRequired[SenderType]
+
+
+MessageType = typing.Union[MessageTypeBase, MessageTypeDict]
+
+
+@dataclasses.dataclass
+class SenderTypeBase(abc.ABC):
+    __typename = "Sender"
+
+    name: typing.Optional[str] = None
+    email: str
+
+
+class SenderTypeDict(typing.TypedDict):
+    name: NotRequired[str]
+    email: str
+
+
+SenderType = typing.Union[SenderTypeBase, SenderTypeDict]
+
+
+class get_sender_by_emailQuery(typing.Protocol):
     def __call__(
         self,
-        root: typing.Any,
         info: cannula.ResolveInfo,
         input: typing.Optional[EmailSearchType] = None,
     ) -> typing.Awaitable[SenderType]:
         ...
 
 
-class Mutation__message(typing.Protocol):
+class messageMutation(typing.Protocol):
     def __call__(
         self,
-        root: typing.Any,
         info: cannula.ResolveInfo,
         text: str,
         sender: str,
@@ -117,13 +132,19 @@ class Mutation__message(typing.Protocol):
         ...
 
 
-class QueryType(typing.TypedDict):
-    messages: NotRequired[Query__messages]
-    get_sender_by_email: NotRequired[Query__get_sender_by_email]
+class messagesQuery(typing.Protocol):
+    def __call__(
+        self,
+        info: cannula.ResolveInfo,
+        limit: int,
+    ) -> typing.Awaitable[typing.List[MessageType]]:
+        ...
 
 
-class MutationType(typing.TypedDict):
-    message: NotRequired[Mutation__message]
+class RootType(typing.TypedDict):
+    get_sender_by_email: NotRequired[get_sender_by_emailQuery]
+    message: NotRequired[messageMutation]
+    messages: NotRequired[messagesQuery]
 """
 
 
@@ -147,7 +168,7 @@ async def test_parse_schema_dict():
                 ),
             ],
             args=[],
-            func_name="Test__name",
+            func_name="nameTest",
             default=None,
             required=False,
         )
