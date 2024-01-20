@@ -36,7 +36,7 @@ from .schema import (
 
 LOG = logging.getLogger(__name__)
 
-RootType = typing.TypeVar("RootType", dict, typing.Mapping, covariant=True)
+RootType = typing.TypeVar("RootType", covariant=True)
 
 
 class ParseResults(typing.NamedTuple):

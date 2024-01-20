@@ -23,6 +23,7 @@ from graphql import (
 LOG = logging.getLogger(__name__)
 QUERY_TYPE = parse("type Query { _empty: String }")
 MUTATION_TYPE = parse("type Mutation { _empty: String }")
+COMPUTED_DIRECTIVE = parse("directive @computed(weight: Int = 1) on FIELD_DEFINITION")
 
 
 def extract_extensions(ast: DocumentNode) -> DocumentNode:
@@ -52,6 +53,9 @@ def assert_has_query_and_mutation(ast: DocumentNode) -> DocumentNode:
     if not has_query_definition:
         LOG.debug("Adding default empty Query type")
         ast = concat_ast([ast, QUERY_TYPE])
+
+    LOG.debug("Adding computed directive")
+    ast = concat_ast([ast, COMPUTED_DIRECTIVE])
 
     return ast
 

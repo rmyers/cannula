@@ -5,7 +5,7 @@ type Movie {
 }
 
 extend type Book {
-    movies: [Movie]
+    movies: [Movie] @computed
 }
 
 extend type Query {
