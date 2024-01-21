@@ -4,6 +4,7 @@ from fastapi import FastAPI, Request
 
 from dashboard.core.config import config
 from dashboard.core.database import create_tables
+from dashboard.part1.routes import part1
 
 
 @asynccontextmanager
@@ -24,3 +25,6 @@ app = FastAPI(
 @app.get("/")
 def home(request: Request):
     return config.templates.TemplateResponse(request, "index.html")
+
+
+app.include_router(part1)

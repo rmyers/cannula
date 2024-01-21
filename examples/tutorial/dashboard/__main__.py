@@ -3,7 +3,7 @@ import asyncio
 import click
 import uvicorn
 
-from dashboard.core.app import app
+from dashboard.main import app
 from dashboard.core.database import create_tables
 
 

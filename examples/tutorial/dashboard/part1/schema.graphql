@@ -1,0 +1,58 @@
+type User {
+    id: ID
+    name: String
+    email: String
+    is_active: Boolean
+    phone: String
+    login_count: Int
+    last_login: String
+}
+
+type Project {
+    id: ID
+    title: String
+    resource: String
+}
+
+interface DataPoint {
+    kind: String
+    title: String
+    location: Location
+}
+
+type Location {
+    x: Int
+    y: Int
+}
+
+type IntPoint implements DataPoint {
+    value: Int
+    kind: String
+    title: String
+    location: Location
+}
+
+type FloatPoint implements DataPoint {
+    value: Float
+    kind: String
+    title: String
+    location: Location
+}
+
+type StringPoint implements DataPoint {
+    value: String
+    kind: String
+    title: String
+    location: Location
+}
+
+type Chart {
+    id: ID
+    title: String
+    data: [DataPoint]
+}
+
+type Query {
+    charts(limit: Int = 100): [Chart]
+    me: User
+}
