@@ -5,6 +5,8 @@ from fastapi import APIRouter, Request
 import cannula
 from cannula.contrib.asgi import GraphQLPayload
 
+from dashboard.core.config import config
+
 part1 = APIRouter(prefix="/part1")
 cannula_app = cannula.API(schema=pathlib.Path("./"))
 
@@ -16,3 +18,8 @@ async def graph(request: Request, payload: GraphQLPayload):
     )
     errors = [e.formatted for e in results.errors] if results.errors else None
     return {"data": results.data, "errors": errors}
+
+
+@part1.get("/")
+async def part1_root(request: Request):
+    return config.templates.TemplateResponse(request, "part1/index.html")

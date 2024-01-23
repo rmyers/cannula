@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1 class="text-3xl md:text-5xl mb-4 font-extrabold">Part One: Schema</h1>
+
+<script>
+    async function runRequest() {
+        const query = `
+            query LoggedInUser {
+                me {
+                    id
+                    name
+                }
+            }
+        `;
+        const body = JSON.stringify({ query });
+        const resp = await fetch(
+            '/part1/graph', {
+            body: body,
+            method: "POST",
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const output = document.getElementById('output');
+        const content = await resp.text();
+        output.innerHTML = content;
+    }
+</script>
+<button class="bg-cyan-900 p-5 mb-3 text-white rounded" onclick="runRequest()">Run Request</button>
+<h2 class="text-xl mb-4 font-extrabold">Results:</h2>
+<pre id="output"></pre>
+{% endblock %}

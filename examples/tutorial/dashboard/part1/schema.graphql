@@ -1,58 +1,66 @@
-type User {
-    id: ID
+interface Persona {
+    id: ID!
     name: String
     email: String
-    is_active: Boolean
-    phone: String
-    login_count: Int
-    last_login: String
 }
 
-type Project {
+type User implements Persona {
+    id: ID!
+    name: String
+    email: String
+    quota: [Quota]
+}
+
+type Admin implements Persona {
+    id: ID!
+    name: String
+    email: String
+}
+
+type Quota {
+    user: User
+    resource: Resource
+    limit: Int
+    count: Int
+}
+
+interface Resource {
+    quota: Quota
+    user: User
+    created: String
+}
+
+type Board implements Resource {
     id: ID
+    quota: Quota
+    user: User
     title: String
-    resource: String
+    created: String
+    posts: [Post]
 }
 
-interface DataPoint {
-    kind: String
-    title: String
-    location: Location
-}
-
-type Location {
-    x: Int
-    y: Int
-}
-
-type IntPoint implements DataPoint {
-    value: Int
-    kind: String
-    title: String
-    location: Location
-}
-
-type FloatPoint implements DataPoint {
-    value: Float
-    kind: String
-    title: String
-    location: Location
-}
-
-type StringPoint implements DataPoint {
-    value: String
-    kind: String
-    title: String
-    location: Location
-}
-
-type Chart {
+type Post implements Resource {
     id: ID
+    quota: Quota
+    user: User
     title: String
-    data: [DataPoint]
+    created: String
+    body: String
 }
 
 type Query {
-    charts(limit: Int = 100): [Chart]
-    me: User
+    me: Persona
+    user(id: ID): User
+    boards(limit: Int = 100, offset: Int = 0): [Board]
+    posts(limit: Int = 100, offset: Int = 0): [Post]
+}
+
+type Mutation {
+    createPost(title: String!, body: String!): Post
+    deletePost(id: ID!): Boolean
+    editPost(id: ID!, title: String, body: String): Post
+    createBoard(title: String!): Board
+    deleteBoard(id: ID!): Boolean
+    editBoard(id: ID!, title: String): Board
+    addPost(board_id: ID!, post_id: ID!): Board
 }

@@ -27,3 +27,4 @@ Contents
 
    part0
    part1
+   part2
