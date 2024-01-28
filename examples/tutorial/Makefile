@@ -30,8 +30,8 @@ clean: ## Clean your local workspace
 test: setup  ## Test the code
 	DATABASE_URI="sqlite+aiosqlite:///:memory:" $(VIRTUAL_ENV)/bin/pytest --cov dashboard --cov-config=setup.cfg
 
-format:  ## Format the code with black
-	$(VIRTUAL_ENV)/bin/black .
+format:  ## Format the code with ruff
+	$(VIRTUAL_ENV)/bin/ruff format dashboard tests
 
 run: setup  ## Run the application
 	$(VIRTUAL_ENV)/bin/python -m dashboard run

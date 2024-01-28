@@ -64,7 +64,6 @@ invalid_query = """
 """
 
 
-query = ariadne.QueryType()
 api = fastapi.FastAPI()
 
 
@@ -82,20 +81,21 @@ async def get_widgets_with_fastapi(use: str) -> typing.Any:
     return _get_widgets(use)
 
 
-@query.field("get_widgets")
-def resolve_get_widgets(_, _info, use: str) -> typing.List[dict]:
+async def resolve_get_widgets(info, use: str) -> typing.List[dict]:
     return _get_widgets(use)
 
 
 # Create executable schema instance
-exe_schema = ariadne.make_executable_schema(schema, query)
-ariadne_app = ariadne.asgi.GraphQL(exe_schema)
-cannula_app = cannula.API(schema=schema)
+exe_schema = ariadne.make_executable_schema(schema)
 
-
-@cannula_app.resolver("Query", "get_widgets")
-def get_widgets(_, _info, use: str) -> typing.Any:
-    return _get_widgets(use)
+# Use the root value for our simple resolver. This way both
+# Ariadne and Cannula use the same logic to resolve a query
+ariadne_app = ariadne.asgi.GraphQL(
+    exe_schema, root_value={"get_widgets": resolve_get_widgets}
+)
+cannula_app = cannula.API(
+    schema=schema, root_value={"get_widgets": resolve_get_widgets}
+)
 
 
 @api.post("/api/ariadne")

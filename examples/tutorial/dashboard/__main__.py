@@ -3,7 +3,6 @@ import asyncio
 import click
 import uvicorn
 
-from dashboard.core.app import app
 from dashboard.core.database import create_tables
 
 
@@ -21,7 +20,7 @@ def initdb():  # pragma: no cover
 
 @click.command()
 def run():  # pragma: no cover
-    uvicorn.run(app)
+    uvicorn.run("dashboard.main:app", reload=True)
 
 
 cli.add_command(initdb)

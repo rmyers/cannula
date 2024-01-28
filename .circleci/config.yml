@@ -40,6 +40,11 @@ jobs:
           name: run tests
           command: make test
 
+      - run:
+          name: test tutorial
+          working_directory: examples/tutorial
+          command: make test
+
       - codecov/upload:
           file: reports/coverage.json
 

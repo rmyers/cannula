@@ -1,0 +1,66 @@
+interface Persona {
+    id: ID!
+    name: String
+    email: String
+}
+
+type User implements Persona {
+    id: ID!
+    name: String
+    email: String
+    quota: [Quota]
+}
+
+type Admin implements Persona {
+    id: ID!
+    name: String
+    email: String
+}
+
+type Quota {
+    user: User
+    resource: Resource
+    limit: Int
+    count: Int
+}
+
+interface Resource {
+    quota: Quota
+    user: User
+    created: String
+}
+
+type Board implements Resource {
+    id: ID
+    quota: Quota
+    user: User
+    title: String
+    created: String
+    posts: [Post]
+}
+
+type Post implements Resource {
+    id: ID
+    quota: Quota
+    user: User
+    title: String
+    created: String
+    body: String
+}
+
+type Query {
+    me: Persona
+    user(id: ID): User
+    boards(limit: Int = 100, offset: Int = 0): [Board]
+    posts(limit: Int = 100, offset: Int = 0): [Post]
+}
+
+type Mutation {
+    createPost(title: String!, body: String!): Post
+    deletePost(id: ID!): Boolean
+    editPost(id: ID!, title: String, body: String): Post
+    createBoard(title: String!): Board
+    deleteBoard(id: ID!): Boolean
+    editBoard(id: ID!, title: String): Board
+    addPost(board_id: ID!, post_id: ID!): Board
+}
