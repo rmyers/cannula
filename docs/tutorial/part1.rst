@@ -164,79 +164,52 @@ pathlib:
     BASE_DIR = pathlib.Path(__file__).parent
     cannula_app = cannula.API(schema=BASE_DIR / "schema.graphql")
 
-Then we just need to create a `graph` handler in our fastapi application, we'll use
-the contrib package to gather the payload from the request. In fastapi that is done
-with dependency injection with the typehints:
-
-.. code-block:: python
-    :emphasize-lines: 2,7
-
-    from fastapi import APIRouter, Request
-    from cannula.contrib.asgi import GraphQLPayload
-
-    part1 = APIRouter(prefix="/part1")
-
-    @part1.post("/graph")
-    async def graph(request: Request, payload: GraphQLPayload):
-        ...
-
-.. note:: GraphQL requests are always a "POST" request
-
-Then from the payload pass the arguments to the `cannula_app` we created:
+Then we just need to create a handler in our fastapi application, we'll use
+a simple query and display the results on our page. Typically this is done
+with a client side Javascript but that is for a later part. First we'll
+focus on how queries work within Python.
 
 .. code-block:: python
 
-    @part1.post("/graph")
-    async def graph(request: Request, payload: GraphQLPayload):
-        results = await cannula_app.call(
-            payload.query, request, variables=payload.variables
+    QUERY = cannula.gql(
+        """
+        query LoggedInUser {
+            me {
+                id
+                name
+            }
+        }
+        """
+    )
+
+    @part1.get("/")
+    async def part1_root(request: Request):
+        results = await cannula_app.call(QUERY, request)
+        return config.templates.TemplateResponse(
+            request, "part1/index.html", {"results": results}
         )
-        return {"data": results.data, "errors": results.errors}
+
 
 Now we just need to call this and to test it out. Typically you would do this
 with a client side javascript library but we can just use the `fetch` library:
 
 .. code-block:: javascript
-    :emphasize-lines: 8-13
 
     {% extends 'base.html' %}
     {% block content %}
     <h1>Part One: Schema</h1>
-
-    <script>
-        async function runRequest() {
-            const query = `
-                query LoggedInUser {
-                    me {
-                        id
-                        name
-                    }
-                }
-            `;
-            const body = JSON.stringify({ query });
-            const resp = await fetch(
-                '/part1/graph', {
-                body: body,
-                method: "POST",
-                headers: { 'Content-Type': 'application/json' }
-            });
-            const output = document.getElementById('output');
-            const content = await resp.text();
-            output.innerHTML = content;
-        }
-    </script>
-    <button onclick="runRequest()">Run Request</button>
     <h2>Results:</h2>
-    <pre id="output"></pre>
+    <pre id="output">{{ results }}</pre>
     {% endblock %}
 
 
-You can see the full output at http://localhost:8000/part1/ click the
-'Run Request' button you'll see that we don't get any errors. YAY! but we don't
+You can see the full output at http://localhost:8000/part1/ YAY no errors! but we don't
 get any data either:
 
-.. code-block:: javascript
+.. code-block::
 
-    {"data":{"me":null},"errors":null}
+    Results:
+
+    ExecutionResult(data={'me': None}, errors=None)
 
 Head on over to part 2 to add resolvers to our application.

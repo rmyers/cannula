@@ -5,6 +5,7 @@ from fastapi import FastAPI, Request
 from dashboard.core.config import config
 from dashboard.core.database import create_tables
 from dashboard.part1.routes import part1
+from dashboard.part2.routes import part2
 
 
 @asynccontextmanager
@@ -28,3 +29,4 @@ def home(request: Request):
 
 
 app.include_router(part1)
+app.include_router(part2)

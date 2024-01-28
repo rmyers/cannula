@@ -1,11 +1,11 @@
 aiosqlite==0.19.0         # Async version of sqlite
-black==23.12.1            # For formatting the code
 cannula==0.11.0           # The reason you are reading this
 click==8.1.7              # Command line tool helper
 fastapi[all]==0.108.0     # The main asgi application logic
-pydantic_settings==2.1.0  # Configurations via ENV variables
-sqlalchemy==2.0.25        # For database table access
 greenlet==3.0.3           # For sqlalchemy async support
+pydantic_settings==2.1.0  # Configurations via ENV variables
+ruff==0.1.4               # For formatting the code
+sqlalchemy==2.0.25        # For database table access
 uvicorn==0.25.0           # Web server for asgi applications
 
 # Testing Tools

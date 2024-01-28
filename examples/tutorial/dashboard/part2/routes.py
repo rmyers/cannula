@@ -1,13 +1,11 @@
-import pathlib
-
 from fastapi import APIRouter, Request
 
 import cannula
 
 from dashboard.core.config import config
+from .graph import cannula_app
 
-part1 = APIRouter(prefix="/part1")
-cannula_app = cannula.API(schema=pathlib.Path(config.root / "part1"))
+part2 = APIRouter(prefix="/part2")
 
 QUERY = cannula.gql(
     """
@@ -21,9 +19,9 @@ QUERY = cannula.gql(
 )
 
 
-@part1.get("/")
-async def part1_root(request: Request):
+@part2.get("/")
+async def part2_root(request: Request):
     results = await cannula_app.call(QUERY, request)
     return config.templates.TemplateResponse(
-        request, "part1/index.html", {"results": results}
+        request, "part2/index.html", {"results": results}
     )

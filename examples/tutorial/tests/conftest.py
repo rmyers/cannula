@@ -4,7 +4,6 @@ import typing
 import httpx
 import pytest
 
-from typing_extensions import NotRequired
 
 from dashboard.main import app
 
