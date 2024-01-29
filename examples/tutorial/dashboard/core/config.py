@@ -3,7 +3,7 @@ import functools
 
 from fastapi.templating import Jinja2Templates
 from pydantic_settings import BaseSettings
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
 DASHBOARD_ROOT = pathlib.Path(__file__).parent.parent
 
@@ -24,6 +24,10 @@ class Config(BaseSettings):
     @functools.cached_property
     def engine(self):
         return create_async_engine(self.database_uri)
+
+    @functools.cached_property
+    def session(self):
+        return async_sessionmaker(self.engine, expire_on_commit=False)
 
 
 config = Config()
