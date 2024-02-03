@@ -39,7 +39,7 @@ test = [
     "pytest-asyncio",
     "pytest-cov",
     "pytest-mock",
-    "pytest<8",
+    "pytest<9",
     "Sphinx==7.2.6",
     "sphinx-autodoc-typehints",
     "pydata-sphinx-theme",
@@ -48,7 +48,7 @@ test = [
     "hatch",
 ]
 performance = [
-    "pytest<8",
+    "pytest<9",
     "pytest-asyncio",
     "pytest-httpx",
     "pytest-cov",
