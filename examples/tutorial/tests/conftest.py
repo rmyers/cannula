@@ -6,6 +6,22 @@ import pytest
 
 
 from dashboard.main import app
+from dashboard.core.config import config
+from dashboard.core.database import create_tables, drop_tables
+
+
+@pytest.fixture(autouse=True, scope="session")
+async def test_config():
+    config.database_uri = "sqlite+aiosqlite:///:memory:"
+
+
+@pytest.fixture(autouse=True, scope="function")
+async def db_session():
+    await create_tables()
+
+    yield
+
+    await drop_tables()
 
 
 @pytest.fixture

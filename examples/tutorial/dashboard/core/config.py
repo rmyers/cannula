@@ -25,7 +25,7 @@ class Config(BaseSettings):
     def engine(self):
         return create_async_engine(self.database_uri)
 
-    @functools.cached_property
+    @property
     def session(self):
         return async_sessionmaker(self.engine, expire_on_commit=False)
 

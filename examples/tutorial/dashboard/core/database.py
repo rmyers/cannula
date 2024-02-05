@@ -1,5 +1,6 @@
 import abc
 import datetime
+import uuid
 import typing
 
 from sqlalchemy import select, func
@@ -18,8 +19,8 @@ class Base(AsyncAttrs, DeclarativeBase):
 class User(Base):
     __tablename__ = "user_account"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    email: Mapped[str]
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    email: Mapped[str] = mapped_column(unique=True)
     name: Mapped[str]
     password: Mapped[str]
     is_admin: Mapped[bool] = mapped_column(default=False)
@@ -29,6 +30,11 @@ class User(Base):
 async def create_tables() -> None:
     async with config.engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+
+async def drop_tables() -> None:
+    async with config.engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
 
 
 class Repository(typing.Generic[Model], abc.ABC):
@@ -43,7 +49,7 @@ class Repository(typing.Generic[Model], abc.ABC):
         ...
 
     @abc.abstractmethod
-    async def add(self, **kwargs) -> typing.Optional[Model]:  # pragma: no cover
+    async def add(self, **kwargs) -> Model:  # pragma: no cover
         ...
 
     @abc.abstractmethod
@@ -62,18 +68,26 @@ class UserRepository(Repository[User]):
             result = await session.execute(select(User))
             return [u for u in result.scalars()]
 
-    async def add(self, name: str, email: str, password: str) -> typing.Optional[User]:
+    async def add(
+        self,
+        name: str,
+        email: str,
+        password: str,
+        id: typing.Optional[uuid.UUID] = None,
+    ) -> User:
         is_admin = "admin" in email
+        user_id = id or uuid.uuid4()
+        new_user = User(
+            id=user_id,
+            name=name,
+            email=email,
+            password=password,
+            is_admin=is_admin,
+        )
         async with config.session() as session:
             async with session.begin():
-                session.add(
-                    User(
-                        name=name,
-                        email=email,
-                        password=password,
-                        is_admin=is_admin,
-                    )
-                )
+                session.add(new_user)
+        return new_user
 
     async def delete(self, **kwargs) -> bool:
         return False

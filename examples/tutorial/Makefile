@@ -28,7 +28,7 @@ clean: ## Clean your local workspace
 	find . -name '*.py[co]' -delete
 
 test: setup  ## Test the code
-	DATABASE_URI="sqlite+aiosqlite:///:memory:" $(VIRTUAL_ENV)/bin/pytest --cov dashboard --cov-config=setup.cfg
+	$(VIRTUAL_ENV)/bin/pytest --cov dashboard --cov-config=setup.cfg
 
 format:  ## Format the code with ruff
 	$(VIRTUAL_ENV)/bin/ruff format dashboard tests
@@ -38,6 +38,9 @@ run: setup  ## Run the application
 
 initdb: setup  ## Create database tables
 	$(VIRTUAL_ENV)/bin/python -m dashboard initdb
+
+addusers: setup  ## Add test users
+	$(VIRTUAL_ENV)/bin/python -m dashboard addusers
 
 help: ## Show the available commands
 	@grep '^[a-zA-Z]' $(MAKEFILE_LIST) | awk -F ':.*?## ' 'NF==2 {printf "   %-20s%s\n", $$1, $$2}' | sort

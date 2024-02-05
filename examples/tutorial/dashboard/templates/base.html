@@ -33,9 +33,33 @@
                             class="text-indigo-600 hover:text-indigo-400 text-xs uppercase py-3 font-bold block"
                             href="/part5/">Part Five: Dynamic UI</a></li>
                 </ul>
-                <a class="bottom-end md:min-w-full text-blueGray-500 hover:text-indigo-400 text-xs uppercase font-bold block pt-1 pb-4 no-underline"
-                    href="/">Tutorial Start
-                </a>
+                {% if request.scope.user %}
+                <div class="bottom-end md:min-w-full">
+                    <p>User: {{ request.scope.user.email }}</p>
+                    <a class="bottom-end md:min-w-full text-blueGray-500 hover:text-indigo-400 text-xs uppercase font-bold block pt-1 pb-4 no-underline"
+                        href="/auth/logout">Log Out
+                    </a>
+                </div>
+                {% else %}
+                <form class="md:min-w-full" action="/auth/login" method="post">
+                    <div>
+                        <label for="email"
+                            class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Email</label>
+                        <input type="text" name="email" id="email"
+                            class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+                            placeholder="John" required>
+                    </div>
+                    <div>
+                        <label for="password"
+                            class="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Password</label>
+                        <input type="password" name="password" id="last_name"
+                            class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+                            placeholder="Doe" required>
+                    </div>
+                    <button type="submit">Signin</button>
+                </form>
+                <p>Signup</p>
+                {% endif %}
             </div>
         </nav>
         <div class="relative md:ml-64 bg-blueGray-50">
