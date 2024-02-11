@@ -71,3 +71,15 @@ async def test_http_datasource():
         "widgets": [{"name": "hammer", "type": "tool"}],
         "another": [{"name": "hammer", "type": "tool"}],
     }
+
+
+async def test_profiler():
+    from tests.fixtures.examples import profiler
+
+    results = await profiler.main()
+    assert results is not None
+    assert results.errors is None
+    assert results.data == {
+        "prime": "17624813 is a prime number",
+        "hello": "hello World!",
+    }
