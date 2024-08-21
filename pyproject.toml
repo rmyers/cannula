@@ -32,7 +32,7 @@ httpx = [
 ]
 test = [
     "black",
-    "coverage==7.4.1",
+    "coverage==7.5.0",
     "flake8==7.0.0",
     "mypy==1.8.0",
     "pycodestyle",
