@@ -43,7 +43,7 @@ test = [
     "Sphinx==7.3.7",
     "sphinx-autodoc-typehints",
     "pydata-sphinx-theme",
-    "twine==4.0.2",
+    "twine==5.0.0",
     "types-requests",
     "hatch",
 ]
