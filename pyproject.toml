@@ -40,7 +40,7 @@ test = [
     "pytest-cov",
     "pytest-mock",
     "pytest<9",
-    "Sphinx==7.2.6",
+    "Sphinx==7.3.7",
     "sphinx-autodoc-typehints",
     "pydata-sphinx-theme",
     "twine==4.0.2",
