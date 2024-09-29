@@ -36,7 +36,7 @@ test = [
     "black",
     "coverage==7.5.0",
     "flake8==7.0.0",
-    "mypy==1.10.0",
+    "mypy==1.11.2",
     "pycodestyle",
     "pytest-asyncio",
     "pytest-cov",
