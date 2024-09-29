@@ -11,3 +11,12 @@ extend type Book {
 extend type Query {
     movies: [Movie]
 }
+
+input MovieInput {
+    name: String
+    director: String
+}
+
+extend type Mutation {
+    createMovie(input: MovieInput): Movie
+}

@@ -28,6 +28,14 @@ class Field:
     default: typing.Any = None
     required: bool = False
 
+    @property
+    def is_computed(self) -> bool:
+        has_args = bool(self.args)
+        has_computed_directive = any(
+            directive.name == "computed" for directive in self.directives
+        )
+        return has_args or has_computed_directive
+
 
 @dataclasses.dataclass
 class FieldType:

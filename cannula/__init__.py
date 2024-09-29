@@ -1,5 +1,5 @@
 from .api import API, Resolver
-from .codegen import render_file
+from .codegen import render_file, render_ast
 from .context import Context, ResolveInfo
 from .errors import format_errors
 from .schema import build_and_extend_schema, concat_documents, load_schema
@@ -21,6 +21,7 @@ __all__ = [
     "concat_documents",
     "gql",
     "load_schema",
+    "render_ast",
     "render_file",
 ]
 

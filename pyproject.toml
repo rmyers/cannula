@@ -21,8 +21,9 @@ classifiers = [
     "Programming Language :: Python :: 3.8",
 ]
 dependencies = [
-    "graphql-core==3.2.3",
-    "typing-extensions==4.11.0",
+    "graphql-core<=3.2.3",
+    "typing-extensions<=4.11.0",
+    "pydantic<=2.6.1",
 ]
 
 [project.optional-dependencies]

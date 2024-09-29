@@ -4,6 +4,7 @@
 
 Like a boss
 """
+
 import argparse
 import logging
 import pathlib
@@ -47,12 +48,39 @@ codegen_parser.add_argument(
     default="_generated.py",
 )
 
+# Codegen AST
+# create the parser for the "codegen" command
+codeast_parser = subparsers.add_parser(
+    "codeast",
+    help="generate code from the schema",
+)
+codeast_parser.add_argument(
+    "schema",
+    help="location of graphql file or directory of files",
+)
+codeast_parser.add_argument(
+    "--dest",
+    help="destination to write the file to",
+    default="_generated_ast.py",
+)
+
 
 def run_codegen(dry_run: bool, schema: str, dest: str):
     source = pathlib.Path(schema)
     documents = cannula.load_schema(source)
     destination = pathlib.Path(dest)
     cannula.render_file(
+        type_defs=documents,
+        path=destination,
+        dry_run=dry_run,
+    )
+
+
+def run_codeast(dry_run: bool, schema: str, dest: str):
+    source = pathlib.Path(schema)
+    documents = cannula.load_schema(source)
+    destination = pathlib.Path(dest)
+    cannula.render_ast(
         type_defs=documents,
         path=destination,
         dry_run=dry_run,
@@ -69,6 +97,12 @@ def main():
         logging.basicConfig(level=level)
         if options.command == "codegen":
             run_codegen(
+                dry_run=options.dry_run,
+                schema=options.schema,
+                dest=options.dest,
+            )
+        if options.command == "codeast":
+            run_codeast(
                 dry_run=options.dry_run,
                 schema=options.schema,
                 dest=options.dest,
