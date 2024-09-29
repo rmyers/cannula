@@ -316,16 +316,6 @@ def parse_node(node: Node):
     )
 
 
-def ast_for_class(name: str, bases: typing.List[str]) -> ast.ClassDef:
-    return ast.ClassDef(
-        name=name,
-        bases=bases,
-        keywords=[],
-        body=[],
-        decorator_list=[],
-    )
-
-
 def parse_schema(
     type_defs: typing.Iterable[typing.Union[str, DocumentNode]]
 ) -> typing.Dict[str, ObjectType]:
