@@ -87,16 +87,6 @@ def ast_for_assign(target: str, value: ast.expr) -> ast.Assign:
     )
 
 
-def ast_for_class(name: str, bases: typing.List[str]) -> ast.ClassDef:
-    return ast.ClassDef(
-        name=name,
-        bases=bases,
-        keywords=[],
-        body=[],
-        decorator_list=[],
-    )
-
-
 def ast_for_argument(arg: Argument) -> ast.arg:
     """
     Create an AST node for a function argument.
@@ -326,6 +316,16 @@ def parse_node(node: Node):
     )
 
 
+def ast_for_class(name: str, bases: typing.List[str]) -> ast.ClassDef:
+    return ast.ClassDef(
+        name=name,
+        bases=bases,
+        keywords=[],
+        body=[],
+        decorator_list=[],
+    )
+
+
 def parse_schema(
     type_defs: typing.Iterable[typing.Union[str, DocumentNode]]
 ) -> typing.Dict[str, ObjectType]:
@@ -351,11 +351,7 @@ def ast_for_class_field(field: Field) -> ast.AnnAssign:
     # set a default value of `None`. But when it is optional we need to properly
     # construct the default using `ast_for_name`.
     default: typing.Optional[ast.expr] = None
-    if field.required:
-        if field.default is not None:
-            # Only set default for required fields that have non-None value
-            default = ast_for_constant(field.default)
-    else:
+    if not field.required:
         default = ast_for_constant(field.default)
 
     return ast_for_annotation_assignment(
