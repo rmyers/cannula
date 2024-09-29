@@ -20,7 +20,7 @@ async def get_widgets():
 
 
 # Create a httpx client that responds with the 'remote_app'
-client = httpx.AsyncClient(app=remote_app)
+client = httpx.AsyncClient(transport=httpx.ASGITransport(app=remote_app))
 
 
 SCHEMA = cannula.gql(

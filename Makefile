@@ -25,6 +25,7 @@ PYTHON_MODULES           := $(shell find . -name '*.py')
 DOCKER_COMPOSE           := $(shell which docker-compose)
 
 export HATCH_INDEX_USER = __token__
+export RUFF_CMD = $(VIRTUAL_ENV)/bin/ruff
 
 .SILENT: help
 .PHONY: setup docs clean
@@ -43,11 +44,14 @@ $(VIRTUAL_ENV)/.requirements-installed: $(REQUIREMENTS)
 	$(VIRTUAL_ENV)/bin/pip install -e .[test,httpx]
 	touch $(VIRTUAL_ENV)/.requirements-installed
 
-setup: $(VIRTUAL_ENV) $(VIRTUAL_ENV)/.requirements-installed ## Setup local environment
+reports:
+	mkdir -p reports
+
+setup: reports $(VIRTUAL_ENV) $(VIRTUAL_ENV)/.requirements-installed ## Setup local environment
 
 clean: ## Clean your local workspace
 	rm -rf $(VIRTUAL_ENV)
-	rm -rf htmlcov .coverage
+	rm -rf htmlcov .coverage reports
 	rm -rf *.egg-info
 	rm -rf build dist .*_cache *.egg-info
 	find . -name '*.py[co]' -delete

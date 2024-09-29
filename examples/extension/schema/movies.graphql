@@ -2,6 +2,7 @@ type Movie {
     name: String
     director: String
     book: Book
+    views: Int
 }
 
 extend type Book {
@@ -9,5 +10,15 @@ extend type Book {
 }
 
 extend type Query {
-    movies: [Movie]
+    movies(limit: Int = 100): [Movie]
+}
+
+input MovieInput {
+    name: String
+    director: String
+    limit: Int = 100
+}
+
+extend type Mutation {
+    createMovie(input: MovieInput): Movie
 }

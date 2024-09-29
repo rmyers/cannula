@@ -21,8 +21,10 @@ classifiers = [
     "Programming Language :: Python :: 3.8",
 ]
 dependencies = [
-    "graphql-core==3.2.3",
-    "typing-extensions==4.11.0",
+    "graphql-core<=3.2.3",
+    "typing-extensions<=4.11.0",
+    "pydantic<=2.6.1",
+    "ruff<=0.6.8",
 ]
 
 [project.optional-dependencies]
@@ -77,6 +79,7 @@ include = [
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 minversion = "6.0"
 addopts = [
     "-vvv",

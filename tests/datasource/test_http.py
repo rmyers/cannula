@@ -28,7 +28,7 @@ async def test_http_datasource(mocker):
             return await self.get("widgets")
 
     get_widget_spy = mocker.spy(mockDB, "get_widgets")
-    mocked_client = httpx.AsyncClient(app=fake_app)
+    mocked_client = httpx.AsyncClient(transport=httpx.ASGITransport(app=fake_app))
     widget = Widget(request=mocker.Mock(), client=mocked_client)
 
     results_one = await widget.get_widgets()
