@@ -50,11 +50,11 @@ def ast_for_import_from(module: str, names: typing.List[str]) -> ast.ImportFrom:
     return ast.ImportFrom(module=module, names=ast_names, level=0)
 
 
-def ast_for_name(name: str) -> ast.Name:
+def ast_for_name(name: str) -> ast.expr:
     return ast.Name(id=name, ctx=ast.Load())
 
 
-def ast_for_constant(value: typing.Any) -> ast.Constant:
+def ast_for_constant(value: typing.Any) -> ast.expr:
     return ast.Constant(value=value)
 
 
@@ -83,7 +83,7 @@ def ast_for_assign(target: str, value: ast.expr) -> ast.Assign:
     return ast.Assign(
         targets=targets,
         value=value,
-        lineno=None,
+        lineno=None,  # type: ignore
     )
 
 
@@ -97,7 +97,7 @@ def ast_for_argument(arg: Argument) -> ast.arg:
 
 
 def ast_for_subscript(
-    value: typing.Union[ast.Name, ast.Attribute], *items: str
+    value: typing.Union[ast.Name, ast.Attribute, ast.expr], *items: str
 ) -> ast.Subscript:
     use_tuple = len(items) > 1
     item_names = [ast_for_name(item) for item in items]
@@ -112,9 +112,7 @@ def ast_for_union_subscript(*items: str) -> ast.Subscript:
 
 def render_function_args_ast(
     args: typing.List[Argument],
-) -> typing.Tuple[
-    typing.List[ast.arg], typing.List[ast.arg], typing.Sequence[ast.expr]
-]:
+) -> typing.Tuple[typing.List[ast.arg], typing.List[ast.arg], typing.List[ast.expr]]:
     """
     Render function arguments as AST nodes.
     """
@@ -136,11 +134,11 @@ def render_computed_field_ast(field: Field) -> ast.FunctionDef:
     ]
     value = field.value if field.required else f"Optional[{field.value}]"
     args_node = ast.arguments(
-        args=args,
+        args=[*args],
         vararg=None,
         posonlyargs=[],
-        kwonlyargs=kwonlyargs,
-        kw_defaults=defaults,
+        kwonlyargs=[*kwonlyargs],
+        kw_defaults=[*defaults],
         kwarg=None,
         defaults=[],
     )
@@ -150,7 +148,7 @@ def render_computed_field_ast(field: Field) -> ast.FunctionDef:
         body=[ast.Pass()],  # Placeholder for the function body
         decorator_list=[ast.Name(id="abc.abstractmethod", ctx=ast.Load())],
         returns=ast.Name(id=f"Awaitable[{value}]", ctx=ast.Load()),
-        lineno=None,
+        lineno=None,  # type: ignore
     )
     return func_node
 
@@ -167,11 +165,11 @@ def render_operation_field_ast(field: Field) -> ast.FunctionDef:
     ]
     # value = field.value if field.required else f"Optional[{field.value}]"
     args_node = ast.arguments(
-        args=args,
+        args=[*args],
         vararg=None,
         posonlyargs=[],
-        kwonlyargs=kwonlyargs,
-        kw_defaults=defaults,
+        kwonlyargs=[*kwonlyargs],
+        kw_defaults=[*defaults],
         kwarg=None,
         defaults=[],
     )
@@ -181,7 +179,7 @@ def render_operation_field_ast(field: Field) -> ast.FunctionDef:
         body=[ELLIPSIS],  # Placeholder for the function body
         decorator_list=[],
         returns=ast.Name(id=f"Awaitable[{field.value}]", ctx=ast.Load()),
-        lineno=None,
+        lineno=None,  # type: ignore
     )
     return func_node
 
@@ -363,7 +361,7 @@ def ast_for_operation_field(field: Field) -> ast.AnnAssign:
     return ast_for_annotation_assignment(field.name, annotation=field_type)
 
 
-def render_object(obj: ObjectType) -> typing.List[ast.stmt]:
+def render_object(obj: ObjectType) -> typing.List[ast.ClassDef | ast.Assign]:
     non_computed: typing.List[Field] = []
     computed: typing.List[Field] = []
     for field in obj.fields:
@@ -390,7 +388,7 @@ def render_object(obj: ObjectType) -> typing.List[ast.stmt]:
         ),
         ast.ClassDef(
             name=dict_name,
-            body=dict_fields,
+            body=[*dict_fields],
             bases=[ast_for_name("TypedDict")],
             keywords=[],
             decorator_list=[],
@@ -417,7 +415,7 @@ def ast_for_root_type(fields: typing.List[Field]) -> ast.ClassDef:
     dict_fields = [ast_for_operation_field(f) for f in fields]
     return ast.ClassDef(
         name="RootType",
-        body=dict_fields,
+        body=[*dict_fields],
         bases=[ast_for_name("TypedDict")],
         keywords=[],
         decorator_list=[],
