@@ -25,6 +25,7 @@ PYTHON_MODULES           := $(shell find . -name '*.py')
 DOCKER_COMPOSE           := $(shell which docker-compose)
 
 export HATCH_INDEX_USER = __token__
+export RUFF_CMD = $(VIRTUAL_ENV)/bin/ruff
 
 .SILENT: help
 .PHONY: setup docs clean

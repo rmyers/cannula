@@ -1,25 +1,13 @@
 import ast
+import os
+import pathlib
 import subprocess
 import tempfile
-import pathlib
+
+RUFF_CMD = os.getenv("RUFF_CMD", "ruff")
 
 
 def format_with_ruff(root: ast.Module, dest: pathlib.Path):
-
-    # # Assuming `root` is your AST root node
-    # root = ast.Module(body=[], type_ignores=[])
-    # # Example of adding a simple function to the AST
-    # root.body.append(
-    #     ast.FunctionDef(
-    #         name="hello_world",
-    #         args=ast.arguments(
-    #             posonlyargs=[], args=[], kwonlyargs=[], kw_defaults=[], defaults=[]
-    #         ),
-    #         body=[ast.Expr(value=ast.Constant(value="Hello, world!"))],
-    #         decorator_list=[],
-    #     )
-    # )
-
     # Convert AST to source code
     source_code = ast.unparse(root)
 
@@ -29,8 +17,8 @@ def format_with_ruff(root: ast.Module, dest: pathlib.Path):
         tmp.write(source_code)
 
     # Format the temporary file using ruff
-    subprocess.run(["ruff", "check", "--fix-only", tmp_path], check=True)
-    subprocess.run(["ruff", "format", tmp_path], check=True)
+    subprocess.run([RUFF_CMD, "check", "--fix-only", tmp_path], check=True)
+    subprocess.run([RUFF_CMD, "format", tmp_path], check=True)
 
     # Read back the formatted code
     with open(tmp_path, "r") as tmp:
