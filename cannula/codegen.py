@@ -45,8 +45,8 @@ def ast_for_import(module: str) -> ast.Import:
 def ast_for_import_from(module: str, names: typing.List[str]) -> ast.ImportFrom:
     ast_names = []
     for name in names:
-        name = ast.alias(name=name, asname=None)
-        ast_names.append(name)
+        ast_name = ast.alias(name=name, asname=None)
+        ast_names.append(ast_name)
     return ast.ImportFrom(module=module, names=ast_names, level=0)
 
 
@@ -344,8 +344,8 @@ def parse_schema(
 
 
 def ast_for_class_field(field: Field) -> ast.AnnAssign:
-    field_type = field.value if field.required else f"Optional[{field.value}]"
-    field_type = ast_for_name(field_type)
+    field_type_str = field.value if field.required else f"Optional[{field.value}]"
+    field_type = ast_for_name(field_type_str)
 
     # Handle the defaults properly. When the field is required we don't want to
     # set a default value of `None`. But when it is optional we need to properly
@@ -364,16 +364,16 @@ def ast_for_class_field(field: Field) -> ast.AnnAssign:
 
 
 def ast_for_dict_field(field: Field) -> ast.AnnAssign:
-    field_type = field.value if field.required else f"NotRequired[{field.value}]"
-    field_type = ast_for_name(field_type)
+    field_type_str = field.value if field.required else f"NotRequired[{field.value}]"
+    field_type = ast_for_name(field_type_str)
     return ast_for_annotation_assignment(field.name, annotation=field_type)
 
 
 def ast_for_operation_field(field: Field) -> ast.AnnAssign:
-    field_type = (
+    field_type_str = (
         field.func_name if field.required else f"NotRequired[{field.func_name}]"
     )
-    field_type = ast_for_name(field_type)
+    field_type = ast_for_name(field_type_str)
     return ast_for_annotation_assignment(field.name, annotation=field_type)
 
 
