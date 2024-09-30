@@ -96,6 +96,10 @@ def ast_for_argument(arg: Argument) -> ast.arg:
     return ast.arg(arg=arg.name, annotation=ast.Name(id=arg_type, ctx=ast.Load()))
 
 
+def ast_for_keyword(arg: str, value: typing.Any) -> ast.keyword:
+    return ast.keyword(arg=arg, value=ast_for_constant(value))
+
+
 def ast_for_subscript(
     value: typing.Union[ast.Name, ast.Attribute, ast.expr], *items: str
 ) -> ast.Subscript:
@@ -300,6 +304,8 @@ def parse_node(node: Node):
     raw_fields = details.get("fields", [])
     raw_description = details.get("description") or {}
     description = raw_description.get("value")
+    raw_types = details.get("types", [])
+    types = [parse_type(t) for t in raw_types]
     directives: typing.Dict[str, typing.List[Directive]] = {}
 
     fields: typing.List[Field] = []
@@ -310,7 +316,12 @@ def parse_node(node: Node):
             directives[parsed.name] = parsed.directives
 
     return ObjectType(
-        name=name, fields=fields, directives=directives, description=description
+        name=name,
+        kind=node.kind,
+        fields=fields,
+        directives=directives,
+        description=description,
+        types=types,
     )
 
 
@@ -382,9 +393,15 @@ def render_object(obj: ObjectType) -> typing.List[ast.ClassDef | ast.Assign]:
         ast.ClassDef(
             name=klass_name,
             body=[type_def, *klass_fields, *computed_fields],
-            bases=[ast_for_name("BaseModel")],
+            bases=[ast_for_name("ABC")],
             keywords=[],
-            decorator_list=[],
+            decorator_list=[
+                ast.Call(
+                    func=ast_for_name("dataclass"),
+                    args=[],
+                    keywords=[ast_for_keyword("kw_only", True)],
+                )
+            ],
         ),
         ast.ClassDef(
             name=dict_name,
@@ -397,6 +414,38 @@ def render_object(obj: ObjectType) -> typing.List[ast.ClassDef | ast.Assign]:
             type_name,
             ast_for_union_subscript(klass_name, dict_name),
         ),
+    ]
+
+
+def render_interface(obj: ObjectType) -> typing.List[ast.ClassDef | ast.Assign]:
+    type_name = f"{obj.name}Type"
+
+    type_def = ast_for_assign("__typename", ast_for_constant(obj.name))
+    klass_fields = [ast_for_class_field(f) for f in obj.fields]
+    return [
+        ast.ClassDef(
+            name=type_name,
+            body=[type_def, *klass_fields],
+            bases=[ast_for_name("Protocol")],
+            keywords=[],
+            decorator_list=[
+                ast.Call(
+                    func=ast_for_name("dataclass"),
+                    args=[],
+                    keywords=[ast_for_keyword("kw_only", True)],
+                )
+            ],
+        )
+    ]
+
+
+def render_union(obj: ObjectType) -> typing.List[ast.ClassDef | ast.Assign]:
+    items = [field.value for field in obj.types]
+    return [
+        ast_for_assign(
+            obj.name,
+            ast_for_union_subscript(*items),
+        )
     ]
 
 
@@ -430,19 +479,30 @@ def render_file(
     parsed = parse_schema(type_defs)
 
     object_types: typing.List[ObjectType] = []
+    interface_types: typing.List[ObjectType] = []
+    union_types: typing.List[ObjectType] = []
     operation_fields: typing.List[Field] = []
     for obj in parsed.values():
         if obj.name in ["Query", "Mutation", "Subscription"]:
             for field in obj.fields:
                 operation_fields.append(field)
-        else:
+        elif obj.kind in [
+            "object_type_definition",
+            "input_object_type_definition",
+            "object_type_extension",
+        ]:
             object_types.append(obj)
+        elif obj.kind == "interface_type_definition":
+            interface_types.append(obj)
+        elif obj.kind == "union_type_definition":
+            union_types.append(obj)
 
     root = ast.Module(body=[], type_ignores=[])
     root.body.append(ast_for_import_from("__future__", ["annotations"]))
     root.body.append(ast_for_import("abc"))
-    root.body.append(ast_for_import("typing"))
     root.body.append(ast_for_import("cannula"))
+    root.body.append(ast_for_import_from("abc", ["ABC", "abstractmethod"]))
+    root.body.append(ast_for_import_from("dataclasses", ["dataclass"]))
     root.body.append(ast_for_import_from("pydantic", ["BaseModel"]))
     root.body.append(
         ast_for_import_from(
@@ -452,21 +512,31 @@ def render_file(
                 "List",
                 "Optional",
                 "Protocol",
-                "TypedDict",
+                # In python < 3.12 pydantic wants us to use typing_extensions
+                # "TypedDict",
                 "Union",
             ],
         )
     )
-    root.body.append(ast_for_import_from("typing_extensions", ["NotRequired"]))
+    root.body.append(
+        ast_for_import_from("typing_extensions", ["NotRequired", "TypedDict"])
+    )
+
+    for obj in interface_types:
+        root.body.extend(render_interface(obj))
 
     object_types.sort(key=lambda o: o.name)
     for obj in object_types:
         root.body.extend(render_object(obj))
 
+    for obj in union_types:
+        root.body.extend(render_union(obj))
+
     operation_fields.sort(key=lambda f: f.name)
     root.body.extend([ast_for_operation(f) for f in operation_fields])
 
-    root.body.append(ast_for_root_type(operation_fields))
+    if operation_fields:
+        root.body.append(ast_for_root_type(operation_fields))
 
     if dry_run:
         LOG.info(f"DRY_RUN would produce: \n{ast.dump(root, indent=4)}")

@@ -46,7 +46,9 @@ class FieldType:
 @dataclasses.dataclass
 class ObjectType:
     name: str
+    kind: str
     fields: typing.List[Field]
+    types: typing.List[FieldType]
     directives: typing.Dict[str, typing.List[Directive]]
     description: typing.Optional[str] = None
 
