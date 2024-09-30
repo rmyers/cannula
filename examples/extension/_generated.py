@@ -41,22 +41,6 @@ GenericThingType = Union[GenericThingTypeBase, GenericThingTypeDict]
 
 
 @dataclass(kw_only=True)
-class JeansTypeBase(ABC):
-    __typename = "Jeans"
-
-    @abc.abstractmethod
-    def book(self, info: cannula.ResolveInfo) -> Awaitable[Optional[BookType]]:
-        pass
-
-
-class JeansTypeDict(TypedDict):
-    book: NotRequired[BookType]
-
-
-JeansType = Union[JeansTypeBase, JeansTypeDict]
-
-
-@dataclass(kw_only=True)
 class MovieTypeBase(ABC):
     __typename = "Movie"
     name: Optional[str] = None

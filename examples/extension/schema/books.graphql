@@ -3,10 +3,6 @@ type Book {
     author: String
 }
 
-type Jeans {
-    book: Book @computed
-}
-
 extend type Query {
     books: [Book]
 }
