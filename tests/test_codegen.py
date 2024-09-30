@@ -53,12 +53,14 @@ EXTENTIONS = """
 expected_output = """\
 from __future__ import annotations
 import cannula
-from pydantic import BaseModel
-from typing import Awaitable, List, Optional, Protocol, TypedDict, Union
-from typing_extensions import NotRequired
+from abc import ABC
+from dataclasses import dataclass
+from typing import Awaitable, List, Optional, Protocol, Union
+from typing_extensions import NotRequired, TypedDict
 
 
-class EmailSearchTypeBase(BaseModel):
+@dataclass(kw_only=True)
+class EmailSearchTypeBase(ABC):
     __typename = "EmailSearch"
     email: str
     limit: Optional[int] = 100
@@ -76,7 +78,8 @@ class EmailSearchTypeDict(TypedDict):
 EmailSearchType = Union[EmailSearchTypeBase, EmailSearchTypeDict]
 
 
-class MessageTypeBase(BaseModel):
+@dataclass(kw_only=True)
+class MessageTypeBase(ABC):
     __typename = "Message"
     text: Optional[str] = None
     sender: Optional[SenderType] = None
@@ -90,7 +93,8 @@ class MessageTypeDict(TypedDict):
 MessageType = Union[MessageTypeBase, MessageTypeDict]
 
 
-class SenderTypeBase(BaseModel):
+@dataclass(kw_only=True)
+class SenderTypeBase(ABC):
     __typename = "Sender"
     name: Optional[str] = None
     email: str
@@ -128,6 +132,63 @@ class RootType(TypedDict):
     messages: NotRequired[messagesQuery]
 """
 
+schema_interface = """\
+interface Persona {
+    id: ID!
+}
+
+type User implements Persona {
+    id: ID!
+}
+
+type Admin implements Persona {
+    id: ID!
+}
+
+union Person = User | Admin
+"""
+
+expected_interface = """\
+from __future__ import annotations
+from abc import ABC
+from dataclasses import dataclass
+from typing import Protocol, Union
+from typing_extensions import TypedDict
+
+
+@dataclass(kw_only=True)
+class PersonaType(Protocol):
+    __typename = "Persona"
+    id: str
+
+
+@dataclass(kw_only=True)
+class AdminTypeBase(ABC):
+    __typename = "Admin"
+    id: str
+
+
+class AdminTypeDict(TypedDict):
+    id: str
+
+
+AdminType = Union[AdminTypeBase, AdminTypeDict]
+
+
+@dataclass(kw_only=True)
+class UserTypeBase(ABC):
+    __typename = "User"
+    id: str
+
+
+class UserTypeDict(TypedDict):
+    id: str
+
+
+UserType = Union[UserTypeBase, UserTypeDict]
+Person = Union[UserType, AdminType]
+"""
+
 
 async def test_parse_schema_dict():
     schema = 'type Test { "name field" name: String @deprecated(reason: "not valid")}'
@@ -157,14 +218,17 @@ async def test_parse_schema_dict():
 
 
 @pytest.mark.parametrize(
-    "dry_run, expected",
-    [(True, ""), (False, expected_output)],
-    ids=["dry-run:True", "dry-run:False"],
+    "dry_run, schema, expected",
+    [
+        pytest.param(True, [SCHEMA, EXTENTIONS], "", id="dry-run:True"),
+        pytest.param(False, [SCHEMA, EXTENTIONS], expected_output, id="dry-run:False"),
+        pytest.param(False, [schema_interface], expected_interface, id="interfaces"),
+    ],
 )
-async def test_render_file(dry_run: bool, expected: str):
+async def test_render_file(dry_run: bool, schema: list[str], expected: str):
     with tempfile.NamedTemporaryFile() as generated_file:
         render_file(
-            [SCHEMA, EXTENTIONS],
+            schema,
             path=pathlib.Path(generated_file.name),
             dry_run=dry_run,
         )
@@ -180,7 +244,7 @@ Module(
         ClassDef(
             name='TestTypeBase',
             bases=[
-                Name(id='BaseModel', ctx=Load())],
+                Name(id='ABC', ctx=Load())],
             keywords=[],
             body=[
                 Assign(
@@ -204,7 +268,14 @@ Module(
                     decorator_list=[
                         Name(id='abc.abstractmethod', ctx=Load())],
                     returns=Name(id='Awaitable[Optional[str]]', ctx=Load()))],
-            decorator_list=[]),
+            decorator_list=[
+                Call(
+                    func=Name(id='dataclass', ctx=Load()),
+                    args=[],
+                    keywords=[
+                        keyword(
+                            arg='kw_only',
+                            value=Constant(value=True))])]),
         ClassDef(
             name='TestTypeDict',
             bases=[
@@ -238,5 +309,5 @@ async def test_render_object_handles_computed_directive():
     assert actual is not None
     obj = actual["Test"]
     rendered = render_object(obj)
-    root = ast.Module(body=rendered, type_ignores=[])
+    root = ast.Module(body=[*rendered], type_ignores=[])
     assert ast.dump(root, indent=4) == EXPECTED_OBJECT

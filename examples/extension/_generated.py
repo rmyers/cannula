@@ -1,12 +1,14 @@
 from __future__ import annotations
 import abc
 import cannula
-from pydantic import BaseModel
-from typing import Awaitable, List, Optional, Protocol, TypedDict, Union
-from typing_extensions import NotRequired
+from abc import ABC
+from dataclasses import dataclass
+from typing import Awaitable, List, Optional, Protocol, Union
+from typing_extensions import NotRequired, TypedDict
 
 
-class BookTypeBase(BaseModel):
+@dataclass(kw_only=True)
+class BookTypeBase(ABC):
     __typename = "Book"
     name: Optional[str] = None
     author: Optional[str] = None
@@ -25,7 +27,8 @@ class BookTypeDict(TypedDict):
 BookType = Union[BookTypeBase, BookTypeDict]
 
 
-class GenericThingTypeBase(BaseModel):
+@dataclass(kw_only=True)
+class GenericThingTypeBase(ABC):
     __typename = "GenericThing"
     name: Optional[str] = None
 
@@ -37,7 +40,24 @@ class GenericThingTypeDict(TypedDict):
 GenericThingType = Union[GenericThingTypeBase, GenericThingTypeDict]
 
 
-class MovieTypeBase(BaseModel):
+@dataclass(kw_only=True)
+class JeansTypeBase(ABC):
+    __typename = "Jeans"
+
+    @abc.abstractmethod
+    def book(self, info: cannula.ResolveInfo) -> Awaitable[Optional[BookType]]:
+        pass
+
+
+class JeansTypeDict(TypedDict):
+    book: NotRequired[BookType]
+
+
+JeansType = Union[JeansTypeBase, JeansTypeDict]
+
+
+@dataclass(kw_only=True)
+class MovieTypeBase(ABC):
     __typename = "Movie"
     name: Optional[str] = None
     director: Optional[str] = None
@@ -55,7 +75,8 @@ class MovieTypeDict(TypedDict):
 MovieType = Union[MovieTypeBase, MovieTypeDict]
 
 
-class MovieInputTypeBase(BaseModel):
+@dataclass(kw_only=True)
+class MovieInputTypeBase(ABC):
     __typename = "MovieInput"
     name: Optional[str] = None
     director: Optional[str] = None
