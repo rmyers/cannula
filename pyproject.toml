@@ -21,7 +21,7 @@ classifiers = [
     "Programming Language :: Python :: 3.8",
 ]
 dependencies = [
-    "graphql-core<=3.2.3",
+    "graphql-core<=3.2.4",
     "typing-extensions<=4.11.0",
     "pydantic<=2.6.1",
     "ruff<=0.6.8",
