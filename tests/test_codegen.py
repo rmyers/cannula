@@ -55,7 +55,7 @@ from __future__ import annotations
 import cannula
 from abc import ABC
 from dataclasses import dataclass
-from typing import Awaitable, List, Optional, Protocol, Union
+from typing import List, Optional, Protocol, Union
 from typing_extensions import NotRequired, TypedDict
 
 
@@ -109,21 +109,21 @@ SenderType = Union[SenderTypeBase, SenderTypeDict]
 
 
 class get_sender_by_emailQuery(Protocol):
-    def __call__(
+    async def __call__(
         self, info: cannula.ResolveInfo, *, input: Optional[EmailSearchType] = None
-    ) -> Awaitable[SenderType]: ...
+    ) -> SenderType: ...
 
 
 class messageMutation(Protocol):
-    def __call__(
+    async def __call__(
         self, info: cannula.ResolveInfo, text: str, sender: str
-    ) -> Awaitable[MessageType]: ...
+    ) -> MessageType: ...
 
 
 class messagesQuery(Protocol):
-    def __call__(
+    async def __call__(
         self, info: cannula.ResolveInfo, limit: int
-    ) -> Awaitable[List[MessageType]]: ...
+    ) -> List[MessageType]: ...
 
 
 class RootType(TypedDict):
@@ -251,7 +251,7 @@ Module(
                     targets=[
                         Name(id='__typename', ctx=Load())],
                     value=Constant(value='Test')),
-                FunctionDef(
+                AsyncFunctionDef(
                     name='name',
                     args=arguments(
                         posonlyargs=[],
@@ -267,7 +267,7 @@ Module(
                         Pass()],
                     decorator_list=[
                         Name(id='abc.abstractmethod', ctx=Load())],
-                    returns=Name(id='Awaitable[Optional[str]]', ctx=Load()))],
+                    returns=Name(id='Optional[str]', ctx=Load()))],
             decorator_list=[
                 Call(
                     func=Name(id='dataclass', ctx=Load()),

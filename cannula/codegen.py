@@ -126,7 +126,7 @@ def render_function_args_ast(
     return pos_args_ast, kwonly_args_ast, defaults
 
 
-def render_computed_field_ast(field: Field) -> ast.FunctionDef:
+def render_computed_field_ast(field: Field) -> ast.AsyncFunctionDef:
     """
     Render a computed field as an AST node for a function definition.
     """
@@ -146,18 +146,18 @@ def render_computed_field_ast(field: Field) -> ast.FunctionDef:
         kwarg=None,
         defaults=[],
     )
-    func_node = ast.FunctionDef(
+    func_node = ast.AsyncFunctionDef(
         name=field.name,
         args=args_node,
         body=[ast.Pass()],  # Placeholder for the function body
         decorator_list=[ast.Name(id="abc.abstractmethod", ctx=ast.Load())],
-        returns=ast.Name(id=f"Awaitable[{value}]", ctx=ast.Load()),
+        returns=ast.Name(id=value, ctx=ast.Load()),
         lineno=None,  # type: ignore
     )
     return func_node
 
 
-def render_operation_field_ast(field: Field) -> ast.FunctionDef:
+def render_operation_field_ast(field: Field) -> ast.AsyncFunctionDef:
     """
     Render a computed field as an AST node for a function definition.
     """
@@ -177,12 +177,12 @@ def render_operation_field_ast(field: Field) -> ast.FunctionDef:
         kwarg=None,
         defaults=[],
     )
-    func_node = ast.FunctionDef(
+    func_node = ast.AsyncFunctionDef(
         name="__call__",
         args=args_node,
         body=[ELLIPSIS],  # Placeholder for the function body
         decorator_list=[],
-        returns=ast.Name(id=f"Awaitable[{field.value}]", ctx=ast.Load()),
+        returns=ast.Name(id=field.value, ctx=ast.Load()),
         lineno=None,  # type: ignore
     )
     return func_node
@@ -330,14 +330,6 @@ def parse_schema(
 ) -> typing.Dict[str, ObjectType]:
     document = concat_documents(type_defs)
     types: typing.Dict[str, ObjectType] = {}
-
-    # # Handle special types first
-    # for definition in document.definitions:
-    #     if definition.kind == "scalar_type_definition":
-    #         details = definition.to_dict()
-    #         name = details.get("name", {}).get("value", "Unknown")
-    #         LOG.debug(f"Adding support for scalar {name}")
-    #         TYPES[name] = "Any"
 
     for definition in document.definitions:
         node = parse_node(definition)

@@ -21,8 +21,9 @@ LOG = logging.getLogger("expanded")
 
 
 class Book(BookTypeBase):
-    async def movies(self, info: cannula.ResolveInfo) -> list[MovieType]:
-        LOG.info(f"{self.name}")
+    async def movies(
+        self, info: cannula.ResolveInfo, *, limit: int | None = 100
+    ) -> list[MovieType] | None:
         return [{"name": "Lost the Movie", "director": "Ted"}]
 
 

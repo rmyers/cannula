@@ -7,7 +7,7 @@ type Movie implements Generic {
 }
 
 extend type Book {
-    movies: [Movie] @computed
+    movies(limit: Int = 100): [Movie] @computed(weight: 5)
 }
 
 extend type Query {

@@ -3,7 +3,7 @@ import abc
 import cannula
 from abc import ABC
 from dataclasses import dataclass
-from typing import Any, Awaitable, List, Optional, Protocol, Union
+from typing import Any, List, Optional, Protocol, Union
 from typing_extensions import NotRequired, TypedDict
 
 DatetimeType = Any
@@ -22,7 +22,9 @@ class BookTypeBase(ABC):
     author: Optional[str] = None
 
     @abc.abstractmethod
-    def movies(self, info: cannula.ResolveInfo) -> Awaitable[Optional[List[MovieType]]]:
+    async def movies(
+        self, info: cannula.ResolveInfo, *, limit: Optional[int] = 100
+    ) -> Optional[List[MovieType]]:
         pass
 
 
@@ -57,13 +59,13 @@ MovieType = Union[MovieTypeBase, MovieTypeDict]
 
 
 class booksQuery(Protocol):
-    def __call__(self, info: cannula.ResolveInfo) -> Awaitable[List[BookType]]: ...
+    async def __call__(self, info: cannula.ResolveInfo) -> List[BookType]: ...
 
 
 class mediaQuery(Protocol):
-    def __call__(
+    async def __call__(
         self, info: cannula.ResolveInfo, *, limit: Optional[int] = 100
-    ) -> Awaitable[List[GenericType]]: ...
+    ) -> List[GenericType]: ...
 
 
 class RootType(TypedDict):
