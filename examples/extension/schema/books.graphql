@@ -1,4 +1,4 @@
-type Book {
+type Book  implements Generic {
     name: String
     author: String
 }

@@ -331,6 +331,14 @@ def parse_schema(
     document = concat_documents(type_defs)
     types: typing.Dict[str, ObjectType] = {}
 
+    # # Handle special types first
+    # for definition in document.definitions:
+    #     if definition.kind == "scalar_type_definition":
+    #         details = definition.to_dict()
+    #         name = details.get("name", {}).get("value", "Unknown")
+    #         LOG.debug(f"Adding support for scalar {name}")
+    #         TYPES[name] = "Any"
+
     for definition in document.definitions:
         node = parse_node(definition)
         if node.name in types:
@@ -481,11 +489,14 @@ def render_file(
     object_types: typing.List[ObjectType] = []
     interface_types: typing.List[ObjectType] = []
     union_types: typing.List[ObjectType] = []
+    scalar_types: typing.List[ObjectType] = []
     operation_fields: typing.List[Field] = []
     for obj in parsed.values():
         if obj.name in ["Query", "Mutation", "Subscription"]:
             for field in obj.fields:
                 operation_fields.append(field)
+        elif obj.kind == "scalar_type_definition":
+            scalar_types.append(obj)
         elif obj.kind in [
             "object_type_definition",
             "input_object_type_definition",
@@ -508,6 +519,7 @@ def render_file(
         ast_for_import_from(
             "typing",
             [
+                "Any",
                 "Awaitable",
                 "List",
                 "Optional",
@@ -521,6 +533,10 @@ def render_file(
     root.body.append(
         ast_for_import_from("typing_extensions", ["NotRequired", "TypedDict"])
     )
+
+    for obj in scalar_types:
+        # TODO(rmyers): add support for specific types
+        root.body.append(ast_for_assign(f"{obj.name}Type", ast_for_name("Any")))
 
     for obj in interface_types:
         root.body.extend(render_interface(obj))
