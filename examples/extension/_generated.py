@@ -4,12 +4,11 @@ import cannula
 from abc import ABC
 from dataclasses import dataclass
 from typing import Any, List, Optional, Protocol, Union
-from typing_extensions import NotRequired, TypedDict
+from typing_extensions import TypedDict
 
 DatetimeType = Any
 
 
-@dataclass(kw_only=True)
 class GenericType(Protocol):
     __typename = "Generic"
     name: Optional[str] = None
@@ -28,10 +27,10 @@ class BookTypeBase(ABC):
         pass
 
 
-class BookTypeDict(TypedDict):
-    movies: NotRequired[List[MovieType]]
-    name: NotRequired[str]
-    author: NotRequired[str]
+class BookTypeDict(TypedDict, total=False):
+    movies: Optional[List[MovieType]]
+    name: Optional[str]
+    author: Optional[str]
 
 
 BookType = Union[BookTypeBase, BookTypeDict]
@@ -47,12 +46,12 @@ class MovieTypeBase(ABC):
     created: Optional[DatetimeType] = None
 
 
-class MovieTypeDict(TypedDict):
-    name: NotRequired[str]
-    director: NotRequired[str]
-    book: NotRequired[BookType]
-    views: NotRequired[int]
-    created: NotRequired[DatetimeType]
+class MovieTypeDict(TypedDict, total=False):
+    name: Optional[str]
+    director: Optional[str]
+    book: Optional[BookType]
+    views: Optional[int]
+    created: Optional[DatetimeType]
 
 
 MovieType = Union[MovieTypeBase, MovieTypeDict]
@@ -68,6 +67,6 @@ class mediaQuery(Protocol):
     ) -> List[GenericType]: ...
 
 
-class RootType(TypedDict):
-    books: NotRequired[booksQuery]
-    media: NotRequired[mediaQuery]
+class RootType(TypedDict, total=False):
+    books: Optional[booksQuery]
+    media: Optional[mediaQuery]
