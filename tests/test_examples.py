@@ -16,7 +16,19 @@ def test_extension_works_properly_from_multiple_file():
                 "movies": [{"director": "Ted", "name": "Lost the Movie"}],
                 "name": "Lost",
             }
-        ]
+        ],
+        "media": [
+            {
+                "__typename": "Book",
+                "author": "Jane",
+                "name": "the Best Movies",
+            },
+            {
+                "__typename": "Movie",
+                "director": "Sally",
+                "name": "the Best Books",
+            },
+        ],
     }
 
 

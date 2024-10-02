@@ -1,24 +1,15 @@
-type Movie {
+type Movie implements Generic {
     name: String
     director: String
     book: Book
     views: Int
+    created: Datetime
 }
 
 extend type Book {
-    movies: [Movie] @computed
-}
-
-extend type Query {
     movies(limit: Int = 100): [Movie]
 }
 
-input MovieInput {
-    name: String
-    director: String
-    limit: Int = 100
-}
-
-extend type Mutation {
-    createMovie(input: MovieInput): Movie
+extend type Query {
+    media(limit: Int = 100): [Generic]
 }

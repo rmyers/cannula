@@ -4,7 +4,14 @@ import pprint
 
 import cannula
 import cannula.middleware
-from ._generated import BookType, BookTypeBase, MovieType, RootType
+from ._generated import (
+    BookType,
+    BookTypeBase,
+    GenericType,
+    MovieType,
+    MovieTypeBase,
+    RootType,
+)
 
 BASE_DIR = pathlib.Path(__file__).parent
 
@@ -14,16 +21,30 @@ LOG = logging.getLogger("expanded")
 
 
 class Book(BookTypeBase):
-    async def movies(self, info: cannula.ResolveInfo) -> list[MovieType]:
-        LOG.info(f"{self.name}")
+    async def movies(
+        self, info: cannula.ResolveInfo, *, limit: int | None = 100
+    ) -> list[MovieType] | None:
         return [{"name": "Lost the Movie", "director": "Ted"}]
+
+
+class Movie(MovieTypeBase):
+    pass
 
 
 async def get_books(info: cannula.ResolveInfo) -> list[BookType]:
     return [Book(name="Lost", author="Frank")]
 
 
-root_value: RootType = {"books": get_books}
+async def get_media(
+    info: cannula.ResolveInfo, limit: int | None = 100
+) -> list[GenericType]:
+    return [
+        Book(name="the Best Movies", author="Jane"),
+        Movie(name="the Best Books", director="Sally"),
+    ]
+
+
+root_value: RootType = {"books": get_books, "media": get_media}
 
 api = cannula.API[RootType](
     root_value=root_value,
@@ -44,6 +65,16 @@ QUERY = cannula.gql(
                 director
             }
         }
+        media {
+            __typename
+            name
+            ... on Book {
+                author
+            }
+            ... on Movie {
+                director
+            }
+        }
     }
 """
 )
@@ -52,3 +83,4 @@ QUERY = cannula.gql(
 if __name__ == "__main__":
     results = api.call_sync(QUERY, None)
     pprint.pprint(results.data)
+    pprint.pprint(results.errors)

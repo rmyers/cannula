@@ -3,8 +3,15 @@ import abc
 import cannula
 from abc import ABC
 from dataclasses import dataclass
-from typing import Awaitable, List, Optional, Protocol, Union
-from typing_extensions import NotRequired, TypedDict
+from typing import Any, List, Optional, Protocol, Union
+from typing_extensions import TypedDict
+
+DatetimeType = Any
+
+
+class GenericType(Protocol):
+    __typename = "Generic"
+    name: Optional[str] = None
 
 
 @dataclass(kw_only=True)
@@ -14,30 +21,19 @@ class BookTypeBase(ABC):
     author: Optional[str] = None
 
     @abc.abstractmethod
-    def movies(self, info: cannula.ResolveInfo) -> Awaitable[Optional[List[MovieType]]]:
+    async def movies(
+        self, info: cannula.ResolveInfo, *, limit: Optional[int] = 100
+    ) -> Optional[List[MovieType]]:
         pass
 
 
-class BookTypeDict(TypedDict):
-    movies: NotRequired[List[MovieType]]
-    name: NotRequired[str]
-    author: NotRequired[str]
+class BookTypeDict(TypedDict, total=False):
+    movies: Optional[List[MovieType]]
+    name: Optional[str]
+    author: Optional[str]
 
 
 BookType = Union[BookTypeBase, BookTypeDict]
-
-
-@dataclass(kw_only=True)
-class GenericThingTypeBase(ABC):
-    __typename = "GenericThing"
-    name: Optional[str] = None
-
-
-class GenericThingTypeDict(TypedDict):
-    name: NotRequired[str]
-
-
-GenericThingType = Union[GenericThingTypeBase, GenericThingTypeDict]
 
 
 @dataclass(kw_only=True)
@@ -47,59 +43,30 @@ class MovieTypeBase(ABC):
     director: Optional[str] = None
     book: Optional[BookType] = None
     views: Optional[int] = None
+    created: Optional[DatetimeType] = None
 
 
-class MovieTypeDict(TypedDict):
-    name: NotRequired[str]
-    director: NotRequired[str]
-    book: NotRequired[BookType]
-    views: NotRequired[int]
+class MovieTypeDict(TypedDict, total=False):
+    name: Optional[str]
+    director: Optional[str]
+    book: Optional[BookType]
+    views: Optional[int]
+    created: Optional[DatetimeType]
 
 
 MovieType = Union[MovieTypeBase, MovieTypeDict]
 
 
-@dataclass(kw_only=True)
-class MovieInputTypeBase(ABC):
-    __typename = "MovieInput"
-    name: Optional[str] = None
-    director: Optional[str] = None
-    limit: Optional[int] = 100
-
-
-class MovieInputTypeDict(TypedDict):
-    name: NotRequired[str]
-    director: NotRequired[str]
-    limit: NotRequired[int]
-
-
-MovieInputType = Union[MovieInputTypeBase, MovieInputTypeDict]
-
-
 class booksQuery(Protocol):
-    def __call__(self, info: cannula.ResolveInfo) -> Awaitable[List[BookType]]: ...
+    async def __call__(self, info: cannula.ResolveInfo) -> List[BookType]: ...
 
 
-class createMovieMutation(Protocol):
-    def __call__(
-        self, info: cannula.ResolveInfo, *, input: Optional[MovieInputType] = None
-    ) -> Awaitable[MovieType]: ...
-
-
-class genericQuery(Protocol):
-    def __call__(
-        self, info: cannula.ResolveInfo
-    ) -> Awaitable[List[GenericThingType]]: ...
-
-
-class moviesQuery(Protocol):
-    def __call__(
+class mediaQuery(Protocol):
+    async def __call__(
         self, info: cannula.ResolveInfo, *, limit: Optional[int] = 100
-    ) -> Awaitable[List[MovieType]]: ...
+    ) -> List[GenericType]: ...
 
 
-class RootType(TypedDict):
-    books: NotRequired[booksQuery]
-    createMovie: NotRequired[createMovieMutation]
-    generic: NotRequired[genericQuery]
-    movies: NotRequired[moviesQuery]
+class RootType(TypedDict, total=False):
+    books: Optional[booksQuery]
+    media: Optional[mediaQuery]

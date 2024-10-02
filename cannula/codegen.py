@@ -126,7 +126,7 @@ def render_function_args_ast(
     return pos_args_ast, kwonly_args_ast, defaults
 
 
-def render_computed_field_ast(field: Field) -> ast.FunctionDef:
+def render_computed_field_ast(field: Field) -> ast.AsyncFunctionDef:
     """
     Render a computed field as an AST node for a function definition.
     """
@@ -136,7 +136,6 @@ def render_computed_field_ast(field: Field) -> ast.FunctionDef:
         ast.arg("info", annotation=ast_for_name("cannula.ResolveInfo")),
         *pos_args,
     ]
-    value = field.value if field.required else f"Optional[{field.value}]"
     args_node = ast.arguments(
         args=[*args],
         vararg=None,
@@ -146,18 +145,18 @@ def render_computed_field_ast(field: Field) -> ast.FunctionDef:
         kwarg=None,
         defaults=[],
     )
-    func_node = ast.FunctionDef(
+    func_node = ast.AsyncFunctionDef(
         name=field.name,
         args=args_node,
         body=[ast.Pass()],  # Placeholder for the function body
         decorator_list=[ast.Name(id="abc.abstractmethod", ctx=ast.Load())],
-        returns=ast.Name(id=f"Awaitable[{value}]", ctx=ast.Load()),
+        returns=ast.Name(id=field.type, ctx=ast.Load()),
         lineno=None,  # type: ignore
     )
     return func_node
 
 
-def render_operation_field_ast(field: Field) -> ast.FunctionDef:
+def render_operation_field_ast(field: Field) -> ast.AsyncFunctionDef:
     """
     Render a computed field as an AST node for a function definition.
     """
@@ -177,12 +176,12 @@ def render_operation_field_ast(field: Field) -> ast.FunctionDef:
         kwarg=None,
         defaults=[],
     )
-    func_node = ast.FunctionDef(
+    func_node = ast.AsyncFunctionDef(
         name="__call__",
         args=args_node,
         body=[ELLIPSIS],  # Placeholder for the function body
         decorator_list=[],
-        returns=ast.Name(id=f"Awaitable[{field.value}]", ctx=ast.Load()),
+        returns=ast.Name(id=field.value, ctx=ast.Load()),
         lineno=None,  # type: ignore
     )
     return func_node
@@ -343,8 +342,7 @@ def parse_schema(
 
 
 def ast_for_class_field(field: Field) -> ast.AnnAssign:
-    field_type_str = field.value if field.required else f"Optional[{field.value}]"
-    field_type = ast_for_name(field_type_str)
+    field_type = ast_for_name(field.type)
 
     # Handle the defaults properly. When the field is required we don't want to
     # set a default value of `None`. But when it is optional we need to properly
@@ -359,16 +357,12 @@ def ast_for_class_field(field: Field) -> ast.AnnAssign:
 
 
 def ast_for_dict_field(field: Field) -> ast.AnnAssign:
-    field_type_str = field.value if field.required else f"NotRequired[{field.value}]"
-    field_type = ast_for_name(field_type_str)
+    field_type = ast_for_name(field.type)
     return ast_for_annotation_assignment(field.name, annotation=field_type)
 
 
 def ast_for_operation_field(field: Field) -> ast.AnnAssign:
-    field_type_str = (
-        field.func_name if field.required else f"NotRequired[{field.func_name}]"
-    )
-    field_type = ast_for_name(field_type_str)
+    field_type = ast_for_name(field.operation_type)
     return ast_for_annotation_assignment(field.name, annotation=field_type)
 
 
@@ -407,7 +401,7 @@ def render_object(obj: ObjectType) -> typing.List[ast.ClassDef | ast.Assign]:
             name=dict_name,
             body=[*dict_fields],
             bases=[ast_for_name("TypedDict")],
-            keywords=[],
+            keywords=[ast.keyword(arg="total", value=ast_for_constant(False))],
             decorator_list=[],
         ),
         ast_for_assign(
@@ -428,13 +422,7 @@ def render_interface(obj: ObjectType) -> typing.List[ast.ClassDef | ast.Assign]:
             body=[type_def, *klass_fields],
             bases=[ast_for_name("Protocol")],
             keywords=[],
-            decorator_list=[
-                ast.Call(
-                    func=ast_for_name("dataclass"),
-                    args=[],
-                    keywords=[ast_for_keyword("kw_only", True)],
-                )
-            ],
+            decorator_list=[],
         )
     ]
 
@@ -466,7 +454,7 @@ def ast_for_root_type(fields: typing.List[Field]) -> ast.ClassDef:
         name="RootType",
         body=[*dict_fields],
         bases=[ast_for_name("TypedDict")],
-        keywords=[],
+        keywords=[ast.keyword(arg="total", value=ast_for_constant(False))],
         decorator_list=[],
     )
 
@@ -481,11 +469,14 @@ def render_file(
     object_types: typing.List[ObjectType] = []
     interface_types: typing.List[ObjectType] = []
     union_types: typing.List[ObjectType] = []
+    scalar_types: typing.List[ObjectType] = []
     operation_fields: typing.List[Field] = []
     for obj in parsed.values():
         if obj.name in ["Query", "Mutation", "Subscription"]:
             for field in obj.fields:
                 operation_fields.append(field)
+        elif obj.kind == "scalar_type_definition":
+            scalar_types.append(obj)
         elif obj.kind in [
             "object_type_definition",
             "input_object_type_definition",
@@ -508,6 +499,7 @@ def render_file(
         ast_for_import_from(
             "typing",
             [
+                "Any",
                 "Awaitable",
                 "List",
                 "Optional",
@@ -521,6 +513,10 @@ def render_file(
     root.body.append(
         ast_for_import_from("typing_extensions", ["NotRequired", "TypedDict"])
     )
+
+    for obj in scalar_types:
+        # TODO(rmyers): add support for specific types
+        root.body.append(ast_for_assign(f"{obj.name}Type", ast_for_name("Any")))
 
     for obj in interface_types:
         root.body.extend(render_interface(obj))

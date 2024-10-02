@@ -1,7 +1,6 @@
-type GenericThing {
+scalar Datetime
+
+interface Generic {
     name: String
 }
 
-type Query {
-    generic: [GenericThing]
-}

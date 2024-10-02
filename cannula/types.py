@@ -29,6 +29,14 @@ class Field:
     required: bool = False
 
     @property
+    def type(self) -> str:
+        return self.value if self.required else f"Optional[{self.value}]"
+
+    @property
+    def operation_type(self) -> str:
+        return self.func_name if self.required else f"Optional[{self.func_name}]"
+
+    @property
     def is_computed(self) -> bool:
         has_args = bool(self.args)
         has_computed_directive = any(

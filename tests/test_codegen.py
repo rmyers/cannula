@@ -55,8 +55,8 @@ from __future__ import annotations
 import cannula
 from abc import ABC
 from dataclasses import dataclass
-from typing import Awaitable, List, Optional, Protocol, Union
-from typing_extensions import NotRequired, TypedDict
+from typing import List, Optional, Protocol, Union
+from typing_extensions import TypedDict
 
 
 @dataclass(kw_only=True)
@@ -68,11 +68,11 @@ class EmailSearchTypeBase(ABC):
     include: Optional[bool] = False
 
 
-class EmailSearchTypeDict(TypedDict):
+class EmailSearchTypeDict(TypedDict, total=False):
     email: str
-    limit: NotRequired[int]
-    other: NotRequired[str]
-    include: NotRequired[bool]
+    limit: Optional[int]
+    other: Optional[str]
+    include: Optional[bool]
 
 
 EmailSearchType = Union[EmailSearchTypeBase, EmailSearchTypeDict]
@@ -85,9 +85,9 @@ class MessageTypeBase(ABC):
     sender: Optional[SenderType] = None
 
 
-class MessageTypeDict(TypedDict):
-    text: NotRequired[str]
-    sender: NotRequired[SenderType]
+class MessageTypeDict(TypedDict, total=False):
+    text: Optional[str]
+    sender: Optional[SenderType]
 
 
 MessageType = Union[MessageTypeBase, MessageTypeDict]
@@ -100,8 +100,8 @@ class SenderTypeBase(ABC):
     email: str
 
 
-class SenderTypeDict(TypedDict):
-    name: NotRequired[str]
+class SenderTypeDict(TypedDict, total=False):
+    name: Optional[str]
     email: str
 
 
@@ -109,30 +109,31 @@ SenderType = Union[SenderTypeBase, SenderTypeDict]
 
 
 class get_sender_by_emailQuery(Protocol):
-    def __call__(
+    async def __call__(
         self, info: cannula.ResolveInfo, *, input: Optional[EmailSearchType] = None
-    ) -> Awaitable[SenderType]: ...
+    ) -> SenderType: ...
 
 
 class messageMutation(Protocol):
-    def __call__(
+    async def __call__(
         self, info: cannula.ResolveInfo, text: str, sender: str
-    ) -> Awaitable[MessageType]: ...
+    ) -> MessageType: ...
 
 
 class messagesQuery(Protocol):
-    def __call__(
+    async def __call__(
         self, info: cannula.ResolveInfo, limit: int
-    ) -> Awaitable[List[MessageType]]: ...
+    ) -> List[MessageType]: ...
 
 
-class RootType(TypedDict):
-    get_sender_by_email: NotRequired[get_sender_by_emailQuery]
-    message: NotRequired[messageMutation]
-    messages: NotRequired[messagesQuery]
+class RootType(TypedDict, total=False):
+    get_sender_by_email: Optional[get_sender_by_emailQuery]
+    message: Optional[messageMutation]
+    messages: Optional[messagesQuery]
 """
 
 schema_interface = """\
+scalar Datetime
 interface Persona {
     id: ID!
 }
@@ -143,6 +144,7 @@ type User implements Persona {
 
 type Admin implements Persona {
     id: ID!
+    created: Datetime
 }
 
 union Person = User | Admin
@@ -152,11 +154,12 @@ expected_interface = """\
 from __future__ import annotations
 from abc import ABC
 from dataclasses import dataclass
-from typing import Protocol, Union
+from typing import Any, Optional, Protocol, Union
 from typing_extensions import TypedDict
 
+DatetimeType = Any
 
-@dataclass(kw_only=True)
+
 class PersonaType(Protocol):
     __typename = "Persona"
     id: str
@@ -166,10 +169,12 @@ class PersonaType(Protocol):
 class AdminTypeBase(ABC):
     __typename = "Admin"
     id: str
+    created: Optional[DatetimeType] = None
 
 
-class AdminTypeDict(TypedDict):
+class AdminTypeDict(TypedDict, total=False):
     id: str
+    created: Optional[DatetimeType]
 
 
 AdminType = Union[AdminTypeBase, AdminTypeDict]
@@ -181,7 +186,7 @@ class UserTypeBase(ABC):
     id: str
 
 
-class UserTypeDict(TypedDict):
+class UserTypeDict(TypedDict, total=False):
     id: str
 
 
@@ -251,7 +256,7 @@ Module(
                     targets=[
                         Name(id='__typename', ctx=Load())],
                     value=Constant(value='Test')),
-                FunctionDef(
+                AsyncFunctionDef(
                     name='name',
                     args=arguments(
                         posonlyargs=[],
@@ -267,7 +272,7 @@ Module(
                         Pass()],
                     decorator_list=[
                         Name(id='abc.abstractmethod', ctx=Load())],
-                    returns=Name(id='Awaitable[Optional[str]]', ctx=Load()))],
+                    returns=Name(id='Optional[str]', ctx=Load()))],
             decorator_list=[
                 Call(
                     func=Name(id='dataclass', ctx=Load()),
@@ -280,11 +285,14 @@ Module(
             name='TestTypeDict',
             bases=[
                 Name(id='TypedDict', ctx=Load())],
-            keywords=[],
+            keywords=[
+                keyword(
+                    arg='total',
+                    value=Constant(value=False))],
             body=[
                 AnnAssign(
                     target=Name(id='name', ctx=Store()),
-                    annotation=Name(id='NotRequired[str]', ctx=Load()),
+                    annotation=Name(id='Optional[str]', ctx=Load()),
                     simple=1)],
             decorator_list=[]),
         Assign(
