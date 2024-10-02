@@ -133,6 +133,7 @@ class RootType(TypedDict):
 """
 
 schema_interface = """\
+scalar Datetime
 interface Persona {
     id: ID!
 }
@@ -143,6 +144,7 @@ type User implements Persona {
 
 type Admin implements Persona {
     id: ID!
+    created: Datetime
 }
 
 union Person = User | Admin
@@ -152,8 +154,10 @@ expected_interface = """\
 from __future__ import annotations
 from abc import ABC
 from dataclasses import dataclass
-from typing import Protocol, Union
-from typing_extensions import TypedDict
+from typing import Any, Optional, Protocol, Union
+from typing_extensions import NotRequired, TypedDict
+
+DatetimeType = Any
 
 
 @dataclass(kw_only=True)
@@ -166,10 +170,12 @@ class PersonaType(Protocol):
 class AdminTypeBase(ABC):
     __typename = "Admin"
     id: str
+    created: Optional[DatetimeType] = None
 
 
 class AdminTypeDict(TypedDict):
     id: str
+    created: NotRequired[DatetimeType]
 
 
 AdminType = Union[AdminTypeBase, AdminTypeDict]
