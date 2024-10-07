@@ -52,8 +52,8 @@ EXTENTIONS = """
 
 expected_output = """\
 from __future__ import annotations
-import cannula
 from abc import ABC
+from cannula import ResolveInfo
 from dataclasses import dataclass
 from typing import List, Optional, Protocol, Union
 from typing_extensions import TypedDict
@@ -110,20 +110,18 @@ SenderType = Union[SenderTypeBase, SenderTypeDict]
 
 class get_sender_by_emailQuery(Protocol):
     async def __call__(
-        self, info: cannula.ResolveInfo, *, input: Optional[EmailSearchType] = None
+        self, info: ResolveInfo, *, input: Optional[EmailSearchType] = None
     ) -> SenderType: ...
 
 
 class messageMutation(Protocol):
     async def __call__(
-        self, info: cannula.ResolveInfo, text: str, sender: str
+        self, info: ResolveInfo, text: str, sender: str
     ) -> MessageType: ...
 
 
 class messagesQuery(Protocol):
-    async def __call__(
-        self, info: cannula.ResolveInfo, limit: int
-    ) -> List[MessageType]: ...
+    async def __call__(self, info: ResolveInfo, limit: int) -> List[MessageType]: ...
 
 
 class RootType(TypedDict, total=False):
@@ -264,14 +262,14 @@ Module(
                             arg(arg='self'),
                             arg(
                                 arg='info',
-                                annotation=Name(id='cannula.ResolveInfo', ctx=Load()))],
+                                annotation=Name(id='ResolveInfo', ctx=Load()))],
                         kwonlyargs=[],
                         kw_defaults=[],
                         defaults=[]),
                     body=[
                         Pass()],
                     decorator_list=[
-                        Name(id='abc.abstractmethod', ctx=Load())],
+                        Name(id='abstractmethod', ctx=Load())],
                     returns=Name(id='Optional[str]', ctx=Load()))],
             decorator_list=[
                 Call(

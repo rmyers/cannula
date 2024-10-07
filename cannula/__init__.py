@@ -1,4 +1,4 @@
-from .api import API, Resolver
+from .api import API
 from .codegen import render_file
 from .context import Context, ResolveInfo
 from .errors import format_errors
@@ -14,7 +14,6 @@ __all__ = [
     "Field",
     "FieldType",
     "ObjectType",
-    "Resolver",
     "ResolveInfo",
     "format_errors",
     "build_and_extend_schema",
