@@ -6,7 +6,7 @@ import pytest
 
 from cannula.codegen import parse_schema, render_file, render_object
 from cannula.types import Argument, Directive, Field
-
+from cannula.scalars import ScalarInterface, Datetime
 
 SCHEMA = '''
 """
@@ -192,6 +192,53 @@ UserType = Union[UserTypeBase, UserTypeDict]
 Person = Union[UserType, AdminType]
 """
 
+schema_scalars = """\
+scalar Datetime
+
+type Thing {
+    created: Datetime
+}
+
+input ThingMaker {
+    created: Datetime!
+}
+"""
+
+expected_scalars = """\
+from __future__ import annotations
+from abc import ABC
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Optional, Union
+from typing_extensions import TypedDict
+
+
+@dataclass(kw_only=True)
+class ThingTypeBase(ABC):
+    __typename = "Thing"
+    created: Optional[datetime] = None
+
+
+class ThingTypeDict(TypedDict, total=False):
+    created: Optional[datetime]
+
+
+ThingType = Union[ThingTypeBase, ThingTypeDict]
+
+
+@dataclass(kw_only=True)
+class ThingMakerTypeBase(ABC):
+    __typename = "ThingMaker"
+    created: datetime
+
+
+class ThingMakerTypeDict(TypedDict, total=False):
+    created: datetime
+
+
+ThingMakerType = Union[ThingMakerTypeBase, ThingMakerTypeDict]
+"""
+
 
 async def test_parse_schema_dict():
     schema = 'type Test { "name field" name: String @deprecated(reason: "not valid")}'
@@ -221,19 +268,33 @@ async def test_parse_schema_dict():
 
 
 @pytest.mark.parametrize(
-    "dry_run, schema, expected",
+    "dry_run, schema, scalars, expected",
     [
-        pytest.param(True, [SCHEMA, EXTENTIONS], "", id="dry-run:True"),
-        pytest.param(False, [SCHEMA, EXTENTIONS], expected_output, id="dry-run:False"),
-        pytest.param(False, [schema_interface], expected_interface, id="interfaces"),
+        pytest.param(True, [SCHEMA, EXTENTIONS], [], "", id="dry-run:True"),
+        pytest.param(
+            False, [SCHEMA, EXTENTIONS], [], expected_output, id="dry-run:False"
+        ),
+        pytest.param(
+            False, [schema_interface], [], expected_interface, id="interfaces"
+        ),
+        pytest.param(
+            False,
+            [schema_scalars],
+            [Datetime],
+            expected_scalars,
+            id="scalars",
+        ),
     ],
 )
-async def test_render_file(dry_run: bool, schema: list[str], expected: str):
+async def test_render_file(
+    dry_run: bool, schema: list[str], expected: str, scalars: list[ScalarInterface]
+):
     with tempfile.NamedTemporaryFile() as generated_file:
         render_file(
             schema,
             path=pathlib.Path(generated_file.name),
             dry_run=dry_run,
+            scalars=scalars,
         )
         with open(generated_file.name, "r") as rendered:
             content = rendered.read()

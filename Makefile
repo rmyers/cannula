@@ -65,6 +65,9 @@ flake8: setup ## Run flake8 checks
 unit: setup ## Run unit tests
 	$(VIRTUAL_ENV)/bin/pytest
 
+test-failed: setup ## Run failing tests
+	$(VIRTUAL_ENV)/bin/pytest --lf
+
 mypy: setup ## Run mypy on code
 	$(VIRTUAL_ENV)/bin/mypy cannula
 

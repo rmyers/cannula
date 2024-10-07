@@ -72,10 +72,6 @@ def add_custom_scalar_handlers(scalars: list[ScalarInterface]) -> None:
         IMPORTS[scalar.output_module.module].add(scalar.output_module.klass)
 
 
-def ast_for_import(module: str) -> ast.Import:
-    return ast.Import(names=[ast.alias(name=module, asname=None)])
-
-
 def ast_for_import_from(module: str, names: set[str]) -> ast.ImportFrom:
     ast_names = []
     _names = list(names)
