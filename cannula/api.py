@@ -6,19 +6,20 @@ Using the API
 """
 
 import asyncio
-import collections
 import functools
 import logging
 import inspect
 import pathlib
 import typing
 
+from cannula.scalars import ScalarInterface
 from graphql import (
     DocumentNode,
     GraphQLError,
     GraphQLField,
     GraphQLFieldMap,
     GraphQLObjectType,
+    GraphQLScalarType,
     execute,
     ExecutionResult,
     GraphQLSchema,
@@ -42,136 +43,6 @@ RootType = typing.TypeVar("RootType", covariant=True)
 class ParseResults(typing.NamedTuple):
     document_ast: DocumentNode
     errors: typing.List[GraphQLError] = []
-
-
-class Resolver:
-    """
-    This class is a helper to organize your project as it grows. It allows you
-    to put your resolver modules and schema in different packages. For example::
-
-        app/
-            api.py     # `api = cannula.API(args)`
-        resolvers/
-            books.py   # `books = cannula.Resolver()`
-            movies.py  # `movies = cannula.Resolver()`
-
-
-    You then register resolvers and dataloaders in the same way:
-
-    resolvers/books.py::
-
-        import cannula
-
-        from database.books import get_books
-
-        books = cannula.Resolver()
-
-        @books.query('books')
-        async def get_books(source, info, args):
-            return await get_books()
-
-    resolvers/moives.py::
-
-        import cannula
-
-        from database.movies import get_movies, fetch_movies_for_book
-
-        movies = cannula.Resolver()
-
-        @movies.query('movies')
-        async def get_movies(source, info, args):
-            return await get_movies()
-
-        @movies.revolver('Books', 'movies')
-        async def list_movies_for_book(book, info) -> list[Movie]:
-            return await fetch_movies_for_book(book.id)
-
-    app/api.py::
-
-        import cannula
-
-        from resolvers.books import books
-        from resolvers.movies import movies
-
-        api = cannula.API(schema=SCHEMA)
-        api.include_resolver(books)
-        api.include_resolver(movies)
-
-
-    """
-
-    registry: typing.Dict[str, dict]
-
-    def __init__(self):
-        self.registry = collections.defaultdict(dict)
-
-    def query(self, field_name: typing.Optional[str] = None) -> typing.Any:
-        """Query Resolver
-
-        Short cut to add a resolver for a query, by default it will use the
-        name of the function as the `field_name` to be resolved::
-
-            resolver = cannula.Resolver()
-
-            @resolver.query
-            async def something(parent, info) -> str:
-                return "hello world"
-
-            @resolver.query(field_name="something")
-            async def some_other_something(parent, info) -> str:
-                return "override the function name"
-
-        :param field_name: Field name to resolve, by default the function name will be used.
-        """
-        return self.resolver("Query", field_name)
-
-    def mutation(self, field_name: typing.Optional[str] = None) -> typing.Any:
-        """Mutation Resolver
-
-        Short cut to add a resolver for a mutation, by default it will use the
-        name of the function as the `field_name` to be resolved::
-
-            resolver = cannula.Resolver()
-
-            @resolver.mutation
-            async def make_it(parent, info, name: str) -> str:
-                return "hello world"
-
-            @resolver.mutation(field_name="make_it")
-            async def some_other_something(parent, info, name: str) -> str:
-                return "override the function name"
-
-        :param field_name: Field name to resolve, by default the function name will be used.
-        """
-        return self.resolver("Mutation", field_name)
-
-    def resolver(
-        self, type_name: str, field_name: typing.Optional[str] = None
-    ) -> typing.Any:
-        """Field Resolver
-
-        Add a field resolver for a given type, by default it will use the
-        name of the function as the `field_name` to be resolved::
-
-            resolver = cannula.Resolver()
-
-            @resolver.resolver("Book")
-            async def name(parent, info) -> str:
-                return "hello world"
-
-            @resolver.resolver("Book", field_name="something")
-            async def some_other_something(parent, info):
-                return "override the function name
-
-        :param type_name: Parent object type name that is being resolved.
-        :param field_name: Field name to resolve, by default the function name will be used.
-        """
-
-        def decorator(function):
-            _name = field_name or function.__name__
-            self.registry[type_name][_name] = function
-
-        return decorator
 
 
 class API(typing.Generic[RootType]):
@@ -198,8 +69,8 @@ class API(typing.Generic[RootType]):
     """
 
     _schema: typing.Union[str, DocumentNode, pathlib.Path]
-    _resolvers: typing.List[Resolver]
     _root_value: typing.Optional[RootType]
+    _scalars: typing.List[ScalarInterface]
     _kwargs: typing.Dict[str, typing.Any]
 
     def __init__(
@@ -208,13 +79,14 @@ class API(typing.Generic[RootType]):
         context: typing.Optional[typing.Any] = None,
         middleware: typing.List[typing.Any] = [],
         root_value: typing.Optional[RootType] = None,
+        scalars: typing.List[ScalarInterface] = [],
         **kwargs,
     ):
         self._context = context or Context
-        self._resolvers = []
         self._schema = schema
         self.middleware = middleware
         self._root_value = root_value
+        self._scalars = scalars
         self._kwargs = kwargs
 
     def query(self, field_name: typing.Optional[str] = None) -> typing.Any:
@@ -286,39 +158,6 @@ class API(typing.Generic[RootType]):
 
         return decorator
 
-    def include_resolver(self, resolver: Resolver):
-        """Include a set of resolvers
-
-        This is used to break up a larger application into different modules.
-        For example you can group all the resolvers for a specific feature set::
-
-            from cannula import Resolver
-
-            from database import Book, filter_books, get_book
-
-            book_resolver = Resolver()
-
-            @book_resolver.query
-            async def books(parent, info, **args) -> list[Book]:
-                return await filter_books(**args)
-
-            @book_resolver.query
-            async def book(parent, info, book_id: str) -> Book:
-                return await get_book(book_id)
-
-        Then include the resolver in the main cannula API::
-
-            import cannula
-            import pathlib
-
-            from features.books import book_resolver
-
-            api = cannula.API(schema=pathlib.Path('.'))
-            api.include_resolver(book_resolver)
-
-        """
-        self._merge_registry(resolver.registry)
-
     def _find_schema(self) -> typing.List[DocumentNode]:
         schemas: typing.List[DocumentNode] = []
 
@@ -335,8 +174,23 @@ class API(typing.Generic[RootType]):
             self._full_schema = self._build_schema()
         return self._full_schema
 
+    def _set_scalars(self, schema: GraphQLSchema) -> GraphQLSchema:
+        for scalar in self._scalars:
+            object_type = schema.get_type(scalar.name)
+            if object_type is None:
+                raise Exception(
+                    f"Invalid scalar type {scalar.name} did you forget to define it?"
+                )
+
+            object_type = typing.cast(GraphQLScalarType, object_type)
+            object_type.serialize = scalar.serialize  # type: ignore
+            object_type.parse_value = scalar.parse_value  # type: ignore
+
+        return schema
+
     def _build_schema(self) -> GraphQLSchema:
         schema = build_and_extend_schema(self._find_schema())
+        schema = self._set_scalars(schema)
 
         schema_validation_errors = validate_schema(schema)
         if schema_validation_errors:
@@ -366,12 +220,6 @@ class API(typing.Generic[RootType]):
 
     def get_context(self, request) -> typing.Any:
         return self._context.init(request)
-
-    def _merge_registry(self, registry: dict):
-        for type_name, value in registry.items():
-            for field_name, revolve_fn in value.items():
-                field_def = self._validate_field(type_name, field_name)
-                field_def.resolve = revolve_fn
 
     @functools.lru_cache(maxsize=128)
     def _validate(self, document: DocumentNode) -> typing.List[GraphQLError]:

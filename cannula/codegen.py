@@ -4,11 +4,13 @@ Code Generation
 """
 
 import ast
+import collections
 import logging
 import pathlib
 import pprint
 import typing
 
+from cannula.scalars import ScalarInterface
 from graphql import (
     DocumentNode,
     Node,
@@ -33,18 +35,48 @@ VALUE_FUNCS = {
     "float_value": lambda value: float(value),
 }
 
+IMPORTS: typing.DefaultDict[str, set[str]] = collections.defaultdict(set[str])
+IMPORTS.update(
+    {
+        "__future__": set(["annotations"]),
+        "abc": set(["ABC", "abstractmethod"]),
+        "cannula": set(["ResolveInfo"]),
+        "dataclasses": set(["dataclass"]),
+        "pydantic": set(["BaseModel"]),
+        "typing": set(
+            [
+                "Any",
+                "Awaitable",
+                "List",
+                "Optional",
+                "Protocol",
+                # In python < 3.12 pydantic wants us to use typing_extensions
+                # "TypedDict",
+                "Union",
+            ]
+        ),
+        "typing_extensions": set(["TypedDict"]),
+    }
+)
+
 # AST contants for common values
 NONE = ast.Constant(value=None)
 ELLIPSIS = ast.Expr(value=ast.Constant(value=Ellipsis))
 
 
-def ast_for_import(module: str) -> ast.Import:
-    return ast.Import(names=[ast.alias(name=module, asname=None)])
+def add_custom_scalar_handlers(scalars: list[ScalarInterface]) -> None:
+    for scalar in scalars:
+        TYPES[scalar.name] = scalar.input_module.klass
+        TYPES[f"{scalar.name}InputType"] = scalar.output_module.klass
+        IMPORTS[scalar.input_module.module].add(scalar.input_module.klass)
+        IMPORTS[scalar.output_module.module].add(scalar.output_module.klass)
 
 
-def ast_for_import_from(module: str, names: typing.List[str]) -> ast.ImportFrom:
+def ast_for_import_from(module: str, names: set[str]) -> ast.ImportFrom:
     ast_names = []
-    for name in names:
+    _names = list(names)
+    _names.sort()
+    for name in _names:
         ast_name = ast.alias(name=name, asname=None)
         ast_names.append(ast_name)
     return ast.ImportFrom(module=module, names=ast_names, level=0)
@@ -56,15 +88,6 @@ def ast_for_name(name: str) -> ast.expr:
 
 def ast_for_constant(value: typing.Any) -> ast.expr:
     return ast.Constant(value=value)
-
-
-def ast_for_attribute(target: str, attr: str) -> ast.Attribute:
-    return ast.Attribute(
-        value=ast.Name(id=target, ctx=ast.Load()), attr=attr, ctx=ast.Load()
-    )
-
-
-RESOLVE_INFO = ast_for_attribute("cannula", "ResolveInfo")
 
 
 def ast_for_annotation_assignment(
@@ -133,7 +156,7 @@ def render_computed_field_ast(field: Field) -> ast.AsyncFunctionDef:
     pos_args, kwonlyargs, defaults = render_function_args_ast(field.args)
     args = [
         ast.arg("self"),
-        ast.arg("info", annotation=ast_for_name("cannula.ResolveInfo")),
+        ast.arg("info", annotation=ast_for_name("ResolveInfo")),
         *pos_args,
     ]
     args_node = ast.arguments(
@@ -149,7 +172,7 @@ def render_computed_field_ast(field: Field) -> ast.AsyncFunctionDef:
         name=field.name,
         args=args_node,
         body=[ast.Pass()],  # Placeholder for the function body
-        decorator_list=[ast.Name(id="abc.abstractmethod", ctx=ast.Load())],
+        decorator_list=[ast.Name(id="abstractmethod", ctx=ast.Load())],
         returns=ast.Name(id=field.type, ctx=ast.Load()),
         lineno=None,  # type: ignore
     )
@@ -163,7 +186,7 @@ def render_operation_field_ast(field: Field) -> ast.AsyncFunctionDef:
     pos_args, kwonlyargs, defaults = render_function_args_ast(field.args)
     args = [
         ast.arg("self"),
-        ast.arg("info", annotation=ast_for_name("cannula.ResolveInfo")),
+        ast.arg("info", annotation=ast_for_name("ResolveInfo")),
         *pos_args,
     ]
     # value = field.value if field.required else f"Optional[{field.value}]"
@@ -462,8 +485,12 @@ def ast_for_root_type(fields: typing.List[Field]) -> ast.ClassDef:
 def render_file(
     type_defs: typing.Iterable[typing.Union[str, DocumentNode]],
     path: pathlib.Path,
+    scalars: list[ScalarInterface] = [],
     dry_run: bool = False,
 ) -> None:
+    # first setup custom scalars so the parsed schema includes them
+    add_custom_scalar_handlers(scalars)
+
     parsed = parse_schema(type_defs)
 
     object_types: typing.List[ObjectType] = []
@@ -489,33 +516,17 @@ def render_file(
             union_types.append(obj)
 
     root = ast.Module(body=[], type_ignores=[])
-    root.body.append(ast_for_import_from("__future__", ["annotations"]))
-    root.body.append(ast_for_import("abc"))
-    root.body.append(ast_for_import("cannula"))
-    root.body.append(ast_for_import_from("abc", ["ABC", "abstractmethod"]))
-    root.body.append(ast_for_import_from("dataclasses", ["dataclass"]))
-    root.body.append(ast_for_import_from("pydantic", ["BaseModel"]))
-    root.body.append(
-        ast_for_import_from(
-            "typing",
-            [
-                "Any",
-                "Awaitable",
-                "List",
-                "Optional",
-                "Protocol",
-                # In python < 3.12 pydantic wants us to use typing_extensions
-                # "TypedDict",
-                "Union",
-            ],
-        )
-    )
-    root.body.append(
-        ast_for_import_from("typing_extensions", ["NotRequired", "TypedDict"])
-    )
+
+    module_imports = list(IMPORTS.keys())
+    module_imports.sort()
+    for module in module_imports:
+        if module == "builtins":
+            continue
+        root.body.append(ast_for_import_from(module=module, names=IMPORTS[module]))
 
     for obj in scalar_types:
-        # TODO(rmyers): add support for specific types
+        if obj.name in TYPES:
+            continue
         root.body.append(ast_for_assign(f"{obj.name}Type", ast_for_name("Any")))
 
     for obj in interface_types:

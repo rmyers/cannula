@@ -6,11 +6,13 @@ Like a boss
 """
 
 import argparse
+import importlib
 import logging
 import pathlib
 import sys
 
 import cannula
+from cannula.scalars import ScalarInterface
 
 # create the top-level parser for global options
 parser = argparse.ArgumentParser(
@@ -47,16 +49,36 @@ codegen_parser.add_argument(
     help="destination to write the file to",
     default="_generated.py",
 )
+codegen_parser.add_argument(
+    "--scalar", help="custom scalar to add", type=str, action="append", dest="scalars"
+)
 
 
-def run_codegen(dry_run: bool, schema: str, dest: str):
+def resolve_scalars(scalars: list[str]) -> list[ScalarInterface]:
+    _scalars: list[ScalarInterface] = []
+    for scalar in scalars or []:
+        _mod, _, _klass = scalar.rpartition(".")
+        if not _mod:
+            raise AttributeError(
+                f"Scalar: {scalar} invalid must be a module path for import like 'my.module.Klass'"
+            )
+        _parent = importlib.import_module(_mod)
+        _klass_obj = getattr(_parent, _klass)
+        _scalars.append(_klass_obj)
+
+    return _scalars
+
+
+def run_codegen(dry_run: bool, schema: str, dest: str, scalars: list[str] | None):
     source = pathlib.Path(schema)
     documents = cannula.load_schema(source)
     destination = pathlib.Path(dest)
+    _scalars = resolve_scalars(scalars or [])
     cannula.render_file(
         type_defs=documents,
         path=destination,
         dry_run=dry_run,
+        scalars=_scalars,
     )
 
 
@@ -67,10 +89,12 @@ def main():
         if not options.command:
             break
         level = logging.DEBUG if options.debug else logging.INFO
+        sys.tracebacklimit = 99 if options.debug else -1
         logging.basicConfig(level=level)
         if options.command == "codegen":
             run_codegen(
                 dry_run=options.dry_run,
                 schema=options.schema,
                 dest=options.dest,
+                scalars=options.scalars,
             )
