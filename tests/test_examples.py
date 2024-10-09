@@ -5,10 +5,10 @@ async def test_hello_world():
     assert results == {"hello": "hello sammy!"}
 
 
-def test_extension_works_properly_from_multiple_file():
+async def test_extension_works_properly_from_multiple_file():
     from tests.fixtures.examples.extension import main
 
-    results = main.api.call_sync(main.QUERY)
+    results = await main.api.call(main.QUERY)
     assert results.data == {
         "books": [
             {
@@ -32,11 +32,11 @@ def test_extension_works_properly_from_multiple_file():
     }
 
 
-def test_mocks_work_properly():
+async def test_mocks_work_properly():
     from tests.fixtures.examples import mocks
 
     # all values are mocked
-    default_results = mocks.default.call_sync(mocks.sample_query)
+    default_results = await mocks.default.call(mocks.sample_query)
     assert default_results.data
     mock_result = default_results.data["mockity"][0]
     assert isinstance(mock_result["text"], str)
@@ -46,7 +46,7 @@ def test_mocks_work_properly():
     assert isinstance(mock_result["id"], str)
 
     # some values are constant while the rest are mocked
-    custom_results = mocks.custom.call_sync(mocks.sample_query)
+    custom_results = await mocks.custom.call(mocks.sample_query)
     assert custom_results.data
     mock_result = custom_results.data["mockity"][0]
     # we need to remove the mocked values
@@ -61,7 +61,7 @@ def test_mocks_work_properly():
     }
 
     # limited mocks only return the custom values
-    limited_results = mocks.limited_mocks.call_sync(mocks.sample_query)
+    limited_results = await mocks.limited_mocks.call(mocks.sample_query)
     assert limited_results.data
     mock_result = limited_results.data["mockity"][0]
     assert mock_result == {
@@ -94,4 +94,21 @@ async def test_profiler():
     assert results.data == {
         "prime": "17624813 is a prime number",
         "hello": "hello World!",
+    }
+
+
+async def test_scalars():
+    from tests.fixtures.examples.scalars import main
+
+    results = await main.api.call(main.QUERY)
+    assert results is not None
+    assert results.errors is None
+    assert results.data == {
+        "scaled": {
+            "birthday": "2019-03-08",
+            "created": "2024-02-05T06:47:00",
+            "id": "e0c2c649-9c66-4f55-a2d4-966cc4f7d186",
+            "meta": '{"fancy": "pants"}',
+            "smoke": "04:20:00",
+        }
     }

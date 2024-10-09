@@ -42,16 +42,6 @@ default = cannula.API(
 )
 
 
-print(
-    f"""
-  Results with the default 'mock_all=True'. Since the result
-  is a list you will get a random number of results unless
-  you specify '__list_length' in mock_objects:
-  {default.call_sync(sample_query).data}
-"""
-)
-
-
 custom_mocks = {
     "String": "This will be used for all Strings",
     "Int": 42,
@@ -66,13 +56,6 @@ custom = cannula.API(
     ],
 )
 
-print(
-    f"""
-  Custom `mock_objects` with `mock_all=True` will return
-  a fake result for every field:
-  {custom.call_sync(sample_query).data}
-"""
-)
 
 limited_mocks = cannula.API(
     schema=schema,
@@ -81,10 +64,29 @@ limited_mocks = cannula.API(
     ],
 )
 
-print(
-    f"""
-  Limited mocks with `mock_all=False` will only return
-  fake results for fields mocked in `mock_objects`:
-  {limited_mocks.call_sync(sample_query).data}
-"""
-)
+if __name__ == "__main__":
+
+    print(
+        f"""
+    Results with the default 'mock_all=True'. Since the result
+    is a list you will get a random number of results unless
+    you specify '__list_length' in mock_objects:
+    {default.call_sync(sample_query).data}
+    """
+    )
+
+    print(
+        f"""
+    Custom `mock_objects` with `mock_all=True` will return
+    a fake result for every field:
+    {custom.call_sync(sample_query).data}
+    """
+    )
+
+    print(
+        f"""
+    Limited mocks with `mock_all=False` will only return
+    fake results for fields mocked in `mock_objects`:
+    {limited_mocks.call_sync(sample_query).data}
+    """
+    )
