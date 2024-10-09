@@ -10,7 +10,9 @@ try:
 except ImportError:  # pragma: no cover
     LOG.warning("dateutil library not installed, the date scalars will be degraded")
 
-    def parse(timestr: str) -> datetime.datetime:
+    def parse(  # type: ignore
+        timestr: str,
+    ) -> datetime.datetime:
         return datetime.datetime.strptime(timestr, "%Y-%m-%dT%H:%M:%S.%f")
 
 
