@@ -47,7 +47,7 @@ def test_codegen_dry_run(mocker: MockerFixture):
 
 
 def test_codegen_scalars(mocker: MockerFixture):
-    expected_scalars = resolve_scalars(["cannula.scalars.Datetime"])
+    expected_scalars = resolve_scalars(["cannula.scalars.date.Datetime"])
     mock_schema = mocker.Mock()
     mocker.patch("cannula.load_schema", return_value=mock_schema)
     mock_render = mocker.patch("cannula.render_file")
@@ -58,7 +58,7 @@ def test_codegen_scalars(mocker: MockerFixture):
             "cli",
             "codegen",
             "schema.grapql",
-            "--scalar=cannula.scalars.Datetime",
+            "--scalar=cannula.scalars.date.Datetime",
         ],
     )
     main()
@@ -71,7 +71,7 @@ def test_codegen_scalars(mocker: MockerFixture):
 
 
 def test_resolve_scalars():
-    expected_scalars = resolve_scalars(["cannula.scalars.Datetime"])
+    expected_scalars = resolve_scalars(["cannula.scalars.date.Datetime"])
     assert expected_scalars[0].name == "Datetime"
 
     with pytest.raises(

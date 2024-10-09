@@ -6,7 +6,8 @@ import pytest
 
 from cannula.codegen import parse_schema, render_file, render_object
 from cannula.types import Argument, Directive, Field
-from cannula.scalars import ScalarInterface, Datetime
+from cannula.scalars import ScalarInterface
+from cannula.scalars.date import Datetime
 
 SCHEMA = '''
 """

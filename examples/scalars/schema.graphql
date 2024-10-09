@@ -1,0 +1,17 @@
+scalar Datetime
+scalar Date
+scalar JSON
+scalar Time
+scalar UUID
+
+type Scaled {
+    id: UUID
+    created: Datetime
+    birthday: Date
+    smoke: Time
+    meta: JSON
+}
+
+type Query {
+    scaled: Scaled
+}

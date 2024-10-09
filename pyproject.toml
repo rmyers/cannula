@@ -42,6 +42,7 @@ test = [
     "pytest-cov",
     "pytest-mock",
     "pytest<9",
+    "python-dateutil==2.9.0",
     "Sphinx==8.0.2",
     "sphinx-autodoc-typehints",
     "pydata-sphinx-theme",
