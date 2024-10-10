@@ -1,7 +1,6 @@
 from __future__ import annotations
-import abc
-import cannula
-from abc import ABC
+from abc import ABC, abstractmethod
+from cannula import ResolveInfo
 from dataclasses import dataclass
 from typing import Any, List, Optional, Protocol, Union
 from typing_extensions import TypedDict
@@ -20,9 +19,9 @@ class BookTypeBase(ABC):
     name: Optional[str] = None
     author: Optional[str] = None
 
-    @abc.abstractmethod
+    @abstractmethod
     async def movies(
-        self, info: cannula.ResolveInfo, *, limit: Optional[int] = 100
+        self, info: ResolveInfo, *, limit: Optional[int] = 100
     ) -> Optional[List[MovieType]]:
         pass
 
@@ -58,12 +57,12 @@ MovieType = Union[MovieTypeBase, MovieTypeDict]
 
 
 class booksQuery(Protocol):
-    async def __call__(self, info: cannula.ResolveInfo) -> List[BookType]: ...
+    async def __call__(self, info: ResolveInfo) -> List[BookType]: ...
 
 
 class mediaQuery(Protocol):
     async def __call__(
-        self, info: cannula.ResolveInfo, *, limit: Optional[int] = 100
+        self, info: ResolveInfo, *, limit: Optional[int] = 100
     ) -> List[GenericType]: ...
 
 

@@ -11,6 +11,8 @@ import logging
 import pathlib
 import sys
 
+import tomli
+
 import cannula
 from cannula.scalars import ScalarInterface
 
@@ -18,6 +20,12 @@ from cannula.scalars import ScalarInterface
 parser = argparse.ArgumentParser(
     prog="cannula",
     description="Cannula cli for general functions",
+)
+parser.add_argument(
+    "--config",
+    "-c",
+    help="default configuration file (pyproject.toml)",
+    default="pyproject.toml",
 )
 parser.add_argument(
     "--dry_run",
@@ -41,8 +49,9 @@ codegen_parser = subparsers.add_parser(
     help="generate code from the schema",
 )
 codegen_parser.add_argument(
-    "schema",
+    "--schema",
     help="location of graphql file or directory of files",
+    default=".",
 )
 codegen_parser.add_argument(
     "--dest",
@@ -52,6 +61,16 @@ codegen_parser.add_argument(
 codegen_parser.add_argument(
     "--scalar", help="custom scalar to add", type=str, action="append", dest="scalars"
 )
+
+
+def load_config(config) -> dict:
+    source = pathlib.Path(config)
+    if not source.is_file():
+        return {}
+
+    with open(source, "rb") as conf_file:
+        options = tomli.load(conf_file)
+        return options.get("tool", {}).get("cannula", {})
 
 
 def resolve_scalars(scalars: list[str]) -> list[ScalarInterface]:
@@ -88,13 +107,20 @@ def main():
         options, argv = parser.parse_known_args(argv)
         if not options.command:
             break
+
         level = logging.DEBUG if options.debug else logging.INFO
         sys.tracebacklimit = 99 if options.debug else -1
         logging.basicConfig(level=level)
+        configuration = load_config(options.config)
+
         if options.command == "codegen":
+            codegen_config = configuration.get("codegen", {})
+            schema = codegen_config.get("schema", options.schema)
+            dest = codegen_config.get("dest", options.dest)
+            scalars = codegen_config.get("scalars", options.scalars)
             run_codegen(
                 dry_run=options.dry_run,
-                schema=options.schema,
-                dest=options.dest,
-                scalars=options.scalars,
+                schema=schema,
+                dest=dest,
+                scalars=scalars,
             )
