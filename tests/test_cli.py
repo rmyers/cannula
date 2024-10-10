@@ -8,6 +8,7 @@ from pytest_mock import MockerFixture
 from cannula.cli import main, resolve_scalars
 
 FIXTURES = pathlib.Path(__file__).parent / "fixtures"
+CANNULA = pathlib.Path(sys.prefix) / "bin" / "cannula"
 
 
 def test_help(mocker: MockerFixture):
@@ -94,11 +95,12 @@ def test_resolve_scalars():
     ],
 )
 def test_cli_codegen_in_examples_generates_correct_file(example):
+    cannula_exe = CANNULA.absolute()
     example_dir = pathlib.Path(FIXTURES / "examples" / example)
     with open(example_dir / "_generated.py") as existing:
         existing_generated = existing.read()
 
-    subprocess.call(["cannula", "codegen"], cwd=example_dir)
+    subprocess.call([cannula_exe, "codegen"], cwd=example_dir)
 
     with open(example_dir / "_generated.py") as after:
         after_generated = after.read()
