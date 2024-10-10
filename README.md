@@ -2,6 +2,7 @@
 
 [![CircleCI](https://circleci.com/gh/rmyers/cannula.svg?style=shield)](https://circleci.com/gh/rmyers/cannula)
 [![Documentation Status](https://readthedocs.org/projects/cannula/badge/?version=main)](https://cannula.readthedocs.io/en/main/?badge=main)
+[![codecov](https://codecov.io/gh/rmyers/cannula/branch/main/graph/badge.svg?token=4OOWACS3QD)](https://codecov.io/gh/rmyers/cannula)
 
 > GraphQL for people who like Python!
 
