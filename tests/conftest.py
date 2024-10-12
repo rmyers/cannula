@@ -1,4 +1,8 @@
 import logging
+from graphql import DocumentNode
+import pytest
+
+import cannula
 
 LOG = logging.getLogger("cannula.tests")
 
@@ -12,3 +16,25 @@ def pytest_runtest_setup(item):
     LOG.info("=======================================================")
     LOG.info(f"Running test: {item.name}")
     LOG.info("=======================================================")
+
+
+@pytest.fixture
+def valid_schema() -> DocumentNode:
+    return cannula.gql(
+        """
+        type User {
+            name: String
+        }
+        type Query {
+            me: User
+        }
+        type Mutation {
+            createMe(name: String!): User
+        }
+        """
+    )
+
+
+@pytest.fixture
+def valid_query() -> DocumentNode:
+    return cannula.gql("query Me { me { name } }")

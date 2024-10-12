@@ -329,7 +329,8 @@ Module(
                         kw_defaults=[],
                         defaults=[]),
                     body=[
-                        Pass()],
+                        Expr(
+                            value=Constant(value=Ellipsis))],
                     decorator_list=[
                         Name(id='abstractmethod', ctx=Load())],
                     returns=Name(id='Optional[str]', ctx=Load()))],
