@@ -23,7 +23,10 @@ class BookTypeBase(ABC):
     async def movies(
         self, info: ResolveInfo, *, limit: Optional[int] = 100
     ) -> Optional[List[MovieType]]:
-        pass
+        """
+        Get all the movies for a given book. This is will be added to the BookType.
+        """
+        ...
 
 
 class BookTypeDict(TypedDict, total=False):
@@ -37,6 +40,12 @@ BookType = Union[BookTypeBase, BookTypeDict]
 
 @dataclass(kw_only=True)
 class MovieTypeBase(ABC):
+    """
+    Movie Type
+
+    Includes a book reference defined in other schema file.
+    """
+
     __typename = "Movie"
     name: Optional[str] = None
     director: Optional[str] = None

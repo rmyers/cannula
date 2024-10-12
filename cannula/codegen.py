@@ -90,6 +90,10 @@ def ast_for_constant(value: typing.Any) -> ast.expr:
     return ast.Constant(value=value)
 
 
+def ast_for_docstring(value: str) -> ast.Expr:
+    return ast.Expr(value=ast_for_constant(value))
+
+
 def ast_for_annotation_assignment(
     target: str, annotation: ast.expr, default: typing.Optional[typing.Any] = None
 ) -> ast.AnnAssign:
@@ -137,15 +141,36 @@ def ast_for_union_subscript(*items: str) -> ast.Subscript:
     return ast_for_subscript(value, *items)
 
 
+def ast_for_function_body(field: Field) -> typing.List[ast.stmt]:
+    body: list[ast.stmt] = []
+    if field.description:
+        body.append(ast_for_docstring(field.description))
+
+    body.append(ELLIPSIS)
+    return body
+
+
 def render_function_args_ast(
     args: typing.List[Argument],
-) -> typing.Tuple[typing.List[ast.arg], typing.List[ast.arg], typing.List[ast.expr]]:
+) -> typing.Tuple[
+    typing.List[ast.arg], typing.List[ast.arg], typing.List[ast.expr | None]
+]:
     """
     Render function arguments as AST nodes.
+
+    This returns a tuple of lists (args, kwargs, defaults). If the field is required
+    it is added to args, if it is not required then it is added to kwargs along
+    with a default in the defaults list.
     """
-    pos_args_ast = [ast_for_argument(arg) for arg in args if arg.required]
-    kwonly_args_ast = [ast_for_argument(arg) for arg in args if not arg.required]
-    defaults = [ast_for_constant(arg.default) for arg in args if not arg.required]
+    pos_args_ast: list[ast.arg] = [
+        ast_for_argument(arg) for arg in args if arg.required
+    ]
+    kwonly_args_ast: list[ast.arg] = [
+        ast_for_argument(arg) for arg in args if not arg.required
+    ]
+    defaults: list[ast.expr | None] = [
+        ast_for_constant(arg.default) for arg in args if not arg.required
+    ]
     return pos_args_ast, kwonly_args_ast, defaults
 
 
@@ -160,18 +185,18 @@ def render_computed_field_ast(field: Field) -> ast.AsyncFunctionDef:
         *pos_args,
     ]
     args_node = ast.arguments(
-        args=[*args],
+        args=args,
         vararg=None,
         posonlyargs=[],
-        kwonlyargs=[*kwonlyargs],
-        kw_defaults=[*defaults],
+        kwonlyargs=kwonlyargs,
+        kw_defaults=defaults,
         kwarg=None,
         defaults=[],
     )
     func_node = ast.AsyncFunctionDef(
         name=field.name,
         args=args_node,
-        body=[ast.Pass()],  # Placeholder for the function body
+        body=ast_for_function_body(field),
         decorator_list=[ast.Name(id="abstractmethod", ctx=ast.Load())],
         returns=ast.Name(id=field.type, ctx=ast.Load()),
         lineno=None,  # type: ignore
@@ -191,18 +216,18 @@ def render_operation_field_ast(field: Field) -> ast.AsyncFunctionDef:
     ]
     # value = field.value if field.required else f"Optional[{field.value}]"
     args_node = ast.arguments(
-        args=[*args],
+        args=args,
         vararg=None,
         posonlyargs=[],
-        kwonlyargs=[*kwonlyargs],
-        kw_defaults=[*defaults],
+        kwonlyargs=kwonlyargs,
+        kw_defaults=defaults,
         kwarg=None,
         defaults=[],
     )
     func_node = ast.AsyncFunctionDef(
         name="__call__",
         args=args_node,
-        body=[ELLIPSIS],  # Placeholder for the function body
+        body=ast_for_function_body(field),
         decorator_list=[],
         returns=ast.Name(id=field.value, ctx=ast.Load()),
         lineno=None,  # type: ignore
@@ -212,7 +237,13 @@ def render_operation_field_ast(field: Field) -> ast.AsyncFunctionDef:
 
 def parse_description(obj: dict) -> typing.Optional[str]:
     raw_description = obj.get("description") or {}
-    return raw_description.get("value")
+    is_block = raw_description.get("block", False)
+    desc = raw_description.get("value")
+    if not desc:
+        return None
+
+    # Format blocks with newlines so the doc strings look correct.
+    return f"\n{desc}\n" if is_block else desc
 
 
 def parse_name(obj: dict) -> str:
@@ -300,7 +331,7 @@ def parse_directives(field: typing.Dict[str, typing.Any]) -> typing.List[Directi
 
 def parse_field(field: typing.Dict[str, typing.Any], parent: str) -> Field:
     LOG.debug("Field: %s", pprint.pformat(field))
-    name = field["name"]["value"]
+    name = parse_name(field)
     field_type = parse_type(field["type"])
     default = parse_default(field)
     directives = parse_directives(field)
@@ -322,10 +353,10 @@ def parse_field(field: typing.Dict[str, typing.Any], parent: str) -> Field:
 def parse_node(node: Node):
     details = node.to_dict()
     LOG.debug("%s: %s", node.kind, pprint.pformat(details))
-    name = details.get("name", {}).get("value", "Unknown")
+    name = parse_name(details)
     raw_fields = details.get("fields", [])
-    raw_description = details.get("description") or {}
-    description = raw_description.get("value")
+
+    description = parse_description(details)
     raw_types = details.get("types", [])
     types = [parse_type(t) for t in raw_types]
     directives: typing.Dict[str, typing.List[Directive]] = {}
@@ -358,6 +389,7 @@ def parse_schema(
         if node.name in types:
             types[node.name].fields.extend(node.fields)
             types[node.name].directives.update(node.directives)
+            types[node.name].description = node.description
         else:
             types[node.name] = node
 
@@ -406,10 +438,17 @@ def render_object(obj: ObjectType) -> typing.List[ast.ClassDef | ast.Assign]:
     klass_fields = [ast_for_class_field(f) for f in non_computed]
     computed_fields = [render_computed_field_ast(f) for f in computed]
     dict_fields = [ast_for_dict_field(f) for f in obj.fields]
+
+    if obj.description:
+        doc_string = ast_for_docstring(obj.description)
+        constants = [doc_string, type_def]
+    else:
+        constants = [type_def]
+
     return [
         ast.ClassDef(
             name=klass_name,
-            body=[type_def, *klass_fields, *computed_fields],
+            body=[*constants, *klass_fields, *computed_fields],
             bases=[ast_for_name("ABC")],
             keywords=[],
             decorator_list=[

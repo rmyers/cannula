@@ -70,13 +70,15 @@ class API(typing.Generic[RootType]):
 
     _schema: typing.Union[str, DocumentNode, pathlib.Path]
     _root_value: typing.Optional[RootType]
+    _context: typing.Type[Context]
     _scalars: typing.List[ScalarInterface]
     _kwargs: typing.Dict[str, typing.Any]
+    schema: GraphQLSchema
 
     def __init__(
         self,
         schema: typing.Union[str, DocumentNode, pathlib.Path],
-        context: typing.Optional[typing.Any] = None,
+        context: typing.Optional[typing.Type[Context]] = None,
         middleware: typing.List[typing.Any] = [],
         root_value: typing.Optional[RootType] = None,
         scalars: typing.List[ScalarInterface] = [],
@@ -88,6 +90,7 @@ class API(typing.Generic[RootType]):
         self._root_value = root_value
         self._scalars = scalars
         self._kwargs = kwargs
+        self.schema = self._build_schema()
 
     def query(self, field_name: typing.Optional[str] = None) -> typing.Any:
         """Query Resolver
@@ -168,12 +171,6 @@ class API(typing.Generic[RootType]):
 
         return schemas
 
-    @property
-    def schema(self) -> GraphQLSchema:
-        if not hasattr(self, "_full_schema"):
-            self._full_schema = self._build_schema()
-        return self._full_schema
-
     def _set_scalars(self, schema: GraphQLSchema) -> GraphQLSchema:
         for scalar in self._scalars:
             object_type = schema.get_type(scalar.name)
@@ -201,22 +198,18 @@ class API(typing.Generic[RootType]):
     def _validate_field(self, type_name: str, field_name: str) -> GraphQLField:
         object_type = self.schema.get_type(type_name)
         if object_type is None:
-            raise Exception(f"Invalid type {type_name}")
+            raise Exception(f"Invalid type '{type_name}' in resolver decorator")
 
         # Need to cast this to object_type to satisfy mypy checks
         object_type = typing.cast(GraphQLObjectType, object_type)
         field_map = typing.cast(GraphQLFieldMap, object_type.fields)
         field_definition = field_map.get(field_name)
         if not field_definition:
-            raise Exception(f"Invalid field {type_name}.{field_name}")
+            raise Exception(
+                f"Invalid field '{type_name}.{field_name}' in resolver decorator"
+            )
 
         return field_definition
-
-    def context(self):
-        def decorator(klass):
-            self._context = klass
-
-        return decorator
 
     def get_context(self, request) -> typing.Any:
         return self._context.init(request)
