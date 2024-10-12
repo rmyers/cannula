@@ -240,7 +240,7 @@ def parse_description(obj: dict) -> typing.Optional[str]:
     is_block = raw_description.get("block", False)
     desc = raw_description.get("value")
     if not desc:
-        return
+        return None
 
     # Format blocks with newlines so the doc strings look correct.
     return f"\n{desc}\n" if is_block else desc
