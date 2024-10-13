@@ -5,8 +5,8 @@ from fastapi import Request, APIRouter, Form, status
 from fastapi.responses import RedirectResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from dashboard.core.database import User, users
-from dashboard.core.config import config
+from .database import User, users
+from .config import config
 
 # Global session store
 SESSION: typing.Dict[str, User] = {}

@@ -7,7 +7,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase, mapped_column, Mapped
 
-from dashboard.core.config import config
+from .config import config
 
 Model = typing.TypeVar("Model", covariant=True)
 

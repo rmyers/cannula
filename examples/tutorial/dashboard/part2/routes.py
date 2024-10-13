@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request
 
 import cannula
 
-from dashboard.core.config import config
+from ..core.config import config
 from .graph import cannula_app
 
 part2 = APIRouter(prefix="/part2")
