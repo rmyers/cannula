@@ -27,6 +27,7 @@ def valid_schema() -> DocumentNode:
         }
         type Query {
             me: User
+            you: User
         }
         type Mutation {
             createMe(name: String!): User
@@ -38,3 +39,8 @@ def valid_schema() -> DocumentNode:
 @pytest.fixture
 def valid_query() -> DocumentNode:
     return cannula.gql("query Me { me { name } }")
+
+
+@pytest.fixture
+def valid_query_string() -> str:
+    return "query Me { me { name } }"
