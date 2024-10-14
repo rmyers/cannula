@@ -1,15 +1,16 @@
-import collections
 import logging
 import typing
 
-from graphql import GraphQLError
+from graphql import GraphQLError, GraphQLFormattedError
+
+DEFAULT_LOGGER = logging.getLogger(__name__)
 
 
 def format_errors(
     errors: typing.Optional[typing.List[GraphQLError]] = None,
     logger: typing.Optional[logging.Logger] = None,
     level: int = logging.DEBUG,
-) -> dict:
+) -> typing.Optional[typing.List[GraphQLFormattedError]]:
     """Return a dict object of the errors.
 
     If there is a path(s) in the error then return a dict with the path
@@ -17,24 +18,15 @@ def format_errors(
     error with the correct data.
     """
     if not errors:
-        return {}
+        return None
 
-    if logger is None:
-        logger = logging.getLogger(__name__)
+    logger = logger or DEFAULT_LOGGER
 
-    formatted_errors: typing.Dict[str, typing.List] = collections.defaultdict(list)
+    formatted_errors: typing.List[GraphQLFormattedError] = []
 
     for err in errors:
         log_error(err, logger, level)
-        error_formatted = err.formatted
-        error_message = error_formatted.get("message")
-        if err.path is not None:
-            for path in err.path:
-                if error_message not in formatted_errors[str(path)]:
-                    formatted_errors[str(path)].append(error_message)
-
-        if error_message not in formatted_errors["errors"]:
-            formatted_errors["errors"].append(error_message)
+        formatted_errors.append(err.formatted)
 
     return formatted_errors
 
@@ -44,8 +36,9 @@ def log_error(
     logger: logging.Logger,
     level: int,
 ):
-    logger.log(level, f"{error}")
     if tb := error.__traceback__:
         while tb and tb.tb_next:
             tb = tb.tb_next
-        logger.log(level, f"Excecution Context: {tb.tb_frame.f_locals!r}")
+        logger.log(level, f"{error} \nContext={tb.tb_frame.f_locals!r}")
+    else:
+        logger.log(level, f"{error}")

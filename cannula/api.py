@@ -74,6 +74,8 @@ class API(typing.Generic[RootType]):
     _scalars: typing.List[ScalarInterface]
     _kwargs: typing.Dict[str, typing.Any]
     schema: GraphQLSchema
+    logger: typing.Optional[logging.Logger]
+    level: int
 
     def __init__(
         self,
@@ -82,6 +84,8 @@ class API(typing.Generic[RootType]):
         middleware: typing.List[typing.Any] = [],
         root_value: typing.Optional[RootType] = None,
         scalars: typing.List[ScalarInterface] = [],
+        logger: typing.Optional[logging.Logger] = None,
+        level: int = logging.DEBUG,
         **kwargs,
     ):
         self._context = context or Context
@@ -90,6 +94,8 @@ class API(typing.Generic[RootType]):
         self._root_value = root_value
         self._scalars = scalars
         self._kwargs = kwargs
+        self.logger = logger
+        self.level = level
         self.schema = self._build_schema()
 
     def query(self, field_name: typing.Optional[str] = None) -> typing.Any:
