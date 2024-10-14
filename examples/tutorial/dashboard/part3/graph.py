@@ -3,19 +3,19 @@ import pathlib
 import cannula
 
 from ..core.config import config
+from ..core.database import User as DBUser
+from ._generated import RootType, PersonaType, UserTypeBase
 
 
-async def resolve_me(info: cannula.ResolveInfo):
-    return {
-        # Comment out this next line to reproduce the error in Tutorial
-        "__typename": "User",
-        "name": "Tiny Tim",
-        "email": "tim@example.com",
-        "id": "1",
-    }
+class User(UserTypeBase):
+    _baseObject: DBUser
 
 
-cannula_app = cannula.API(
+async def resolve_me(info: cannula.ResolveInfo) -> PersonaType:
+    return User(id="1", name="Tiny Tim", email="foo@bar.com")
+
+
+cannula_app = cannula.API[RootType](
     schema=pathlib.Path(config.root / "part3"),
     root_value={"me": resolve_me},
 )
