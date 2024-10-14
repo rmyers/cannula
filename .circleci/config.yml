@@ -65,16 +65,16 @@ jobs:
       # Download and cache dependencies
       - restore_cache:
           keys:
-            - v1-dependencies-{{ checksum "pyproject.toml" }}
+            - v2-dependencies-{{ checksum "pyproject.toml" }}
             # fallback to using the latest cache if no exact match is found
-            - v1-dependencies-
+            - v2-dependencies-
 
       - run: make setup
 
       - save_cache:
           paths:
-            - ./.venv
-          key: v1-dependencies-{{ checksum "pyproject.toml" }}
+            - ./venv
+          key: v2-dependencies-{{ checksum "pyproject.toml" }}
 
       - run: make publish
 
