@@ -1,7 +1,7 @@
-from typing import Annotated
+from typing import Annotated, Optional
 
 from cannula.contrib.asgi import GraphQLDepends, ExecutionResponse
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 
 from .graph import cannula_app
 

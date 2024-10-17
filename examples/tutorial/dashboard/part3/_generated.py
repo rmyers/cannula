@@ -3,38 +3,39 @@ from abc import ABC
 from cannula import ResolveInfo
 from dataclasses import dataclass
 from typing import List, Optional, Protocol, Union
+from pydantic import BaseModel
 from typing_extensions import TypedDict
+from uuid import UUID
 
 
 class PersonaType(Protocol):
-    __typename: str = "Persona"
-    id: str
+    __typename = "Persona"
+    id: UUID
     name: Optional[str] = None
     email: Optional[str] = None
 
 
 class ResourceType(Protocol):
-    __typename: str = "Resource"
+    __typename = "Resource"
     quota: Optional[QuotaType] = None
     user: Optional[UserType] = None
     created: Optional[str] = None
 
 
-@dataclass(kw_only=True)
-class AdminTypeBase(ABC):
+class AdminType(BaseModel):
     __typename = "Admin"
-    id: str
+    id: UUID
     name: Optional[str] = None
     email: Optional[str] = None
 
 
 class AdminTypeDict(TypedDict, total=False):
-    id: str
+    id: UUID
     name: Optional[str]
     email: Optional[str]
 
 
-AdminType = Union[AdminTypeBase, AdminTypeDict]
+# AdminType = Union[AdminTypeBase, AdminTypeDict]
 
 
 @dataclass(kw_only=True)
@@ -87,14 +88,14 @@ PostType = Union[PostTypeBase, PostTypeDict]
 class QuotaTypeBase(ABC):
     __typename = "Quota"
     user: Optional[UserType] = None
-    resource: Optional[ResourceType] = None
+    resource: Optional[str] = None
     limit: Optional[int] = None
     count: Optional[int] = None
 
 
 class QuotaTypeDict(TypedDict, total=False):
     user: Optional[UserType]
-    resource: Optional[ResourceType]
+    resource: Optional[str]
     limit: Optional[int]
     count: Optional[int]
 
@@ -102,23 +103,22 @@ class QuotaTypeDict(TypedDict, total=False):
 QuotaType = Union[QuotaTypeBase, QuotaTypeDict]
 
 
-@dataclass(kw_only=True)
-class UserTypeBase(ABC):
+class UserType(BaseModel):
     __typename = "User"
-    id: str
+    id: UUID
     name: Optional[str] = None
     email: Optional[str] = None
     quota: Optional[List[QuotaType]] = None
 
 
 class UserTypeDict(TypedDict, total=False):
-    id: str
+    id: UUID
     name: Optional[str]
     email: Optional[str]
     quota: Optional[List[QuotaType]]
 
 
-UserType = Union[UserTypeBase, UserTypeDict]
+# UserType = Union[UserTypeBase, UserTypeDict]
 
 
 class addPostMutation(Protocol):
@@ -174,6 +174,10 @@ class meQuery(Protocol):
     async def __call__(self, info: ResolveInfo) -> PersonaType: ...
 
 
+class peopleQuery(Protocol):
+    async def __call__(self, info: ResolveInfo) -> List[PersonaType]: ...
+
+
 class postsQuery(Protocol):
     async def __call__(
         self,
@@ -200,5 +204,6 @@ class RootType(TypedDict, total=False):
     editBoard: Optional[editBoardMutation]
     editPost: Optional[editPostMutation]
     me: Optional[meQuery]
+    people: Optional[peopleQuery]
     posts: Optional[postsQuery]
     user: Optional[userQuery]

@@ -3,7 +3,6 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-
 from .core.config import config
 from .core.database import create_tables
 from .core.session import SessionMiddleware, auth_router

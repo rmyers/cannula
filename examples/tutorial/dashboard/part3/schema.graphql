@@ -1,25 +1,32 @@
+scalar UUID
+
 interface Persona {
-    id: ID!
+    id: UUID!
     name: String
     email: String
 }
 
 type User implements Persona {
-    id: ID!
+    id: UUID!
     name: String
     email: String
     quota: [Quota]
 }
 
 type Admin implements Persona {
-    id: ID!
+    id: UUID!
     name: String
     email: String
 }
 
+enum Resources {
+    BOARD
+    POST
+}
+
 type Quota {
     user: User
-    resource: Resource
+    resource: String
     limit: Int
     count: Int
 }
@@ -50,6 +57,7 @@ type Post implements Resource {
 
 type Query {
     me: Persona
+    people: [Persona]
     user(id: ID): User
     boards(limit: Int = 100, offset: Int = 0): [Board]
     posts(limit: Int = 100, offset: Int = 0): [Post]
