@@ -3,7 +3,9 @@ import asyncio
 import click
 import uvicorn
 
-from dashboard.core.database import create_tables, users
+from .core.config import config
+from .core.database import create_tables
+from .core.repository import UserRepository
 
 
 @click.group()
@@ -24,8 +26,10 @@ def run():  # pragma: no cover
 
 
 async def _add_users():  # pragma: no cover
-    await users.add("Normal User", email="user@email.com", password="test1")
-    await users.add("Admin User", email="admin@example.com", password="test2")
+    async with config.session() as session:
+        users = UserRepository(session)
+        await users.add("Normal User", email="user@email.com", password="test1")
+        await users.add("Admin User", email="admin@example.com", password="test2")
 
 
 @click.command()

@@ -2,7 +2,7 @@ import pathlib
 
 import cannula
 
-from dashboard.core.config import config
+from ..core.config import config
 
 
 async def resolve_me(info: cannula.ResolveInfo):
