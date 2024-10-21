@@ -112,18 +112,17 @@ SenderType = Union[SenderTypeBase, SenderTypeDict]
 class get_sender_by_emailQuery(Protocol):
     async def __call__(
         self, info: ResolveInfo, *, input: Optional[EmailSearchType] = None
-    ) -> SenderType:
-        ...
+    ) -> SenderType: ...
 
 
 class messageMutation(Protocol):
-    async def __call__(self, info: ResolveInfo, text: str, sender: str) -> MessageType:
-        ...
+    async def __call__(
+        self, info: ResolveInfo, text: str, sender: str
+    ) -> MessageType: ...
 
 
 class messagesQuery(Protocol):
-    async def __call__(self, info: ResolveInfo, limit: int) -> List[MessageType]:
-        ...
+    async def __call__(self, info: ResolveInfo, limit: int) -> List[MessageType]: ...
 
 
 class RootType(TypedDict, total=False):
