@@ -23,7 +23,7 @@ classifiers = [
 dependencies = [
     "graphql-core<=3.2.4",
     "typing-extensions<=4.12.2",
-    "ruff<=0.6.8",
+    "ruff<=0.7.0",
     "tomli<=2.0.2",
 ]
 
@@ -45,6 +45,7 @@ test = [
     "python-dateutil==2.9.0",
     "Sphinx==8.0.2",
     "sphinx-autodoc-typehints",
+    "sqlalchemy==2.0.36",
     "pydata-sphinx-theme",
     "twine==5.1.1",
     "types-python-dateutil",

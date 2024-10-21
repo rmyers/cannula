@@ -237,8 +237,11 @@ class API(typing.Generic[RootType]):
     async def call(
         self,
         document: typing.Union[DocumentNode, str],
-        request: typing.Any = None,
+        *,
         variables: typing.Optional[typing.Dict[str, typing.Any]] = None,
+        operation_name: typing.Optional[str] = None,
+        context: typing.Optional[typing.Any] = None,
+        request: typing.Optional[typing.Any] = None,
     ) -> ExecutionResult:
         """Preform a query against the schema.
 
@@ -253,12 +256,15 @@ class API(typing.Generic[RootType]):
         if validation_errors := self._validate(document):
             return ExecutionResult(data=None, errors=validation_errors)
 
-        context = self.get_context(request)
+        if context is None:
+            context = self.get_context(request)
+
         result = execute(
             schema=self.schema,
             document=document,
             context_value=context,
             variable_values=variables,
+            operation_name=operation_name,
             middleware=self.middleware,
             root_value=self._root_value,
             **self._kwargs,
@@ -269,9 +275,20 @@ class API(typing.Generic[RootType]):
 
     def call_sync(
         self,
-        document: DocumentNode,
-        request: typing.Optional[typing.Any] = None,
+        document: typing.Union[DocumentNode, str],
+        *,
         variables: typing.Optional[typing.Dict[str, typing.Any]] = None,
+        operation_name: typing.Optional[str] = None,
+        context: typing.Optional[typing.Any] = None,
+        request: typing.Optional[typing.Any] = None,
     ) -> ExecutionResult:
         loop = asyncio.get_event_loop()
-        return loop.run_until_complete(self.call(document, request, variables))
+        return loop.run_until_complete(
+            self.call(
+                document=document,
+                variables=variables,
+                operation_name=operation_name,
+                context=context,
+                request=request,
+            )
+        )

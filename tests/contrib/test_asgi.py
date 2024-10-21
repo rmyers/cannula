@@ -5,7 +5,7 @@ import pytest
 from fastapi import Depends, FastAPI
 
 import cannula
-from cannula.contrib.asgi import GraphQLDepends, ExecutionResponse
+from cannula.contrib.asgi import GraphQLDepends, ExecutionResponse, GraphQLExec
 
 QUERY = """
     query LoggedInUser {
@@ -38,11 +38,11 @@ async def graph_api(cannula_app) -> FastAPI:
     @api.post("/graph")
     async def _root(
         graph_response: typing.Annotated[
-            ExecutionResponse,
+            GraphQLExec,
             Depends(GraphQLDepends(cannula_app)),
         ]
     ) -> ExecutionResponse:
-        return graph_response
+        return await graph_response()
 
     return api
 
