@@ -23,7 +23,7 @@ classifiers = [
 dependencies = [
     "graphql-core<=3.2.4",
     "typing-extensions<=4.12.2",
-    "ruff<=0.6.8",
+    "ruff<=0.7.0",
     "tomli<=2.0.2",
 ]
 
