@@ -42,7 +42,7 @@ test = [
     "pytest-cov",
     "pytest-mock",
     "pytest<9",
-    "python-dateutil==2.9.0",
+    "python-dateutil==2.9.0.post0",
     "Sphinx==8.0.2",
     "sphinx-autodoc-typehints",
     "sqlalchemy==2.0.36",
