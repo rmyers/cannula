@@ -23,7 +23,7 @@ QUERY = cannula.gql(
 
 @part1.get("/")
 async def part1_root(request: Request):
-    results = await cannula_app.call(QUERY, request)
+    results = await cannula_app.call(QUERY)
     return config.templates.TemplateResponse(
         request, "part1/index.html", {"results": results}
     )

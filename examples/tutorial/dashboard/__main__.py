@@ -16,8 +16,7 @@ def cli():  # pragma: no cover
 @click.command()
 def initdb():  # pragma: no cover
     click.echo("Initialized the database")
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(create_tables())
+    asyncio.run(create_tables())
 
 
 @click.command()
@@ -35,8 +34,7 @@ async def _add_users():  # pragma: no cover
 @click.command()
 def addusers():  # pragma: no cover
     click.echo("Adding users")
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(_add_users())
+    asyncio.run(_add_users())
 
 
 cli.add_command(initdb)

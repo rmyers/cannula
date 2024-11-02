@@ -3,26 +3,12 @@ from typing import Any, Dict, Generic, Optional, TypeVar
 
 from sqlalchemy import BinaryExpression, ColumnExpressionArgument, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from pydantic import BaseModel
 from .database import Base, User
 
 Model = TypeVar("Model", bound=Base)
-GraphQLModel = TypeVar("GraphQLModel")
 
 # Global session store
 SESSION: Dict[str, User] = {}
-
-
-class DBMixin(Generic[Model, GraphQLModel]):
-    """Used to map a database model to a generated GraphQL type"""
-
-    _db_model: Model
-
-    @classmethod
-    def from_db(cls, db_obj: Model) -> GraphQLModel:
-        obj = cls(**db_obj.__dict__)
-        obj._db_model = db_obj
-        return obj  # type: ignore
 
 
 class DatabaseRepository(Generic[Model]):
