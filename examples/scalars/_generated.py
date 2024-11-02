@@ -30,8 +30,7 @@ ScaledType = Union[ScaledTypeBase, ScaledTypeDict]
 
 
 class scaledQuery(Protocol):
-    async def __call__(self, info: ResolveInfo) -> ScaledType:
-        ...
+    async def __call__(self, info: ResolveInfo) -> ScaledType: ...
 
 
 class RootType(TypedDict, total=False):

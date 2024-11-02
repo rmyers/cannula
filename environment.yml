@@ -1,0 +1,8 @@
+name: dev
+dependencies:
+- python=3.10.15
+- pip=24.0
+pip:
+- .[test]
+channels:
+- defaults

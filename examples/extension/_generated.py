@@ -24,7 +24,8 @@ class BookTypeBase(ABC):
         self, info: ResolveInfo, *, limit: Optional[int] = 100
     ) -> Optional[List[MovieType]]:
         """
-        Get all the movies for a given book. This is will be added to the BookType."""
+        Get all the movies for a given book. This is will be added to the BookType.
+        """
         ...
 
 
@@ -42,7 +43,8 @@ class MovieTypeBase(ABC):
     """
     Movie Type
 
-    Includes a book reference defined in other schema file."""
+    Includes a book reference defined in other schema file.
+    """
 
     __typename = "Movie"
     name: Optional[str] = None
@@ -64,15 +66,13 @@ MovieType = Union[MovieTypeBase, MovieTypeDict]
 
 
 class booksQuery(Protocol):
-    async def __call__(self, info: ResolveInfo) -> List[BookType]:
-        ...
+    async def __call__(self, info: ResolveInfo) -> List[BookType]: ...
 
 
 class mediaQuery(Protocol):
     async def __call__(
         self, info: ResolveInfo, *, limit: Optional[int] = 100
-    ) -> List[GenericType]:
-        ...
+    ) -> List[GenericType]: ...
 
 
 class RootType(TypedDict, total=False):
