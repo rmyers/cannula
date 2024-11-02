@@ -19,8 +19,10 @@
 #%
 
 REQUIREMENTS             := $(shell find . -name 'pyproject.toml')
+ENVIRONMENT              := $(shell find . -name 'environment.yml')
 SHELL                    := /bin/bash
-VIRTUAL_ENV              ?= venv
+CONDA_PREFIX             ?= venv
+VIRTUAL_ENV              ?= $(CONDA_PREFIX)
 PYTHON_MODULES           := $(shell find . -name '*.py')
 DOCKER_COMPOSE           := $(shell which docker-compose)
 
@@ -40,12 +42,15 @@ $(VIRTUAL_ENV):
 	python3 -m venv $(VIRTUAL_ENV)
 
 # Check for the existence of reqs-(md5) and run pip install if missing.
-$(VIRTUAL_ENV)/.requirements-installed: $(REQUIREMENTS)
+$(VIRTUAL_ENV)/.requirements-installed: $(REQUIREMENTS) $(ENVIRONMENT)
 	$(VIRTUAL_ENV)/bin/pip install -e .[test,httpx]
 	touch $(VIRTUAL_ENV)/.requirements-installed
 
 reports:
 	mkdir -p reports
+
+conda:
+	conda env $(shell [ -d $(VIRTUAL_ENV) ] && echo update || echo create) -p $(VIRTUAL_ENV) -f environment.yml
 
 setup: reports $(VIRTUAL_ENV) $(VIRTUAL_ENV)/.requirements-installed ## Setup local environment
 
