@@ -3,7 +3,6 @@ from abc import ABC
 from cannula import ResolveInfo
 from dataclasses import dataclass
 from typing import List, Optional, Protocol, Union
-from pydantic import BaseModel
 from typing_extensions import TypedDict
 from uuid import UUID
 
@@ -22,7 +21,8 @@ class ResourceType(Protocol):
     created: Optional[str] = None
 
 
-class AdminType(BaseModel):
+@dataclass(kw_only=True)
+class AdminTypeBase(ABC):
     __typename = "Admin"
     id: UUID
     name: Optional[str] = None
@@ -35,7 +35,7 @@ class AdminTypeDict(TypedDict, total=False):
     email: Optional[str]
 
 
-# AdminType = Union[AdminTypeBase, AdminTypeDict]
+AdminType = Union[AdminTypeBase, AdminTypeDict]
 
 
 @dataclass(kw_only=True)
@@ -103,7 +103,8 @@ class QuotaTypeDict(TypedDict, total=False):
 QuotaType = Union[QuotaTypeBase, QuotaTypeDict]
 
 
-class UserType(BaseModel):
+@dataclass(kw_only=True)
+class UserTypeBase(ABC):
     __typename = "User"
     id: UUID
     name: Optional[str] = None
@@ -118,13 +119,14 @@ class UserTypeDict(TypedDict, total=False):
     quota: Optional[List[QuotaType]]
 
 
-# UserType = Union[UserTypeBase, UserTypeDict]
+UserType = Union[UserTypeBase, UserTypeDict]
 
 
 class addPostMutation(Protocol):
     async def __call__(
         self, info: ResolveInfo, board_id: str, post_id: str
-    ) -> BoardType: ...
+    ) -> BoardType:
+        ...
 
 
 class boardsQuery(Protocol):
@@ -134,29 +136,35 @@ class boardsQuery(Protocol):
         *,
         limit: Optional[int] = 100,
         offset: Optional[int] = 0,
-    ) -> List[BoardType]: ...
+    ) -> List[BoardType]:
+        ...
 
 
 class createBoardMutation(Protocol):
-    async def __call__(self, info: ResolveInfo, title: str) -> BoardType: ...
+    async def __call__(self, info: ResolveInfo, title: str) -> BoardType:
+        ...
 
 
 class createPostMutation(Protocol):
-    async def __call__(self, info: ResolveInfo, title: str, body: str) -> PostType: ...
+    async def __call__(self, info: ResolveInfo, title: str, body: str) -> PostType:
+        ...
 
 
 class deleteBoardMutation(Protocol):
-    async def __call__(self, info: ResolveInfo, id: str) -> bool: ...
+    async def __call__(self, info: ResolveInfo, id: str) -> bool:
+        ...
 
 
 class deletePostMutation(Protocol):
-    async def __call__(self, info: ResolveInfo, id: str) -> bool: ...
+    async def __call__(self, info: ResolveInfo, id: str) -> bool:
+        ...
 
 
 class editBoardMutation(Protocol):
     async def __call__(
         self, info: ResolveInfo, id: str, *, title: Optional[str] = None
-    ) -> BoardType: ...
+    ) -> BoardType:
+        ...
 
 
 class editPostMutation(Protocol):
@@ -167,15 +175,18 @@ class editPostMutation(Protocol):
         *,
         title: Optional[str] = None,
         body: Optional[str] = None,
-    ) -> PostType: ...
+    ) -> PostType:
+        ...
 
 
 class meQuery(Protocol):
-    async def __call__(self, info: ResolveInfo) -> PersonaType: ...
+    async def __call__(self, info: ResolveInfo) -> PersonaType:
+        ...
 
 
 class peopleQuery(Protocol):
-    async def __call__(self, info: ResolveInfo) -> List[PersonaType]: ...
+    async def __call__(self, info: ResolveInfo) -> List[PersonaType]:
+        ...
 
 
 class postsQuery(Protocol):
@@ -185,13 +196,15 @@ class postsQuery(Protocol):
         *,
         limit: Optional[int] = 100,
         offset: Optional[int] = 0,
-    ) -> List[PostType]: ...
+    ) -> List[PostType]:
+        ...
 
 
 class userQuery(Protocol):
     async def __call__(
         self, info: ResolveInfo, *, id: Optional[str] = None
-    ) -> UserType: ...
+    ) -> UserType:
+        ...
 
 
 class RootType(TypedDict, total=False):

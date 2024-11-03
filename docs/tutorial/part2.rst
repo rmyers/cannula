@@ -87,3 +87,13 @@ Now we get the results we wanted::
     Results:
 
     ExecutionResult(data={'me': {'id': '1', 'name': 'Tiny Tim'}}, errors=None)
+
+
+This is great but seems like a ton of boilerplate we need to add. Luckily since we
+have done all the work to define our schema with types we can use this to auto generate
+code.
+
+In the frontend world you can use GraphQL Codegen to create types and React hooks
+with Cannula we can do the same for your backend code.
+
+Go to :doc:`part3` to see this in action.

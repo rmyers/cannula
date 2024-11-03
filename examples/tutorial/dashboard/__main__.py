@@ -1,11 +1,12 @@
 import asyncio
+import uuid
 
 import click
 import uvicorn
 
 from .core.config import config
 from .core.database import create_tables
-from .core.repository import UserRepository
+from .core.repository import UserRepository, QuotaRepository
 
 
 @click.group()
@@ -16,8 +17,7 @@ def cli():  # pragma: no cover
 @click.command()
 def initdb():  # pragma: no cover
     click.echo("Initialized the database")
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(create_tables())
+    asyncio.run(create_tables())
 
 
 @click.command()
@@ -27,16 +27,31 @@ def run():  # pragma: no cover
 
 async def _add_users():  # pragma: no cover
     async with config.session() as session:
-        users = UserRepository(session)
-        await users.add("Normal User", email="user@email.com", password="test1")
-        await users.add("Admin User", email="admin@example.com", password="test2")
+        user_id = uuid.uuid4()
+        admin_id = uuid.uuid4()
+        users = UserRepository(session=session)
+        quotas = QuotaRepository(session=session)
+        await users.add(
+            id=user_id,
+            name="Normal User",
+            email="user@email.com",
+            password="test1",
+        )
+        await users.add(
+            id=admin_id,
+            name="Admin User",
+            email="admin@example.com",
+            password="test2",
+        )
+        await quotas.add(user_id=user_id, resource="fire", limit=10, count=4)
+        await quotas.add(user_id=user_id, resource="water", limit=15, count=4)
+        await quotas.add(user_id=admin_id, resource="fire", limit=5, count=4)
 
 
 @click.command()
 def addusers():  # pragma: no cover
     click.echo("Adding users")
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(_add_users())
+    asyncio.run(_add_users())
 
 
 cli.add_command(initdb)

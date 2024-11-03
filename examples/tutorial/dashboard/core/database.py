@@ -27,7 +27,6 @@ class User(Base):
     name: Mapped[str]
     password: Mapped[str]
     is_admin: Mapped[bool] = mapped_column(default=False)
-    created: Mapped[datetime.datetime] = mapped_column(server_default=func.now())
     quota: Mapped[typing.List["Quota"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )

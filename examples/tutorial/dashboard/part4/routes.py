@@ -7,11 +7,11 @@ from ..core.config import config
 from .graph import cannula_app
 from .context import Context
 
-part3 = APIRouter(prefix="/part3")
+part4 = APIRouter(prefix="/part4")
 
 
-@part3.post("/graph")
-async def part3_root(
+@part4.post("/graph")
+async def part4_root(
     graph_call: Annotated[
         GraphQLExec,
         Depends(GraphQLDepends(cannula_app)),
