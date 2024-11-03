@@ -22,7 +22,7 @@ cannula API you can add this in the middleware list in the contructor::
     import cannula
     from cannula.middleware import MockMiddleware
 
-    api = cannula.API(
+    api = cannula.CannulaAPI(
         __name__,
         SCHEMA,
         middleware = [

@@ -1,6 +1,6 @@
 from fastapi import Request
 
-from cannula import context, API
+from cannula import context, CannulaAPI
 
 
 async def test_custom_context(valid_schema, valid_query):
@@ -12,7 +12,7 @@ async def test_custom_context(valid_schema, valid_query):
 
     root_value = {"me": get_me}
 
-    api = API(valid_schema, context=MyContext, root_value=root_value)
+    api = CannulaAPI(valid_schema, context=MyContext, root_value=root_value)
 
     results = await api.call(valid_query)
     assert results.data

@@ -58,7 +58,7 @@ class CustomContext(Context):
         return request
 
 
-api = cannula.API(schema=SCHEMA, context=CustomContext)
+api = cannula.CannulaAPI(schema=SCHEMA, context=CustomContext)
 
 
 @api.query("widgets")

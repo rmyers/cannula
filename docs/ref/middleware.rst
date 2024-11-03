@@ -6,7 +6,6 @@ process. These middleware resolvers intercept the default resolvers and alter
 the request/response to provide useful information or completely replace
 the default resolvers.
 
-
 .. automodule:: cannula.middleware.debug
    :members:
 

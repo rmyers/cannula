@@ -11,7 +11,7 @@ SCHEMA = """
 """
 
 # Basic API setup with the schema we defined
-api = cannula.API(schema=SCHEMA)
+api = cannula.CannulaAPI(schema=SCHEMA)
 
 
 # The query resolver takes a `source` and `info` objects

@@ -47,6 +47,8 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "**/node_modules", "**/v
 
 source_suffix = [".rst"]
 
+suppress_warnings = ["misc.highlighting_failure"]
+
 # -- Options for HTML output -------------------------------------------------
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
@@ -65,6 +67,10 @@ html_theme_options = {
         {
             "name": "GraphQL-core",
             "url": "https://graphql-core-3.readthedocs.io/en/latest/",
+        },
+        {
+            "name": "GraphQL-Codegen",
+            "url": "https://the-guild.dev/graphql/codegen",
         },
     ],
     "icon_links": [

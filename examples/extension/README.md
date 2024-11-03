@@ -9,5 +9,5 @@ The directory `schema` contains multiple graphql files that will be loaded if we
 import cannula
 import pathlib
 
-api = cannula.API(schema=pathlib.Path('./schema'))
+api = cannula.CannulaAPI(schema=pathlib.Path('./schema'))
 ```

@@ -17,14 +17,14 @@ QUERY = """
 
 
 @pytest.fixture()
-async def cannula_app(valid_schema) -> cannula.API:
+async def cannula_app(valid_schema) -> cannula.CannulaAPI:
     async def resolve_me(*args, **kwargs) -> typing.Any:
         return {"name": "Tony Hawk"}
 
     async def resolve_you(*args, **kwargs) -> typing.Any:
         raise Exception("I am not working")
 
-    cannula_app = cannula.API(
+    cannula_app = cannula.CannulaAPI(
         schema=valid_schema,
         root_value={"me": resolve_me, "you": resolve_you},
     )

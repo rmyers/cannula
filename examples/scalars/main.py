@@ -32,7 +32,7 @@ async def get_scaled(info: cannula.ResolveInfo) -> ScaledType:
     }
 
 
-api = cannula.API[RootType](
+api = cannula.CannulaAPI[RootType](
     root_value={"scaled": get_scaled},
     schema=pathlib.Path(BASE_DIR),
     scalars=[

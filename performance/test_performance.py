@@ -93,7 +93,7 @@ exe_schema = ariadne.make_executable_schema(schema)
 ariadne_app = ariadne.asgi.GraphQL(
     exe_schema, root_value={"get_widgets": resolve_get_widgets}
 )
-cannula_app = cannula.API(
+cannula_app = cannula.CannulaAPI(
     schema=schema, root_value={"get_widgets": resolve_get_widgets}
 )
 

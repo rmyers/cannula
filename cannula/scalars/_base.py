@@ -12,6 +12,13 @@ class ModuleImport(typing.NamedTuple):
 
 
 class ScalarInterface(typing.Protocol):
+    """Scalar Interface
+
+    This is used for type hints to assert that the Custom Scalars match
+    this interface. For concrete implementations you should subclass the
+    :py:class:`cannula.scalars.ScalarType`
+    """
+
     name: str
     input_module: ModuleImport
     output_module: ModuleImport

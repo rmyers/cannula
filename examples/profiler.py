@@ -18,7 +18,7 @@ SCHEMA = """
 """
 
 # Basic API setup with the schema we defined
-api = cannula.API(schema=SCHEMA, middleware=[ProfileMiddleware(logger=LOG)])
+api = cannula.CannulaAPI(schema=SCHEMA, middleware=[ProfileMiddleware(logger=LOG)])
 
 
 async def prime(info: cannula.ResolveInfo, num: int) -> str:
@@ -47,7 +47,7 @@ def hello(
 
 
 # Basic API setup with the schema we defined
-api = cannula.API(
+api = cannula.CannulaAPI(
     schema=SCHEMA,
     middleware=[ProfileMiddleware(logger=LOG)],
     root_value={"prime": prime, "hello": hello},
