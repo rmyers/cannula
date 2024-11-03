@@ -3,7 +3,7 @@ from typing import Any, Dict, Generic, Optional, TypeVar
 
 from sqlalchemy import BinaryExpression, ColumnExpressionArgument, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from .database import Base, User
+from .database import Base, User, Quota
 
 Model = TypeVar("Model", bound=Base)
 
@@ -71,3 +71,8 @@ class UserRepository(DatabaseRepository[User]):
                 return session_id
 
         raise Exception("Invalid email or password")
+
+
+class QuotaRepository(DatabaseRepository[Quota]):
+    def __init__(self, session: AsyncSession) -> None:
+        super().__init__(Quota, session)

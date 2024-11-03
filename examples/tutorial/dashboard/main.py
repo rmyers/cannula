@@ -9,6 +9,7 @@ from .core.session import SessionMiddleware, auth_router
 from .part1.routes import part1
 from .part2.routes import part2
 from .part3.routes import part3
+from .part4.routes import part4
 
 
 @asynccontextmanager
@@ -49,3 +50,4 @@ app.include_router(auth_router)
 app.include_router(part1)
 app.include_router(part2)
 app.include_router(part3)
+app.include_router(part4)

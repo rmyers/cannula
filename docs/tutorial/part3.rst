@@ -139,3 +139,5 @@ This should return something like this:
         "errors": null,
         "extensions": null
     }
+
+Great this is looking better, now we need to explore :doc:`part4`
