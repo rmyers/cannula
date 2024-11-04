@@ -34,7 +34,7 @@ class GraphQLDepends:
     Example::
 
         from fastapi import FastAPI
-        from cannula import API
+        from cannula import CannulaAPI
         from cannula.contrib.asgi import ExecutionResponse, GraphQLDepends, GraphQLExec
 
         api = FastAPI()
@@ -61,9 +61,9 @@ class GraphQLDepends:
             return await graph_call(context=context)
     """
 
-    graph: cannula.API
+    graph: cannula.CannulaAPI
 
-    def __init__(self, graph: cannula.API) -> None:
+    def __init__(self, graph: cannula.CannulaAPI) -> None:
         self.graph = graph
 
     async def __call__(

@@ -35,7 +35,7 @@ separate module `graph.py`:
             "id": "1",
         }
 
-    cannula_app = cannula.API(
+    cannula_app = cannula.CannulaAPI(
         schema=pathlib.Path(config.root / "part1"),
         root_value={"me": resolve_me},
     )
@@ -77,7 +77,7 @@ defined which with schema first we do not have (yet).
             "id": "1",
         }
 
-    cannula_app = cannula.API(
+    cannula_app = cannula.CannulaAPI(
         schema=pathlib.Path(config.root / "part1"),
         root_value={"me": resolve_me},
     )

@@ -60,7 +60,7 @@ NOTIFICATIONS = [
     Email(text="hello", address="jane@example.com"),
 ]
 
-api = cannula.API(schema=SCHEMA)
+api = cannula.CannulaAPI(schema=SCHEMA)
 
 
 @api.resolver("Query", "notifications")

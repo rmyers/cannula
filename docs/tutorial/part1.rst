@@ -162,7 +162,7 @@ pathlib:
     import pathlib
 
     BASE_DIR = pathlib.Path(__file__).parent
-    cannula_app = cannula.API(schema=BASE_DIR / "schema.graphql")
+    cannula_app = cannula.CannulaAPI(schema=BASE_DIR / "schema.graphql")
 
 Then we just need to create a handler in our fastapi application, we'll use
 a simple query and display the results on our page. Typically this is done

@@ -19,9 +19,6 @@ and run the full application (Chester Cheata').
 
 Head over to :doc:`part0`
 
-Contents
---------
-
 .. toctree::
    :maxdepth: 1
 

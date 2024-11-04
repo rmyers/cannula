@@ -46,7 +46,7 @@ async def get_media(
 
 root_value: RootType = {"books": get_books, "media": get_media}
 
-api = cannula.API[RootType](
+api = cannula.CannulaAPI[RootType](
     root_value=root_value,
     schema=pathlib.Path(BASE_DIR / "schema"),
     middleware=[

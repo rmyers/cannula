@@ -40,7 +40,7 @@ async def test_debug_middleware(mocker):
     mock_time.return_value = 0.00001
 
     logger = mock.Mock(spec=logging.Logger)
-    api = cannula.API(
+    api = cannula.CannulaAPI(
         schema=SCHEMA,
         middleware=[DebugMiddleware(logger=logger)],
     )

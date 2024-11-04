@@ -36,7 +36,7 @@ sample_query = cannula.gql(
 """
 )
 
-default = cannula.API(
+default = cannula.CannulaAPI(
     schema=schema,
     middleware=[MockMiddleware()],
 )
@@ -49,7 +49,7 @@ custom_mocks = {
     "Query": {"mockity": [{"isOn": False, "brocoli": {}}]},
 }
 
-custom = cannula.API(
+custom = cannula.CannulaAPI(
     schema=schema,
     middleware=[
         MockMiddleware(mock_objects=custom_mocks, mock_all=True),
@@ -57,7 +57,7 @@ custom = cannula.API(
 )
 
 
-limited_mocks = cannula.API(
+limited_mocks = cannula.CannulaAPI(
     schema=schema,
     middleware=[
         MockMiddleware(mock_objects=custom_mocks, mock_all=False),

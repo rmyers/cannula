@@ -38,7 +38,7 @@ async def get_sender_by_email(email: str) -> dict:
 
 
 async def test_extentions_are_correct():
-    api = cannula.API(schema=SCHEMA + EXTENTIONS)
+    api = cannula.CannulaAPI(schema=SCHEMA + EXTENTIONS)
 
     @api.resolver("Query", "get_sender_by_email")
     async def get_sender_by_email(_root, _info, email: str) -> dict:

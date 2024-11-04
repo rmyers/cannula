@@ -15,7 +15,7 @@ Example with Cannula API
     import cannula
     from cannula.middleware import DebugMiddleware
 
-    api = cannula.API(
+    api = cannula.CannulaAPI(
         __name__,
         schema=SCHEMA,
         middleware=[
@@ -41,6 +41,7 @@ You can optionally use this middleware as a standalone with the `graphql-core-ne
     )
 
 """
+
 import inspect
 import logging
 import time
