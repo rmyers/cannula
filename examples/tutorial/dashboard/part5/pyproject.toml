@@ -1,0 +1,7 @@
+[tool.cannula.codegen]
+scalars = [
+    "cannula.scalars.date.Date",
+    "cannula.scalars.date.Datetime",
+    "cannula.scalars.util.UUID",
+]
+dest="_generated.py"

@@ -22,7 +22,7 @@ async def resolve_people(
 # a resolver with an incorrect signature
 root_value: RootType = {"people": resolve_people}
 
-cannula_app = cannula.API[RootType](
+cannula_app = cannula.CannulaAPI[RootType](
     schema=pathlib.Path(config.root / "part4"),
     root_value=root_value,
 )

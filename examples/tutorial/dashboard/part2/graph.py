@@ -15,7 +15,7 @@ async def resolve_me(info: cannula.ResolveInfo):
     }
 
 
-cannula_app = cannula.API(
+cannula_app = cannula.CannulaAPI(
     schema=pathlib.Path(config.root / "part2"),
     root_value={"me": resolve_me},
 )

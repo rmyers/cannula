@@ -10,6 +10,7 @@ from .part1.routes import part1
 from .part2.routes import part2
 from .part3.routes import part3
 from .part4.routes import part4
+from .part5.routes import part5
 
 
 @asynccontextmanager
@@ -51,3 +52,4 @@ app.include_router(part1)
 app.include_router(part2)
 app.include_router(part3)
 app.include_router(part4)
+app.include_router(part5)
