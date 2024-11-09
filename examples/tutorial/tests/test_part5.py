@@ -16,10 +16,16 @@ QUERY = """
             overQuota(resource: "water") {
                 count
             }
+            again: overQuota(resource: "water") {
+                limit
+            }
         }
         person(id: $id) {
             name
             email
+            quota {
+                resource
+            }
         }
         another: person(id: $id) {
             name
@@ -60,6 +66,7 @@ async def test_part_five_graph(client: httpx.AsyncClient, mocker):
                 "email": "sam@example.com",
                 "name": "test",
                 "overQuota": {"count": 4},
+                "again": {"limit": 15},
                 "quota": [
                     {"limit": 10, "resource": "fire"},
                     {"limit": 15, "resource": "water"},
@@ -70,9 +77,17 @@ async def test_part_five_graph(client: httpx.AsyncClient, mocker):
                 "name": "adder",
                 "overQuota": None,
                 "quota": [{"limit": 5, "resource": "fire"}],
+                "again": None,
             },
         ],
-        "person": {"email": "sam@example.com", "name": "test"},
+        "person": {
+            "email": "sam@example.com",
+            "name": "test",
+            "quota": [
+                {"resource": "fire"},
+                {"resource": "water"},
+            ],
+        },
         "another": {"email": "sam@example.com", "name": "test"},
     }
 
