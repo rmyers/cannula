@@ -17,4 +17,5 @@ type Quota {
 
 type Query {
     people: [User]
+    person(id: UUID!): User
 }

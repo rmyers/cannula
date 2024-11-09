@@ -1,12 +1,6 @@
-from functools import cached_property
-
 import cannula
 from fastapi import Request
-from sqlalchemy.ext.asyncio import AsyncSession
-
-# This UserRepository follows the 'repository' pattern which encapsilates
-# our database access so that we don't tightly couple our code to the db.
-from ..core.repository import UserRepository
+from sqlalchemy.ext.asyncio import async_sessionmaker
 
 
 class Context(cannula.Context):
@@ -16,15 +10,9 @@ class Context(cannula.Context):
     the session to setup our repositories and other dataloaders.
     """
 
-    session: AsyncSession
+    session: async_sessionmaker
     authorization: str | None
 
-    def __init__(self, session: AsyncSession, request: Request) -> None:
+    def __init__(self, session: async_sessionmaker, request: Request) -> None:
         self.session = session
         self.authorization = request.headers.get("Authorization")
-
-    @cached_property
-    def user_repo(self) -> UserRepository:
-        # Add this as a cached property so that we only initialize this
-        # if we actually use it in a resolver
-        return UserRepository(self.session)

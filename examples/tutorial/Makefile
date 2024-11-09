@@ -33,6 +33,9 @@ test: setup  ## Test the code
 format:  ## Format the code with ruff
 	$(VIRTUAL_ENV)/bin/ruff format dashboard tests
 
+mypy: setup ## Run mypy on code
+	$(VIRTUAL_ENV)/bin/mypy ./dashboard
+
 run: setup  ## Run the application
 	$(VIRTUAL_ENV)/bin/python -m dashboard run
 

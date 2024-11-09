@@ -18,9 +18,6 @@ async def part3_root(
     ],
     request: Request,
 ) -> ExecutionResponse:
-    # We could also add a dependency for db_session but this we want to
-    # show how this is working.
-    async with config.session() as session:
-        # Setup the context for all the resolvers
-        context = Context(session, request)
-        return await graph_call(context=context)
+    # create a context instance for our resolvers to use
+    context = Context(config.session, request)
+    return await graph_call(context=context)

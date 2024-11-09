@@ -2,7 +2,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from cannula import ResolveInfo
 from dataclasses import dataclass
-from typing import List, Optional, Protocol, Union
+from typing import List, Optional, Protocol, Sequence, Union
 from typing_extensions import TypedDict
 from uuid import UUID
 
@@ -34,12 +34,12 @@ class UserTypeBase(ABC):
     email: Optional[str] = None
 
     @abstractmethod
-    async def quota(self, info: ResolveInfo) -> Optional[List[QuotaType]]:
-        ...
+    async def quota(self, info: ResolveInfo) -> Optional[List[QuotaType]]: ...
 
     @abstractmethod
-    async def overQuota(self, info: ResolveInfo, resource: str) -> Optional[QuotaType]:
-        ...
+    async def overQuota(
+        self, info: ResolveInfo, resource: str
+    ) -> Optional[QuotaType]: ...
 
 
 class UserTypeDict(TypedDict, total=False):
@@ -54,9 +54,13 @@ UserType = Union[UserTypeBase, UserTypeDict]
 
 
 class peopleQuery(Protocol):
-    async def __call__(self, info: ResolveInfo) -> List[UserType]:
-        ...
+    async def __call__(self, info: ResolveInfo) -> Sequence[UserType]: ...
+
+
+class personQuery(Protocol):
+    async def __call__(self, info: ResolveInfo, id: UUID) -> Optional[UserType]: ...
 
 
 class RootType(TypedDict, total=False):
     people: Optional[peopleQuery]
+    person: Optional[personQuery]

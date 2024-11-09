@@ -14,3 +14,4 @@ pytest-asyncio
 pytest-cov
 pytest-httpx
 pytest-mock
+mypy
