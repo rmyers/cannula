@@ -1,7 +1,7 @@
 import logging
 
 import uuid
-from dataclasses import fields
+from dataclasses import fields, is_dataclass
 from typing import (
     Any,
     Awaitable,
@@ -10,6 +10,7 @@ from typing import (
     Generic,
     List,
     Protocol,
+    Sequence,
     TypeVar,
     TYPE_CHECKING,
     cast,
@@ -21,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 
 from ..core.database import User as DBUser, Quota as DBQuota
-from ._generated import UserTypeBase, QuotaTypeBase
+from ._generated import UserTypeBase, QuotaTypeBase, UserTypeDict
 
 from cannula.datasource.http import cacheable
 
@@ -39,19 +40,32 @@ DBModel = TypeVar("DBModel", bound=DeclarativeBase)
 LOG = logging.getLogger(__name__)
 
 
+def expected_fields(obj: Any) -> set[str]:  # pragma: no cover
+    if is_dataclass(obj):
+        return {field.name for field in fields(obj)}
+    elif hasattr(obj, "model_fields"):
+        return {obj.model_fields.keys()}
+
+    raise ValueError(
+        "Invalid model type set for 'GraphModel' must be a dataclass or pydantic model"
+    )
+
+
 class DatabaseRepository(Generic[DBModel, GraphModel]):
     """Repository for performing database queries."""
 
     _memoized_get: Dict[str, Awaitable[DBModel | None]]
     _memoized_list: Dict[str, Awaitable[list[DBModel]]]
-    _dbmodel: type[DBModel]
-    _graphmodel: type[GraphModel]
+    _db_model: type[DBModel]
+    _graph_model: type[GraphModel]
+    _expected_fields: set[str]
 
     def __init_subclass__(
-        cls, *, dbmodel: type[DBModel], graphmodel: type[GraphModel]
+        cls, *, db_model: type[DBModel], graph_model: type[GraphModel]
     ) -> None:
-        cls._dbmodel = dbmodel
-        cls._graphmodel = graphmodel
+        cls._db_model = db_model
+        cls._graph_model = graph_model
+        cls._expected_fields = expected_fields(graph_model)
         return super().__init_subclass__()
 
     def __init__(
@@ -67,18 +81,17 @@ class DatabaseRepository(Generic[DBModel, GraphModel]):
     def from_db(self, db_obj: DBModel, **kwargs) -> GraphModel:
         model_kwargs = db_obj.__dict__.copy()
         model_kwargs.update(kwargs)
-        expected_fields = {
-            field.name for field in fields(cast(DataclassInstance, self._graphmodel))
-        }
         cleaned_kwargs = {
-            key: value for key, value in model_kwargs.items() if key in expected_fields
+            key: value
+            for key, value in model_kwargs.items()
+            if key in self._expected_fields
         }
-        obj = self._graphmodel(**cleaned_kwargs)
+        obj = self._graph_model(**cleaned_kwargs)
         return obj
 
     async def add(self, **data: Any) -> GraphModel:
         async with self.session_maker() as session:
-            instance = self._dbmodel(**data)
+            instance = self._db_model(**data)
             session.add(instance)
             await session.commit()
             await session.refresh(instance)
@@ -90,7 +103,7 @@ class DatabaseRepository(Generic[DBModel, GraphModel]):
         @cacheable
         async def process_get():
             async with self.readonly_session_maker() as session:
-                return await session.get(self._dbmodel, pk)
+                return await session.get(self._db_model, pk)
 
         if results := self._memoized_get.get(cache_key):
             LOG.error(f"Found cached query for {cache_key}")
@@ -102,7 +115,7 @@ class DatabaseRepository(Generic[DBModel, GraphModel]):
     async def get_by_query(
         self, *expressions: BinaryExpression | ColumnExpressionArgument
     ) -> DBModel | None:
-        query = select(self._dbmodel).where(*expressions)
+        query = select(self._db_model).where(*expressions)
 
         # Get the query as a string with bound values
         cache_key = str(query.compile(compile_kwargs={"literal_binds": True}))
@@ -120,23 +133,23 @@ class DatabaseRepository(Generic[DBModel, GraphModel]):
         self._memoized_get[cache_key] = process_get()
         return await self._memoized_get[cache_key]
 
-    async def get(self, pk: uuid.UUID) -> GraphModel | None:
+    async def get_model(self, pk: uuid.UUID) -> GraphModel | None:
         if db_obj := await self.get_by_pk(pk):
             return self.from_db(db_obj)
 
-    async def get_by(
+    async def get_model_by_query(
         self, *expressions: BinaryExpression | ColumnExpressionArgument
     ) -> GraphModel | None:
         if db_obj := await self.get_by_query(*expressions):
             return self.from_db(db_obj)
 
-    async def query_db(
+    async def filter(
         self,
         *expressions: BinaryExpression | ColumnExpressionArgument,
         limit: int = 100,
         offset: int = 0,
     ) -> list[DBModel]:
-        query = select(self._dbmodel).limit(limit).offset(offset)
+        query = select(self._db_model).limit(limit).offset(offset)
         if expressions:
             query = query.where(*expressions)
 
@@ -159,7 +172,7 @@ class DatabaseRepository(Generic[DBModel, GraphModel]):
         self._memoized_list[cache_key] = process_filter()
         return await self._memoized_list[cache_key]
 
-    async def filter(
+    async def get_models(
         self,
         *expressions: BinaryExpression | ColumnExpressionArgument,
         limit: int = 100,
@@ -168,7 +181,7 @@ class DatabaseRepository(Generic[DBModel, GraphModel]):
         return list(
             map(
                 self.from_db,
-                await self.query_db(*expressions, limit=limit, offset=offset),
+                await self.filter(*expressions, limit=limit, offset=offset),
             )
         )
 
@@ -191,20 +204,22 @@ class Quota(QuotaTypeBase):
 
 class UserRepository(
     DatabaseRepository[DBUser, User],
-    dbmodel=DBUser,
-    graphmodel=User,
+    db_model=DBUser,
+    graph_model=User,
 ):
     pass
 
 
 class QuotaRepository(
     DatabaseRepository[DBQuota, Quota],
-    dbmodel=DBQuota,
-    graphmodel=Quota,
+    db_model=DBQuota,
+    graph_model=Quota,
 ):
 
     async def get_quota_for_user(self, id: uuid.UUID) -> List[Quota]:
-        return await self.filter(DBQuota.user_id == id)
+        return await self.get_models(DBQuota.user_id == id)
 
     async def get_over_quota(self, id: uuid.UUID, resource: str) -> Quota | None:
-        return await self.get_by(DBQuota.user_id == id, DBQuota.resource == resource)
+        return await self.get_model_by_query(
+            DBQuota.user_id == id, DBQuota.resource == resource
+        )
