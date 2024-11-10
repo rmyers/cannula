@@ -23,7 +23,7 @@ class Config(BaseSettings):
 
     @functools.cached_property
     def engine(self):
-        return create_async_engine(self.database_uri)
+        return create_async_engine(self.database_uri, echo=True)
 
     @property
     def session(self):

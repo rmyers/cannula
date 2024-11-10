@@ -42,7 +42,7 @@ data then the relation is not queried. In sqlalchemy this is exposed via the `As
 Here is how we can use that in our updated `models.py`:
 
 .. literalinclude:: ../examples/tutorial/dashboard/part4/models.py
-    :emphasize-lines: 17,18,19,21,22,23,24,25,26,27
+    :emphasize-lines: 18,19,20,21,22,24,25,26,27,28,29,30,31,32
 
 The graph changes slightly because we simplied the schema:
 

@@ -7,7 +7,7 @@ import cannula
 from dashboard.core.config import config
 
 part1 = APIRouter(prefix="/part1")
-cannula_app = cannula.API(schema=pathlib.Path(config.root / "part1"))
+cannula_app = cannula.CannulaAPI(schema=pathlib.Path(config.root / "part1"))
 
 QUERY = cannula.gql(
     """
