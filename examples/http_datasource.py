@@ -1,5 +1,6 @@
 import logging
 import typing
+from dataclasses import dataclass
 
 import cannula
 import fastapi
@@ -19,10 +20,6 @@ async def get_widgets():
     return [{"name": "hammer", "type": "tool"}]
 
 
-# Create a httpx client that responds with the 'remote_app'
-client = httpx.AsyncClient(transport=httpx.ASGITransport(app=remote_app))
-
-
 SCHEMA = cannula.gql(
     """
     type Widget {
@@ -38,32 +35,37 @@ SCHEMA = cannula.gql(
 )
 
 
-# Our actual datasource object
-class WidgetDatasource(http.HTTPDataSource):
-    # set our base url to work with the demo fastapi app
-    base_url = "http://localhost"
+@dataclass
+class Widget:
+    name: str
+    type: str
 
-    async def get_widgets(self):
-        return await self.get("/widgets")
+
+# Our actual datasource object
+class WidgetDatasource(
+    http.HTTPDataSource[Widget], graph_model=Widget, base_url="http://localhost"
+):
+
+    async def get_widgets(self) -> list[Widget]:
+        response = await self.get("/widgets")
+        return self.model_list_from_response(response)
 
 
 # Create a custom context and add the datasource
 class CustomContext(Context):
-    widget_datasource: WidgetDatasource
 
-    def handle_request(self, request: typing.Any) -> typing.Any:
-        # Initialize the datasource using the request and
-        # set the client to use the demo client app
-        self.widget_datasource = WidgetDatasource(request, client=client)
-        return request
+    def __init__(self, client) -> None:
+        self.widget_datasource = WidgetDatasource(client=client)
 
 
-api = cannula.CannulaAPI(schema=SCHEMA, context=CustomContext)
-
-
-@api.query("widgets")
-async def list_widgets(parent, info: ResolveInfo[CustomContext]):
+async def list_widgets(info: ResolveInfo[CustomContext]):
     return await info.context.widget_datasource.get_widgets()
+
+
+api = cannula.CannulaAPI(
+    schema=SCHEMA,
+    root_value={"widgets": list_widgets},
+)
 
 
 async def main():
@@ -83,7 +85,10 @@ async def main():
     """
     )
 
-    results = await api.call(query)
+    # Create a httpx client that responds with the 'remote_app' and add to context
+    client = httpx.AsyncClient(transport=httpx.ASGITransport(app=remote_app))
+
+    results = await api.call(query, context=CustomContext(client))
     print(results.data, results.errors)
     return results.data
 
