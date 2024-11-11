@@ -1,7 +1,13 @@
+from dataclasses import dataclass
 import httpx
 import fastapi
 
 from cannula.datasource import http
+
+
+@dataclass
+class Widgety:
+    some: str
 
 
 class MockDB:
@@ -21,15 +27,17 @@ async def widget():
 
 
 async def test_http_datasource(mocker):
-    class Widget(http.HTTPDataSource):
-        base_url = "http://localhost/"
+    class Widget(
+        http.HTTPDataSource[Widgety], graph_model=Widgety, base_url="http://localhost"
+    ):
 
-        async def get_widgets(self):
-            return await self.get("widgets")
+        async def get_widgets(self) -> list[Widgety]:
+            response = await self.get("widgets")
+            return list(map(self.model_from_response, response))
 
     get_widget_spy = mocker.spy(mockDB, "get_widgets")
     mocked_client = httpx.AsyncClient(transport=httpx.ASGITransport(app=fake_app))
-    widget = Widget(request=mocker.Mock(), client=mocked_client)
+    widget = Widget(client=mocked_client)
 
     results_one = await widget.get_widgets()
     results_two = await widget.get_widgets()

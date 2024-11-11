@@ -24,3 +24,6 @@ that for longer you'll need to implement that yourself.
 
 .. automodule:: cannula.datasource.http
    :members:
+
+.. automodule:: cannula.datasource.orm
+   :members:
