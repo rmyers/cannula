@@ -109,12 +109,14 @@ class DatabaseRepository(Generic[DBModel, GraphModel]):
     async def get_model(self, pk: _PKIdentityArgument) -> GraphModel | None:
         if db_obj := await self.get_by_pk(pk):
             return self.from_db(db_obj)
+        return None
 
     async def get_model_by_query(
         self, *expressions: BinaryExpression | ColumnExpressionArgument
     ) -> GraphModel | None:
         if db_obj := await self.get_by_query(*expressions):
             return self.from_db(db_obj)
+        return None
 
     async def filter(
         self,
