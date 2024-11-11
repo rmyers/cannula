@@ -46,8 +46,6 @@ def expected_fields(obj: typing.Any) -> set[str]:
     """
     if dataclasses.is_dataclass(obj):
         return {field.name for field in dataclasses.fields(obj)}
-    elif hasattr(obj, "model_fields"):
-        return {obj.model_fields.keys()}
 
     raise ValueError(
         "Invalid model for 'GraphModel' must be a dataclass or pydantic model"

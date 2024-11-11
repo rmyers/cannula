@@ -137,7 +137,7 @@ class HTTPDataSource(typing.Generic[GraphModel]):
         self._should_close_client = client is None
         self.memoized_requests = {}
 
-    def __del__(self):
+    def __del__(self):  # pragma: no cover
         if self._should_close_client:
             LOG.debug(f"Closing httpx session for {self.__class__.__name__}")
             asyncio.ensure_future(self.client.aclose())

@@ -86,6 +86,9 @@ async def test_orm_defaults(mocker):
     mock_logger.debug.assert_called_with("Found cached query for UserRepository")
     mock_logger.reset()
 
+    query_not_found = await users.get_model_by_query(DBUser.email == "not-found")
+    assert query_not_found is None
+
     filter_users = await users.get_models(DBUser.name == "test")
     assert len(filter_users) == 1
 
@@ -93,3 +96,20 @@ async def test_orm_defaults(mocker):
     assert len(filter_users_again) == 1
     mock_logger.debug.assert_called_with("Found cached results for UserRepository")
     mock_logger.reset()
+
+
+async def test_invalid_graph_model():
+    class NotCorrect:
+        pass
+
+    with pytest.raises(
+        ValueError,
+        match="Invalid model for 'GraphModel' must be a dataclass or pydantic model",
+    ):
+
+        class InvalidRepository(
+            DatabaseRepository[DBUser, NotCorrect],
+            db_model=DBUser,
+            graph_model=NotCorrect,
+        ):
+            pass
