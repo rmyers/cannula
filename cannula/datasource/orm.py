@@ -1,12 +1,13 @@
 import logging
 
-import uuid
 from typing import (
     Any,
     Awaitable,
     Dict,
     Generic,
     TypeVar,
+    Tuple,
+    Union,
 )
 
 from sqlalchemy import BinaryExpression, ColumnExpressionArgument, select
@@ -18,6 +19,7 @@ from cannula.datasource import GraphModel, cacheable, expected_fields
 
 
 DBModel = TypeVar("DBModel", bound=DeclarativeBase)
+_PKIdentityArgument = Union[Any, Tuple[Any, ...]]
 
 LOG = logging.getLogger(__name__)
 
@@ -68,16 +70,16 @@ class DatabaseRepository(Generic[DBModel, GraphModel]):
             await session.refresh(instance)
             return self.from_db(instance)
 
-    async def get_by_pk(self, pk: uuid.UUID) -> DBModel | None:
+    async def get_by_pk(self, pk: _PKIdentityArgument) -> DBModel | None:
         cache_key = f"get:{pk}"
 
         @cacheable
-        async def process_get():
+        async def process_get() -> DBModel | None:
             async with self.readonly_session_maker() as session:
                 return await session.get(self._db_model, pk)
 
         if results := self._memoized_get.get(cache_key):
-            LOG.error(f"Found cached query for {cache_key}")
+            LOG.debug(f"Found cached query for {cache_key}")
             return await results
 
         self._memoized_get[cache_key] = process_get()
@@ -92,19 +94,19 @@ class DatabaseRepository(Generic[DBModel, GraphModel]):
         cache_key = str(query.compile(compile_kwargs={"literal_binds": True}))
 
         @cacheable
-        async def process_get():
+        async def process_get() -> DBModel | None:
             async with self.readonly_session_maker() as session:
                 results = await session.scalars(query)
                 return results.one_or_none()
 
         if results := self._memoized_get.get(cache_key):
-            LOG.error(f"Found cached query for {cache_key}")
+            LOG.debug(f"Found cached query for {self.__class__.__name__}")
             return await results
 
         self._memoized_get[cache_key] = process_get()
         return await self._memoized_get[cache_key]
 
-    async def get_model(self, pk: uuid.UUID) -> GraphModel | None:
+    async def get_model(self, pk: _PKIdentityArgument) -> GraphModel | None:
         if db_obj := await self.get_by_pk(pk):
             return self.from_db(db_obj)
 
@@ -128,18 +130,16 @@ class DatabaseRepository(Generic[DBModel, GraphModel]):
         cache_key = str(query.compile(compile_kwargs={"literal_binds": True}))
 
         @cacheable
-        async def process_filter():
+        async def process_filter() -> list[DBModel]:
             async with self.readonly_session_maker() as session:
                 # If we don't convert this to a list only the first
                 # coroutine that awaits this will be able to read the data.
                 return list(await session.scalars(query))
 
         if results := self._memoized_list.get(cache_key):
-            LOG.error(cache_key)
-            LOG.error(f"\nfound cached results for {self.__class__.__name__}\n")
+            LOG.debug(f"Found cached results for {self.__class__.__name__}")
             return await results
 
-        LOG.error(f"Caching data for {self.__class__.__name__}")
         self._memoized_list[cache_key] = process_filter()
         return await self._memoized_list[cache_key]
 
