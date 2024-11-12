@@ -47,7 +47,7 @@ IMPORTS.update(
             [
                 "Any",
                 "Awaitable",
-                "List",
+                "Sequence",
                 "Optional",
                 "Protocol",
                 # In python < 3.12 pydantic wants us to use typing_extensions
@@ -55,7 +55,7 @@ IMPORTS.update(
                 "Union",
             ]
         ),
-        "typing_extensions": set(["TypedDict"]),
+        "typing_extensions": set(["TypedDict", "NotRequired"]),
     }
 )
 
@@ -141,7 +141,7 @@ def ast_for_union_subscript(*items: str) -> ast.Subscript:
     return ast_for_subscript(value, *items)
 
 
-def ast_for_function_body(field: Field) -> typing.List[ast.stmt]:
+def ast_for_function_body(field: Field) -> list[ast.stmt]:
     body: list[ast.stmt] = []
     if field.description:
         body.append(ast_for_docstring(field.description))
@@ -151,10 +151,8 @@ def ast_for_function_body(field: Field) -> typing.List[ast.stmt]:
 
 
 def render_function_args_ast(
-    args: typing.List[Argument],
-) -> typing.Tuple[
-    typing.List[ast.arg], typing.List[ast.arg], typing.List[ast.expr | None]
-]:
+    args: list[Argument],
+) -> typing.Tuple[list[ast.arg], list[ast.arg], list[ast.expr | None]]:
     """
     Render function arguments as AST nodes.
 
@@ -229,7 +227,7 @@ def render_operation_field_ast(field: Field) -> ast.AsyncFunctionDef:
         args=args_node,
         body=ast_for_function_body(field),
         decorator_list=[],
-        returns=ast.Name(id=field.value, ctx=ast.Load()),
+        returns=ast.Name(id=field.type, ctx=ast.Load()),
         lineno=None,  # type: ignore
     )
     return func_node
@@ -270,8 +268,8 @@ def parse_default(obj: typing.Dict[str, typing.Any]) -> typing.Any:
     return parse_value(default_value)
 
 
-def parse_args(obj: dict) -> typing.List[Argument]:
-    args: typing.List[Argument] = []
+def parse_args(obj: dict) -> list[Argument]:
+    args: list[Argument] = []
     raw_args = obj.get("arguments") or []
     for arg in raw_args:
         name = parse_name(arg)
@@ -307,7 +305,7 @@ def parse_type(type_obj: dict) -> FieldType:
 
     if type_obj["kind"] == "list_type":
         list_type = parse_type(type_obj["type"]).value
-        value = f"List[{list_type}]"
+        value = f"Sequence[{list_type}]"
 
     if type_obj["kind"] == "named_type":
         name = type_obj["name"]
@@ -320,8 +318,8 @@ def parse_type(type_obj: dict) -> FieldType:
     return FieldType(value=value, required=required)
 
 
-def parse_directives(field: typing.Dict[str, typing.Any]) -> typing.List[Directive]:
-    directives: typing.List[Directive] = []
+def parse_directives(field: typing.Dict[str, typing.Any]) -> list[Directive]:
+    directives: list[Directive] = []
     for directive in field.get("directives", []):
         name = parse_name(directive)
         args = parse_args(directive)
@@ -359,9 +357,9 @@ def parse_node(node: Node):
     description = parse_description(details)
     raw_types = details.get("types", [])
     types = [parse_type(t) for t in raw_types]
-    directives: typing.Dict[str, typing.List[Directive]] = {}
+    directives: typing.Dict[str, list[Directive]] = {}
 
-    fields: typing.List[Field] = []
+    fields: list[Field] = []
     for field in raw_fields:
         parsed = parse_field(field, parent=name)
         fields.append(parsed)
@@ -383,6 +381,13 @@ def parse_schema(
 ) -> typing.Dict[str, ObjectType]:
     document = concat_documents(type_defs)
     types: typing.Dict[str, ObjectType] = {}
+
+    # First we need to pull out the input types since the default
+    # names are different than normal object types.
+    for definition in document.definitions:
+        node = parse_node(definition)
+        if node.kind == "input_object_type_definition":
+            TYPES[node.name] = f"{node.name}Input"
 
     for definition in document.definitions:
         node = parse_node(definition)
@@ -412,7 +417,7 @@ def ast_for_class_field(field: Field) -> ast.AnnAssign:
 
 
 def ast_for_dict_field(field: Field) -> ast.AnnAssign:
-    field_type = ast_for_name(field.type)
+    field_type = ast_for_name(field.value)
     return ast_for_annotation_assignment(field.name, annotation=field_type)
 
 
@@ -421,23 +426,20 @@ def ast_for_operation_field(field: Field) -> ast.AnnAssign:
     return ast_for_annotation_assignment(field.name, annotation=field_type)
 
 
-def render_object(obj: ObjectType) -> typing.List[ast.ClassDef | ast.Assign]:
-    non_computed: typing.List[Field] = []
-    computed: typing.List[Field] = []
+def render_object(obj: ObjectType) -> list[ast.ClassDef | ast.Assign]:
+    non_computed: list[Field] = []
+    computed: list[Field] = []
     for field in obj.fields:
         if field.is_computed:
             computed.append(field)
         else:
             non_computed.append(field)
 
-    klass_name = f"{obj.name}TypeBase"
-    dict_name = f"{obj.name}TypeDict"
     type_name = f"{obj.name}Type"
 
     type_def = ast_for_assign("__typename", ast_for_constant(obj.name))
     klass_fields = [ast_for_class_field(f) for f in non_computed]
     computed_fields = [render_computed_field_ast(f) for f in computed]
-    dict_fields = [ast_for_dict_field(f) for f in obj.fields]
 
     if obj.description:
         doc_string = ast_for_docstring(obj.description)
@@ -447,7 +449,7 @@ def render_object(obj: ObjectType) -> typing.List[ast.ClassDef | ast.Assign]:
 
     return [
         ast.ClassDef(
-            name=klass_name,
+            name=type_name,
             body=[*constants, *klass_fields, *computed_fields],
             bases=[ast_for_name("ABC")],
             keywords=[],
@@ -458,38 +460,53 @@ def render_object(obj: ObjectType) -> typing.List[ast.ClassDef | ast.Assign]:
                     keywords=[ast_for_keyword("kw_only", True)],
                 )
             ],
+            # type_params=[],
         ),
-        ast.ClassDef(
-            name=dict_name,
-            body=[*dict_fields],
-            bases=[ast_for_name("TypedDict")],
-            keywords=[ast.keyword(arg="total", value=ast_for_constant(False))],
-            decorator_list=[],
-        ),
-        ast_for_assign(
-            type_name,
-            ast_for_union_subscript(klass_name, dict_name),
-        ),
+        # TODO(rmyers): add option for pydantic
+        # ast.ClassDef(
+        #     name=type_name,
+        #     body=[*constants, *klass_fields, *computed_fields],
+        #     bases=[ast_for_name("BaseModel")],
+        #     keywords=[],
+        #     decorator_list=[],
+        #     type_params=[],
+        # ),
     ]
 
 
-def render_interface(obj: ObjectType) -> typing.List[ast.ClassDef | ast.Assign]:
-    type_name = f"{obj.name}Type"
+def render_input(obj: ObjectType) -> list[ast.ClassDef | ast.Assign]:
+    type_name = f"{obj.name}Input"
 
-    type_def = ast_for_assign("__typename", ast_for_constant(obj.name))
-    klass_fields = [ast_for_class_field(f) for f in obj.fields]
+    dict_fields = [ast_for_dict_field(f) for f in obj.fields]
     return [
         ast.ClassDef(
             name=type_name,
-            body=[type_def, *klass_fields],
-            bases=[ast_for_name("Protocol")],
+            body=[*dict_fields],
+            bases=[ast_for_name("TypedDict")],
             keywords=[],
             decorator_list=[],
+            # type_params=[],
         )
     ]
 
 
-def render_union(obj: ObjectType) -> typing.List[ast.ClassDef | ast.Assign]:
+def render_interface(obj: ObjectType) -> list[ast.ClassDef | ast.Assign]:
+    type_name = f"{obj.name}Type"
+
+    klass_fields = [ast_for_class_field(f) for f in obj.fields]
+    return [
+        ast.ClassDef(
+            name=type_name,
+            body=[*klass_fields],
+            bases=[ast_for_name("Protocol")],
+            keywords=[],
+            decorator_list=[],
+            # type_params=[],
+        )
+    ]
+
+
+def render_union(obj: ObjectType) -> list[ast.ClassDef | ast.Assign]:
     items = [field.value for field in obj.types]
     return [
         ast_for_assign(
@@ -507,10 +524,11 @@ def ast_for_operation(field: Field) -> ast.ClassDef:
         bases=[ast_for_name("Protocol")],
         keywords=[],
         decorator_list=[],
+        # type_params=[],
     )
 
 
-def ast_for_root_type(fields: typing.List[Field]) -> ast.ClassDef:
+def ast_for_root_type(fields: list[Field]) -> ast.ClassDef:
     dict_fields = [ast_for_operation_field(f) for f in fields]
     return ast.ClassDef(
         name="RootType",
@@ -518,6 +536,7 @@ def ast_for_root_type(fields: typing.List[Field]) -> ast.ClassDef:
         bases=[ast_for_name("TypedDict")],
         keywords=[ast.keyword(arg="total", value=ast_for_constant(False))],
         decorator_list=[],
+        # type_params=[],
     )
 
 
@@ -532,11 +551,12 @@ def render_file(
 
     parsed = parse_schema(type_defs)
 
-    object_types: typing.List[ObjectType] = []
-    interface_types: typing.List[ObjectType] = []
-    union_types: typing.List[ObjectType] = []
-    scalar_types: typing.List[ObjectType] = []
-    operation_fields: typing.List[Field] = []
+    object_types: list[ObjectType] = []
+    interface_types: list[ObjectType] = []
+    input_types: list[ObjectType] = []
+    union_types: list[ObjectType] = []
+    scalar_types: list[ObjectType] = []
+    operation_fields: list[Field] = []
     for obj in parsed.values():
         if obj.name in ["Query", "Mutation", "Subscription"]:
             for field in obj.fields:
@@ -545,10 +565,11 @@ def render_file(
             scalar_types.append(obj)
         elif obj.kind in [
             "object_type_definition",
-            "input_object_type_definition",
             "object_type_extension",
         ]:
             object_types.append(obj)
+        elif obj.kind == "input_object_type_definition":
+            input_types.append(obj)
         elif obj.kind == "interface_type_definition":
             interface_types.append(obj)
         elif obj.kind == "union_type_definition":
@@ -570,6 +591,9 @@ def render_file(
 
     for obj in interface_types:
         root.body.extend(render_interface(obj))
+
+    for obj in input_types:
+        root.body.extend(render_input(obj))
 
     object_types.sort(key=lambda o: o.name)
     for obj in object_types:

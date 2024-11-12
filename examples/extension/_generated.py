@@ -2,19 +2,18 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from cannula import ResolveInfo
 from dataclasses import dataclass
-from typing import Any, List, Optional, Protocol, Union
+from typing import Any, Optional, Protocol, Sequence
 from typing_extensions import TypedDict
 
 DatetimeType = Any
 
 
 class GenericType(Protocol):
-    __typename = "Generic"
     name: Optional[str] = None
 
 
 @dataclass(kw_only=True)
-class BookTypeBase(ABC):
+class BookType(ABC):
     __typename = "Book"
     name: Optional[str] = None
     author: Optional[str] = None
@@ -22,24 +21,15 @@ class BookTypeBase(ABC):
     @abstractmethod
     async def movies(
         self, info: ResolveInfo, *, limit: Optional[int] = 100
-    ) -> Optional[List[MovieType]]:
+    ) -> Optional[Sequence[MovieType]]:
         """
         Get all the movies for a given book. This is will be added to the BookType.
         """
         ...
 
 
-class BookTypeDict(TypedDict, total=False):
-    movies: Optional[List[MovieType]]
-    name: Optional[str]
-    author: Optional[str]
-
-
-BookType = Union[BookTypeBase, BookTypeDict]
-
-
 @dataclass(kw_only=True)
-class MovieTypeBase(ABC):
+class MovieType(ABC):
     """
     Movie Type
 
@@ -54,27 +44,21 @@ class MovieTypeBase(ABC):
     created: Optional[DatetimeType] = None
 
 
-class MovieTypeDict(TypedDict, total=False):
-    name: Optional[str]
-    director: Optional[str]
-    book: Optional[BookType]
-    views: Optional[int]
-    created: Optional[DatetimeType]
-
-
-MovieType = Union[MovieTypeBase, MovieTypeDict]
-
-
 class booksQuery(Protocol):
-    async def __call__(self, info: ResolveInfo) -> List[BookType]: ...
+    async def __call__(self, info: ResolveInfo) -> Optional[Sequence[BookType]]: ...
 
 
 class mediaQuery(Protocol):
     async def __call__(
         self, info: ResolveInfo, *, limit: Optional[int] = 100
-    ) -> List[GenericType]: ...
+    ) -> Optional[Sequence[GenericType]]: ...
+
+
+class movieQuery(Protocol):
+    async def __call__(self, info: ResolveInfo, name: str) -> Optional[MovieType]: ...
 
 
 class RootType(TypedDict, total=False):
     books: Optional[booksQuery]
     media: Optional[mediaQuery]
+    movie: Optional[movieQuery]
