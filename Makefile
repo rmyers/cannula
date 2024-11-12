@@ -68,7 +68,7 @@ flake8: setup ## Run flake8 checks
 	$(VIRTUAL_ENV)/bin/flake8 cannula tests
 
 unit: setup ## Run unit tests
-	$(VIRTUAL_ENV)/bin/pytest
+	$(VIRTUAL_ENV)/bin/pytest $(args)
 
 test-failed: setup ## Run failing tests
 	$(VIRTUAL_ENV)/bin/pytest --lf

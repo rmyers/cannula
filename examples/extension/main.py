@@ -1,15 +1,14 @@
 import logging
 import pathlib
 import pprint
+from typing import Sequence
 
 import cannula
 import cannula.middleware
 from ._generated import (
     BookType,
-    BookTypeBase,
     GenericType,
     MovieType,
-    MovieTypeBase,
     RootType,
 )
 
@@ -20,18 +19,18 @@ logging.basicConfig(level=logging.DEBUG)
 LOG = logging.getLogger("expanded")
 
 
-class Book(BookTypeBase):
-    async def movies(
-        self, info: cannula.ResolveInfo, *, limit: int | None = 100
-    ) -> list[MovieType] | None:
-        return [{"name": "Lost the Movie", "director": "Ted"}]
-
-
-class Movie(MovieTypeBase):
+class Movie(MovieType):
     pass
 
 
-async def get_books(info: cannula.ResolveInfo) -> list[BookType]:
+class Book(BookType):
+    async def movies(
+        self, info: cannula.ResolveInfo, *, limit: int | None = 100
+    ) -> list[MovieType] | None:
+        return [Movie(name="Lost the Movie", director="Ted")]
+
+
+async def get_books(info: cannula.ResolveInfo) -> Sequence[BookType]:
     return [Book(name="Lost", author="Frank")]
 
 
@@ -81,6 +80,6 @@ QUERY = cannula.gql(
 
 
 if __name__ == "__main__":
-    results = api.call_sync(QUERY, None)
+    results = api.call_sync(QUERY)
     pprint.pprint(results.data)
     pprint.pprint(results.errors)

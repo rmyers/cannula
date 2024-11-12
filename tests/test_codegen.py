@@ -56,73 +56,47 @@ from __future__ import annotations
 from abc import ABC
 from cannula import ResolveInfo
 from dataclasses import dataclass
-from typing import List, Optional, Protocol, Union
+from typing import Optional, Protocol, Sequence
 from typing_extensions import TypedDict
 
 
-@dataclass(kw_only=True)
-class EmailSearchTypeBase(ABC):
-    __typename = "EmailSearch"
+class EmailSearchInput(TypedDict):
     email: str
-    limit: Optional[int] = 100
-    other: Optional[str] = "blah"
-    include: Optional[bool] = False
-
-
-class EmailSearchTypeDict(TypedDict, total=False):
-    email: str
-    limit: Optional[int]
-    other: Optional[str]
-    include: Optional[bool]
-
-
-EmailSearchType = Union[EmailSearchTypeBase, EmailSearchTypeDict]
+    limit: int
+    other: str
+    include: bool
 
 
 @dataclass(kw_only=True)
-class MessageTypeBase(ABC):
+class MessageType(ABC):
     __typename = "Message"
     text: Optional[str] = None
     sender: Optional[SenderType] = None
 
 
-class MessageTypeDict(TypedDict, total=False):
-    text: Optional[str]
-    sender: Optional[SenderType]
-
-
-MessageType = Union[MessageTypeBase, MessageTypeDict]
-
-
 @dataclass(kw_only=True)
-class SenderTypeBase(ABC):
+class SenderType(ABC):
     __typename = "Sender"
     name: Optional[str] = None
     email: str
 
 
-class SenderTypeDict(TypedDict, total=False):
-    name: Optional[str]
-    email: str
-
-
-SenderType = Union[SenderTypeBase, SenderTypeDict]
-
-
 class get_sender_by_emailQuery(Protocol):
     async def __call__(
-        self, info: ResolveInfo, *, input: Optional[EmailSearchType] = None
-    ) -> SenderType: ...
+        self, info: ResolveInfo, *, input: Optional[EmailSearchInput] = None
+    ) -> Optional[SenderType]: ...
 
 
 class messageMutation(Protocol):
     async def __call__(
         self, info: ResolveInfo, text: str, sender: str
-    ) -> MessageType: ...
+    ) -> Optional[MessageType]: ...
 
 
 class messagesQuery(Protocol):
-    async def __call__(self, info: ResolveInfo, limit: int) -> List[MessageType]: ...
+    async def __call__(
+        self, info: ResolveInfo, limit: int
+    ) -> Optional[Sequence[MessageType]]: ...
 
 
 class RootType(TypedDict, total=False):
@@ -154,42 +128,27 @@ from __future__ import annotations
 from abc import ABC
 from dataclasses import dataclass
 from typing import Any, Optional, Protocol, Union
-from typing_extensions import TypedDict
 
 DatetimeType = Any
 
 
 class PersonaType(Protocol):
-    __typename = "Persona"
     id: str
 
 
 @dataclass(kw_only=True)
-class AdminTypeBase(ABC):
+class AdminType(ABC):
     __typename = "Admin"
     id: str
     created: Optional[DatetimeType] = None
 
 
-class AdminTypeDict(TypedDict, total=False):
-    id: str
-    created: Optional[DatetimeType]
-
-
-AdminType = Union[AdminTypeBase, AdminTypeDict]
-
-
 @dataclass(kw_only=True)
-class UserTypeBase(ABC):
+class UserType(ABC):
     __typename = "User"
     id: str
 
 
-class UserTypeDict(TypedDict, total=False):
-    id: str
-
-
-UserType = Union[UserTypeBase, UserTypeDict]
 Person = Union[UserType, AdminType]
 """
 
@@ -210,34 +169,18 @@ from __future__ import annotations
 from abc import ABC
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional, Union
+from typing import Optional
 from typing_extensions import TypedDict
 
 
+class ThingMakerInput(TypedDict):
+    created: datetime
+
+
 @dataclass(kw_only=True)
-class ThingTypeBase(ABC):
+class ThingType(ABC):
     __typename = "Thing"
     created: Optional[datetime] = None
-
-
-class ThingTypeDict(TypedDict, total=False):
-    created: Optional[datetime]
-
-
-ThingType = Union[ThingTypeBase, ThingTypeDict]
-
-
-@dataclass(kw_only=True)
-class ThingMakerTypeBase(ABC):
-    __typename = "ThingMaker"
-    created: datetime
-
-
-class ThingMakerTypeDict(TypedDict, total=False):
-    created: datetime
-
-
-ThingMakerType = Union[ThingMakerTypeBase, ThingMakerTypeDict]
 """
 
 
@@ -307,7 +250,7 @@ EXPECTED_OBJECT = """\
 Module(
     body=[
         ClassDef(
-            name='TestTypeBase',
+            name='TestType',
             bases=[
                 Name(id='ABC', ctx=Load())],
             keywords=[],
@@ -341,32 +284,7 @@ Module(
                     keywords=[
                         keyword(
                             arg='kw_only',
-                            value=Constant(value=True))])]),
-        ClassDef(
-            name='TestTypeDict',
-            bases=[
-                Name(id='TypedDict', ctx=Load())],
-            keywords=[
-                keyword(
-                    arg='total',
-                    value=Constant(value=False))],
-            body=[
-                AnnAssign(
-                    target=Name(id='name', ctx=Store()),
-                    annotation=Name(id='Optional[str]', ctx=Load()),
-                    simple=1)],
-            decorator_list=[]),
-        Assign(
-            targets=[
-                Name(id='TestType', ctx=Load())],
-            value=Subscript(
-                value=Name(id='Union', ctx=Load()),
-                slice=Tuple(
-                    elts=[
-                        Name(id='TestTypeBase', ctx=Load()),
-                        Name(id='TestTypeDict', ctx=Load())],
-                    ctx=Load()),
-                ctx=Load()))],
+                            value=Constant(value=True))])])],
     type_ignores=[])\
 """
 
