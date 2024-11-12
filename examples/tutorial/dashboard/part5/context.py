@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 # This UserRepository follows the 'repository' pattern which encapsilates
 # our database access so that we don't tightly couple our code to the db.
-from .repository import UserRepository, QuotaRepository
+from .models import UserRepository, QuotaRepository
 from ..core.config import config
 
 LOG = logging.getLogger(__name__)

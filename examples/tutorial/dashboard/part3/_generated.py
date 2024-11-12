@@ -2,67 +2,44 @@ from __future__ import annotations
 from abc import ABC
 from cannula import ResolveInfo
 from dataclasses import dataclass
-from typing import List, Optional, Protocol, Union
+from typing import Optional, Protocol, Sequence
 from typing_extensions import TypedDict
 from uuid import UUID
 
 
 class PersonaType(Protocol):
-    __typename = "Persona"
     id: UUID
     name: Optional[str] = None
     email: Optional[str] = None
 
 
 class ResourceType(Protocol):
-    __typename = "Resource"
     quota: Optional[QuotaType] = None
     user: Optional[UserType] = None
     created: Optional[str] = None
 
 
 @dataclass(kw_only=True)
-class AdminTypeBase(ABC):
+class AdminType(ABC):
     __typename = "Admin"
     id: UUID
     name: Optional[str] = None
     email: Optional[str] = None
 
 
-class AdminTypeDict(TypedDict, total=False):
-    id: UUID
-    name: Optional[str]
-    email: Optional[str]
-
-
-AdminType = Union[AdminTypeBase, AdminTypeDict]
-
-
 @dataclass(kw_only=True)
-class BoardTypeBase(ABC):
+class BoardType(ABC):
     __typename = "Board"
     id: Optional[str] = None
     quota: Optional[QuotaType] = None
     user: Optional[UserType] = None
     title: Optional[str] = None
     created: Optional[str] = None
-    posts: Optional[List[PostType]] = None
-
-
-class BoardTypeDict(TypedDict, total=False):
-    id: Optional[str]
-    quota: Optional[QuotaType]
-    user: Optional[UserType]
-    title: Optional[str]
-    created: Optional[str]
-    posts: Optional[List[PostType]]
-
-
-BoardType = Union[BoardTypeBase, BoardTypeDict]
+    posts: Optional[Sequence[PostType]] = None
 
 
 @dataclass(kw_only=True)
-class PostTypeBase(ABC):
+class PostType(ABC):
     __typename = "Post"
     id: Optional[str] = None
     quota: Optional[QuotaType] = None
@@ -72,20 +49,8 @@ class PostTypeBase(ABC):
     body: Optional[str] = None
 
 
-class PostTypeDict(TypedDict, total=False):
-    id: Optional[str]
-    quota: Optional[QuotaType]
-    user: Optional[UserType]
-    title: Optional[str]
-    created: Optional[str]
-    body: Optional[str]
-
-
-PostType = Union[PostTypeBase, PostTypeDict]
-
-
 @dataclass(kw_only=True)
-class QuotaTypeBase(ABC):
+class QuotaType(ABC):
     __typename = "Quota"
     user: Optional[UserType] = None
     resource: Optional[str] = None
@@ -93,39 +58,19 @@ class QuotaTypeBase(ABC):
     count: Optional[int] = None
 
 
-class QuotaTypeDict(TypedDict, total=False):
-    user: Optional[UserType]
-    resource: Optional[str]
-    limit: Optional[int]
-    count: Optional[int]
-
-
-QuotaType = Union[QuotaTypeBase, QuotaTypeDict]
-
-
 @dataclass(kw_only=True)
-class UserTypeBase(ABC):
+class UserType(ABC):
     __typename = "User"
     id: UUID
     name: Optional[str] = None
     email: Optional[str] = None
-    quota: Optional[List[QuotaType]] = None
-
-
-class UserTypeDict(TypedDict, total=False):
-    id: UUID
-    name: Optional[str]
-    email: Optional[str]
-    quota: Optional[List[QuotaType]]
-
-
-UserType = Union[UserTypeBase, UserTypeDict]
+    quota: Optional[Sequence[QuotaType]] = None
 
 
 class addPostMutation(Protocol):
     async def __call__(
         self, info: ResolveInfo, board_id: str, post_id: str
-    ) -> BoardType:
+    ) -> Optional[BoardType]:
         ...
 
 
@@ -136,34 +81,36 @@ class boardsQuery(Protocol):
         *,
         limit: Optional[int] = 100,
         offset: Optional[int] = 0,
-    ) -> List[BoardType]:
+    ) -> Optional[Sequence[BoardType]]:
         ...
 
 
 class createBoardMutation(Protocol):
-    async def __call__(self, info: ResolveInfo, title: str) -> BoardType:
+    async def __call__(self, info: ResolveInfo, title: str) -> Optional[BoardType]:
         ...
 
 
 class createPostMutation(Protocol):
-    async def __call__(self, info: ResolveInfo, title: str, body: str) -> PostType:
+    async def __call__(
+        self, info: ResolveInfo, title: str, body: str
+    ) -> Optional[PostType]:
         ...
 
 
 class deleteBoardMutation(Protocol):
-    async def __call__(self, info: ResolveInfo, id: str) -> bool:
+    async def __call__(self, info: ResolveInfo, id: str) -> Optional[bool]:
         ...
 
 
 class deletePostMutation(Protocol):
-    async def __call__(self, info: ResolveInfo, id: str) -> bool:
+    async def __call__(self, info: ResolveInfo, id: str) -> Optional[bool]:
         ...
 
 
 class editBoardMutation(Protocol):
     async def __call__(
         self, info: ResolveInfo, id: str, *, title: Optional[str] = None
-    ) -> BoardType:
+    ) -> Optional[BoardType]:
         ...
 
 
@@ -175,17 +122,17 @@ class editPostMutation(Protocol):
         *,
         title: Optional[str] = None,
         body: Optional[str] = None,
-    ) -> PostType:
+    ) -> Optional[PostType]:
         ...
 
 
 class meQuery(Protocol):
-    async def __call__(self, info: ResolveInfo) -> PersonaType:
+    async def __call__(self, info: ResolveInfo) -> Optional[PersonaType]:
         ...
 
 
 class peopleQuery(Protocol):
-    async def __call__(self, info: ResolveInfo) -> List[PersonaType]:
+    async def __call__(self, info: ResolveInfo) -> Optional[Sequence[PersonaType]]:
         ...
 
 
@@ -196,14 +143,14 @@ class postsQuery(Protocol):
         *,
         limit: Optional[int] = 100,
         offset: Optional[int] = 0,
-    ) -> List[PostType]:
+    ) -> Optional[Sequence[PostType]]:
         ...
 
 
 class userQuery(Protocol):
     async def __call__(
         self, info: ResolveInfo, *, id: Optional[str] = None
-    ) -> UserType:
+    ) -> Optional[UserType]:
         ...
 
 

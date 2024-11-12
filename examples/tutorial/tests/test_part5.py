@@ -2,7 +2,7 @@ import httpx
 import uuid
 
 from dashboard.core.config import config
-from dashboard.part5.repository import QuotaRepository, UserRepository
+from dashboard.part5.models import QuotaRepository, UserRepository
 
 QUERY = """
     query People($id: UUID!) {
