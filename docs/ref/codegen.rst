@@ -4,6 +4,8 @@ Codegen
 .. toctree::
    :maxdepth: 2
 
+.. _codegen:
+
 One of the most powerful aspect of the schema first approach is the ability to
 generate interfaces and type hints to match your schema. This can cut down on
 the amount of maintence that you have on a project.

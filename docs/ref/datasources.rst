@@ -22,8 +22,8 @@ Notice the second request is cached since the datasource already resovled it.
 This cache is only stored for single GraphQL request. If you want to persist
 that for longer you'll need to implement that yourself.
 
-.. automodule:: cannula.datasource.http
+.. automodule:: cannula.datasource.orm
    :members:
 
-.. automodule:: cannula.datasource.orm
+.. automodule:: cannula.datasource.http
    :members:

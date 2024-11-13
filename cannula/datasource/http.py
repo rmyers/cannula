@@ -51,7 +51,7 @@ class HTTPDataSource(typing.Generic[GraphModel]):
     Example::
 
         @dataclass(kw_only=True)
-        class User(UserTypeBase):
+        class User(UserType):
             id: UUID
             name: str
 
