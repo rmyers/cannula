@@ -1,0 +1,17 @@
+type User {
+    id: ID
+    name: String
+    email: String
+    widgets: [Widget] @computed
+}
+
+type Widget {
+    id: ID
+    name: String
+    user_id: ID
+    type: String
+}
+
+type Query {
+    user(id: Int!): User
+}

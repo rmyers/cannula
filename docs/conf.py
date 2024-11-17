@@ -34,6 +34,7 @@ release = cannula.__VERSION__
 # ones.
 extensions = [
     "sphinx.ext.autodoc",
+    "sphinx.ext.napoleon",
     "sphinx_autodoc_typehints",
 ]
 
@@ -48,6 +49,12 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "**/node_modules", "**/v
 source_suffix = [".rst"]
 
 suppress_warnings = ["misc.highlighting_failure"]
+
+# Typehints
+always_use_bars_union = True
+always_document_param_types = True
+typehints_defaults = "braces"
+autodoc_typehints = "description"
 
 # -- Options for HTML output -------------------------------------------------
 

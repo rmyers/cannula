@@ -1,3 +1,17 @@
+"""
+.. _ormdatasource:
+
+ORM Data Source
+===============
+
+This is useful for mapping SQLAlchemy ORM models to generated graph models.
+It follows the `Repository Pattern` and assists with memoized queries to
+allow your resolvers to run concurrently and return the same results for
+identical queryies.
+
+.. note:: This requires that you have SQLAlchemy installed and configured properly.
+"""
+
 import logging
 
 from typing import (
@@ -25,7 +39,35 @@ LOG = logging.getLogger(__name__)
 
 
 class DatabaseRepository(Generic[DBModel, GraphModel]):
-    """Repository for performing database queries."""
+    """Repository pattern for performing database queries and returning hydrated models.
+
+    This object is constructed with both the database model and a generated graph
+    model from :doc:`codegen`. It provides a couple helper methods to memoize
+    queries that are read only operations cutting down on duplicate SQL calls.
+
+    This class has an `__init_subclass__` that simplifies construction and will
+    raise errors if incorrect types are used or missing. Construct a new object::
+
+        class UserRepo(
+            DatabaseRepository[DBUser, User],  # Adds specific types for return values
+            db_model=DBUser,  # The
+            graph_model=User
+        ):
+
+            async def get_user(pk: uuid.UUID) -> User:
+                return self.get_model(pk)
+
+    Class Arguments:
+
+    * `db_model`: The database ORM model to perform queries with.
+    * `graph_model`: Subclass of a generated graph model
+
+    Args:
+        session_maker:
+            Session maker object that is read/write.
+        readonly_session_maker:
+            Optional readonly session maker object for spliting queries to different nodes.
+    """
 
     _memoized_get: Dict[str, Awaitable[DBModel | None]]
     _memoized_list: Dict[str, Awaitable[list[DBModel]]]
@@ -52,6 +94,7 @@ class DatabaseRepository(Generic[DBModel, GraphModel]):
         self._memoized_list = {}
 
     def from_db(self, db_obj: DBModel, **kwargs) -> GraphModel:
+        """Hook for returning a GraphModel instance from a DBModel."""
         model_kwargs = db_obj.__dict__.copy()
         model_kwargs.update(kwargs)
         cleaned_kwargs = {
@@ -63,6 +106,7 @@ class DatabaseRepository(Generic[DBModel, GraphModel]):
         return obj
 
     async def add(self, **data: Any) -> GraphModel:
+        """Insert a new object in the database."""
         async with self.session_maker() as session:
             instance = self._db_model(**data)
             session.add(instance)
@@ -71,6 +115,13 @@ class DatabaseRepository(Generic[DBModel, GraphModel]):
             return self.from_db(instance)
 
     async def get_by_pk(self, pk: _PKIdentityArgument) -> DBModel | None:
+        """Get a single database ORM model by primary key.
+
+        .. note::
+            This is query is memoized and intended to be used internally
+            but is available to chain other database operations like resolving
+            related objects.
+        """
         cache_key = f"get:{pk}"
 
         @cacheable
