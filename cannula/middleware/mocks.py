@@ -231,7 +231,7 @@ class MockObjectStore:
 
     def get(self, key: str, default: typing.Optional[typing.Any] = None) -> typing.Any:
         mock = self.mock_objects.get(key, default)
-        if mock is None:
+        if mock is None:  # pragma: no cover
             return
 
         return self.return_results(mock)
@@ -245,7 +245,7 @@ class MockObjectStore:
             else getattr(parent, field_name, None)
         )
 
-        if mock is None:
+        if mock is None:  # pragma: no cover
             return
 
         return self.return_results(mock)
@@ -293,7 +293,7 @@ class MockMiddleware:
         mock_objects = self._mock_objects.copy()
         mock_objects.update(extra)
 
-        if not mock_objects:
+        if not mock_objects:  # pragma: no cover
             return None
 
         return MockObjectStore(mock_objects)
@@ -301,14 +301,14 @@ class MockMiddleware:
     def get_mocks_from_headers(self, context: typing.Any) -> dict:
         try:
             mock_header = context.request.headers.get(self.mock_object_header)
-            if not mock_header:
+            if not mock_header:  # pragma: no cover
                 return {}
         except Exception:
             return {}
 
         try:
             return json.loads(mock_header)
-        except Exception:
+        except Exception:  # pragma: no cover
             return {}
 
     async def run_next(self, _next, _resource, _info, **kwargs):

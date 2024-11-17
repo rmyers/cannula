@@ -74,17 +74,6 @@ async def test_mocks_work_properly():
     }
 
 
-async def test_http_datasource():
-    from tests.fixtures.examples import http_datasource
-
-    results = await http_datasource.main()
-    assert results is not None
-    assert results == {
-        "widgets": [{"name": "hammer", "type": "tool"}],
-        "another": [{"name": "hammer", "type": "tool"}],
-    }
-
-
 async def test_profiler():
     from tests.fixtures.examples import profiler
 
@@ -111,4 +100,52 @@ async def test_scalars():
             "meta": '{"fancy": "pants"}',
             "smoke": "04:20:00",
         }
+    }
+
+
+async def test_orm_datasource():
+    from tests.fixtures.examples.datasources import orm
+
+    results = await orm.main()
+    assert results is not None
+    assert results.errors is None
+    assert results.data == {
+        "user": {
+            "widgets": [
+                {"name": "Hammer"},
+                {"name": "Drill"},
+                {"name": "Nail"},
+            ],
+        },
+        "another": {
+            "widgets": [
+                {"name": "Hammer"},
+                {"name": "Drill"},
+                {"name": "Nail"},
+            ],
+        },
+    }
+
+
+async def test_http_datasource():
+    from tests.fixtures.examples.datasources import http
+
+    results = await http.main()
+    assert results is not None
+    assert results.errors is None
+    assert results.data == {
+        "user": {
+            "widgets": [
+                {"name": "Hammer"},
+                {"name": "Drill"},
+                {"name": "Nail"},
+            ],
+        },
+        "another": {
+            "widgets": [
+                {"name": "Hammer"},
+                {"name": "Drill"},
+                {"name": "Nail"},
+            ],
+        },
     }
