@@ -131,20 +131,20 @@ class HTTPDataSource(typing.Generic[GraphModel]):
     _graph_model: type[GraphModel]
     _expected_fields: set[str]
     # The base url of this resource
-    _base_url: typing.Optional[str]
+    _base_url: typing.Optional[httpx.URL]
     # A mapping of requests using the cache_key_for_request. Multiple resolvers
     # could attempt to fetch the same resource, using this we can limit to at
     # most one request per cache key.
     memoized_requests: typing.Dict[str, typing.Awaitable]
 
     # Timeout for an individual request in seconds.
-    _timeout: typing.Optional[int]
+    _timeout: typing.Optional[httpx.Timeout]
 
     def __init_subclass__(
         cls,
         graph_model: type[GraphModel],
-        base_url: typing.Optional[str] = None,
-        timeout: typing.Optional[int] = None,
+        base_url: typing.Optional[httpx.URL] = None,
+        timeout: typing.Optional[httpx.Timeout] = None,
     ) -> None:
         cls._graph_model = graph_model
         cls._expected_fields = expected_fields(graph_model)
