@@ -16,6 +16,3 @@ Which means you can combine loosly related items into a single parent.
 
 .. automodule:: cannula.api
    :members:
-
-.. automodule:: cannula.scalars
-   :members:

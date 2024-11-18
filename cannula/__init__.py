@@ -23,4 +23,4 @@ __all__ = [
     "render_file",
 ]
 
-__VERSION__ = "0.15.0"
+__VERSION__ = "0.16.0"

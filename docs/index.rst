@@ -41,4 +41,5 @@ Read More About It
    :maxdepth: 2
 
    tutorial/index
+   ref/codegen
    ref/index

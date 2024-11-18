@@ -10,5 +10,6 @@ API Reference
    resolvers
    context
    schema
+   scalars
    datasources
    middleware

@@ -72,10 +72,6 @@ html_theme_options = {
     "primary_sidebar_end": ["indices.html", "sidebar-ethical-ads.html"],
     "external_links": [
         {
-            "name": "GraphQL-core",
-            "url": "https://graphql-core-3.readthedocs.io/en/latest/",
-        },
-        {
             "name": "GraphQL-Codegen",
             "url": "https://the-guild.dev/graphql/codegen",
         },
