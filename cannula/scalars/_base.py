@@ -12,8 +12,7 @@ class ModuleImport(typing.NamedTuple):
 
 
 class ScalarInterface(typing.Protocol):
-    """Scalar Interface
-
+    """
     This is used for type hints to assert that the Custom Scalars match
     this interface. For concrete implementations you should subclass the
     :py:class:`cannula.scalars.ScalarType`
@@ -31,8 +30,7 @@ class ScalarInterface(typing.Protocol):
 
 
 class ScalarType(typing.Generic[Input, Output]):
-    """Scalar Type
-
+    """
     This class is intended to assist in generating well typed custom scalars.
     This class is a Generic type that expects two concrete types, `Input` and
     `Output`. `Input` is the raw python type and `Output` is a serializable
@@ -47,7 +45,10 @@ class ScalarType(typing.Generic[Input, Output]):
         from datetime import datetime
 
         class Datetime(
-            ScalarType[datetime, str],  # Input is the first type and Output is the second
+            ScalarType[
+                datetime,     # The first type is the Input
+                str,          # The second type is the Output
+            ],
             name="Datetime",  # Optional scalar name, by default the class name will be used.
         ):
 

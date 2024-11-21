@@ -17,6 +17,7 @@ except ImportError:  # pragma: no cover
 
 
 class Date(ScalarType[datetime.date, str]):
+    """Date seralizes to datetime.date objects"""
 
     @staticmethod
     def serialize(value: datetime.date) -> str:
@@ -28,6 +29,7 @@ class Date(ScalarType[datetime.date, str]):
 
 
 class Datetime(ScalarType[datetime.datetime, str]):
+    """Datetime seralizes to datetime.datetime objects"""
 
     @staticmethod
     def serialize(value: datetime.datetime) -> str:
@@ -39,6 +41,7 @@ class Datetime(ScalarType[datetime.datetime, str]):
 
 
 class Time(ScalarType[datetime.time, str]):
+    """Time seralizes to datetime.time objects"""
 
     @staticmethod
     def serialize(value: datetime.time) -> str:

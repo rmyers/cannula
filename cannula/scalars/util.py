@@ -5,6 +5,7 @@ from ._base import ScalarType
 
 
 class JSON(ScalarType[dict, str]):
+    """JSON seralizes to :func:`json` objects"""
 
     @staticmethod
     def serialize(value: dict) -> str:
@@ -16,6 +17,7 @@ class JSON(ScalarType[dict, str]):
 
 
 class UUID(ScalarType[uuid.UUID, str]):
+    """UUID seralizes to :func:`uuid.UUID` objects"""
 
     @staticmethod
     def serialize(value: uuid.UUID) -> str:

@@ -1,0 +1,20 @@
+scalar UUID
+
+type User {
+    id: UUID!
+    name: String
+    email: String
+    quota: [Quota!] @computed
+    overQuota(resource: String!): Quota
+}
+
+type Quota {
+    user: User
+    resource: String
+    limit: Int
+    count: Int
+}
+
+type Query {
+    people: [User]
+}

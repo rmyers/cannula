@@ -34,8 +34,10 @@ release = cannula.__VERSION__
 # ones.
 extensions = [
     "sphinx.ext.autodoc",
+    "sphinx.ext.autosummary",
     "sphinx.ext.napoleon",
     "sphinx_autodoc_typehints",
+    "sphinxarg.ext",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -62,6 +64,13 @@ autodoc_typehints = "description"
 # a list of builtin themes.
 #
 html_theme = "pydata_sphinx_theme"
+
+html_context = {
+    "github_user": "rmyers",
+    "github_repo": "cannula",
+    "github_version": "main",
+    "doc_path": "docs",
+}
 
 html_theme_options = {
     "logo": {
@@ -90,4 +99,15 @@ html_theme_options = {
             "type": "fontawesome",
         },
     ],
+    "footer_start": ["copyright"],
+    "footer_center": ["sphinx-version"],
+    "use_edit_page_button": True,
+    "show_toc_level": 1,
+    "navigation_depth": 2,
+    "collapse_navigation": True,
+    # "navbar_align": "left",  # [left, content, right] For testing that the navbar items align properly
+    "show_nav_level": 2,
+    # "announcement": "https://raw.githubusercontent.com/pydata/pydata-sphinx-theme/main/docs/_templates/custom-template.html",
+    # "show_version_warning_banner": True,
+    # "navbar_center": ["version-switcher", "navbar-nav"],
 }

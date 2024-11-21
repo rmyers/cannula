@@ -33,11 +33,18 @@ using with the full dotted import path::
 Built-in Scalars
 ----------------
 
-.. automodule:: cannula.scalars.date
-    :members:
+These scalars are available to use just add to your configuration. If you are
+using codegen they will also need to be set in the `pyproject.toml` definition
+so that the generated code will import them properly.
 
-.. automodule:: cannula.scalars.util
-    :members:
+.. autosummary::
+    :nosignatures:
+
+    cannula.scalars.date.Date
+    cannula.scalars.date.Datetime
+    cannula.scalars.date.Time
+    cannula.scalars.util.JSON
+    cannula.scalars.util.UUID
 
 
 Custom Scalars

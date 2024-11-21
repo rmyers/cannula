@@ -1,0 +1,12 @@
+[tool.cannula.codegen]
+# path to the schema file or folder with .graphql files
+# by default this will search all sub folders
+schema = "myschema.graphql"
+
+# list all the scalars you are using
+scalars = [
+    "cannula.scalars.date.Datetime",
+    "cannula.scalars.util.UUID",
+]
+# Where to put your generated file
+dest="app/models.py"

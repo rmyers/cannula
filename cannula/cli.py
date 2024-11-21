@@ -1,10 +1,3 @@
-"""
-# Run some stuff
-==============
-
-Like a boss
-"""
-
 import argparse
 import importlib
 import logging
@@ -19,47 +12,51 @@ from cannula.scalars import ScalarInterface
 # create the top-level parser for global options
 parser = argparse.ArgumentParser(
     prog="cannula",
-    description="Cannula cli for general functions",
+    description="Cannula command for performing code generation and migrations.",
 )
 parser.add_argument(
     "--config",
-    "-c",
-    help="default configuration file (pyproject.toml)",
+    help="Specify a different location or name of the configuration file. This should be a well formatted TOML file.",
     default="pyproject.toml",
 )
-parser.add_argument(
-    "--dry_run",
-    "--dry-run",
-    action="store_true",
-    help="do not preform actions",
-)
-parser.add_argument(
-    "--debug",
-    "-d",
-    action="store_true",
-    help="print debug information",
-)
+
 
 # Sub Commands parser
-subparsers = parser.add_subparsers(help="sub-command --help", dest="command")  # type: ignore
+subparsers = parser.add_subparsers(dest="command")  # type: ignore
 
 # create the parser for the "codegen" command
 codegen_parser = subparsers.add_parser(
     "codegen",
-    help="generate code from the schema",
+    help="Generate Python objects from GraphQL schema files.",
+)
+codegen_parser.add_argument(
+    "--dry_run",
+    "--dry-run",
+    action="store_true",
+    help="Do not write any changes to the file instead print output to terminal",
+)
+codegen_parser.add_argument(
+    "--debug",
+    "-d",
+    action="store_true",
+    help="Display debug information while parsing and generating code.",
 )
 codegen_parser.add_argument(
     "--schema",
-    help="location of graphql file or directory of files",
+    help="Specific a path or location for the schema files to use.",
     default=".",
 )
 codegen_parser.add_argument(
     "--dest",
-    help="destination to write the file to",
+    help="Change the default location of the output file.",
     default="_generated.py",
 )
 codegen_parser.add_argument(
-    "--scalar", help="custom scalar to add", type=str, action="append", dest="scalars"
+    "--scalar",
+    help="Scalars to use during code generation, this can be specified multiple times.",
+    type=str,
+    action="append",
+    dest="scalars",
 )
 
 
