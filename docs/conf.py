@@ -65,6 +65,9 @@ autodoc_typehints = "description"
 #
 html_theme = "pydata_sphinx_theme"
 
+html_static_path = ["_static"]
+html_css_files = ["custom.css"]
+
 html_context = {
     "github_user": "rmyers",
     "github_repo": "cannula",
@@ -73,18 +76,20 @@ html_context = {
 }
 
 html_theme_options = {
-    "logo": {
-        "text": "Cannula Documentation",
-        "image_light": "_static/mind-map.png",
-        "image_dark": "_static/mind-map.png",
-    },
-    "primary_sidebar_end": ["indices.html", "sidebar-ethical-ads.html"],
+    "collapse_navigation": False,
     "external_links": [
         {
             "name": "GraphQL-Codegen",
             "url": "https://the-guild.dev/graphql/codegen",
         },
     ],
+    "footer_start": ["copyright"],
+    "footer_center": ["sphinx-version"],
+    "logo": {
+        "text": "Cannula Documentation",
+        "image_light": "_static/mind-map.png",
+        "image_dark": "_static/mind-map.png",
+    },
     "icon_links": [
         {
             "name": "GitHub",
@@ -99,15 +104,11 @@ html_theme_options = {
             "type": "fontawesome",
         },
     ],
-    "footer_start": ["copyright"],
-    "footer_center": ["sphinx-version"],
-    "use_edit_page_button": True,
-    "show_toc_level": 1,
     "navigation_depth": 2,
-    "collapse_navigation": True,
-    # "navbar_align": "left",  # [left, content, right] For testing that the navbar items align properly
+    "primary_sidebar_end": ["sidebar-ethical-ads.html"],
     "show_nav_level": 2,
-    # "announcement": "https://raw.githubusercontent.com/pydata/pydata-sphinx-theme/main/docs/_templates/custom-template.html",
-    # "show_version_warning_banner": True,
-    # "navbar_center": ["version-switcher", "navbar-nav"],
+    "show_toc_level": 1,
+    "sidebar_includehidden": False,
+    "sidebarwidth": 200,
+    "use_edit_page_button": True,
 }

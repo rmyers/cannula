@@ -41,7 +41,15 @@ def test_codegen_dry_run(mocker: MockerFixture):
     mock_schema = mocker.Mock()
     mocker.patch("cannula.load_schema", return_value=mock_schema)
     mock_render = mocker.patch("cannula.render_file")
-    mocker.patch.object(sys, "argv", ["cli", "--dry-run", "codegen"])
+    mocker.patch.object(
+        sys,
+        "argv",
+        [
+            "cli",
+            "codegen",
+            "--dry-run",
+        ],
+    )
     main()
     mock_render.assert_called_with(
         type_defs=mock_schema,

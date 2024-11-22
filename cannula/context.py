@@ -36,17 +36,18 @@ class ResolveInfo(typing.Generic[C], GraphQLResolveInfo):
         class CustomContext(cannula.Context):
             widgets = widget_datasource()
 
-        @api.query
-        def get_widgets(
-            parent: typing.Any,
-            info: cannual.ResolveInfo[CustomContext],
+
+        async def get_widgets(
+            info: cannual.ResolveInfo[CustomContext]
         ) -> typing.List[Widget]:
+
             # type checker will be able to verify `get_widgets`
             # has the correct return type `list[Widget]`
             return info.context.widgets.get_widgets()
-    """
 
-    context: C
+    Args:
+        context: Custom context to use for resolver functions.
+    """
 
 
 class Context(typing.Generic[R]):
