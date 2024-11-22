@@ -6,15 +6,14 @@ as the second argument to resolvers.
 
 Example Resolver::
 
-    @api.query
-    def get_something(parent: Any, info: ResolveInfo[Context]):
+    aysnc def get_something(info: ResolveInfo[Context]):
         original_request = info.context.request
         if not can_access_something(original_request):
             raise AccessDenied("you do not have permission!")
-        return get_something()
+        return await get_something()
 
-Context API Docs
-----------------
+Context Reference
+-----------------
 """
 
 import typing
@@ -44,10 +43,9 @@ class ResolveInfo(typing.Generic[C], GraphQLResolveInfo):
             # type checker will be able to verify `get_widgets`
             # has the correct return type `list[Widget]`
             return info.context.widgets.get_widgets()
-
-    Args:
-        context: Custom context to use for resolver functions.
     """
+
+    context: C
 
 
 class Context(typing.Generic[R]):
