@@ -1,9 +1,6 @@
 Codegen
 =======
 
-.. toctree::
-   :maxdepth: 2
-
 .. _codegen:
 
 One of the most powerful aspect of the schema first approach is the ability to
@@ -15,5 +12,9 @@ With cannula you can keep your backend well typed and hopefully cut down on
 bugs you have as your schema changes.
 
 See the tutorial for an example :doc:`../tutorial/part3`
+
+
+References
+----------
 
 .. _GraphQL-Codegen: https://the-guild.dev/graphql/codegen

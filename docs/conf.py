@@ -34,8 +34,10 @@ release = cannula.__VERSION__
 # ones.
 extensions = [
     "sphinx.ext.autodoc",
+    "sphinx.ext.autosummary",
     "sphinx.ext.napoleon",
     "sphinx_autodoc_typehints",
+    "sphinxarg.ext",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -63,23 +65,31 @@ autodoc_typehints = "description"
 #
 html_theme = "pydata_sphinx_theme"
 
+html_static_path = ["_static"]
+html_css_files = ["custom.css"]
+
+html_context = {
+    "github_user": "rmyers",
+    "github_repo": "cannula",
+    "github_version": "main",
+    "doc_path": "docs",
+}
+
 html_theme_options = {
-    "logo": {
-        "text": "Cannula Documentation",
-        "image_light": "_static/mind-map.png",
-        "image_dark": "_static/mind-map.png",
-    },
-    "primary_sidebar_end": ["indices.html", "sidebar-ethical-ads.html"],
+    "collapse_navigation": False,
     "external_links": [
-        {
-            "name": "GraphQL-core",
-            "url": "https://graphql-core-3.readthedocs.io/en/latest/",
-        },
         {
             "name": "GraphQL-Codegen",
             "url": "https://the-guild.dev/graphql/codegen",
         },
     ],
+    "footer_start": ["copyright"],
+    "footer_center": ["sphinx-version"],
+    "logo": {
+        "text": "Cannula Documentation",
+        "image_light": "_static/mind-map.png",
+        "image_dark": "_static/mind-map.png",
+    },
     "icon_links": [
         {
             "name": "GitHub",
@@ -94,4 +104,11 @@ html_theme_options = {
             "type": "fontawesome",
         },
     ],
+    "navigation_depth": 2,
+    "primary_sidebar_end": ["sidebar-ethical-ads.html"],
+    "show_nav_level": 2,
+    "show_toc_level": 1,
+    "sidebar_includehidden": False,
+    "sidebarwidth": 200,
+    "use_edit_page_button": True,
 }

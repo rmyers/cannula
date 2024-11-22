@@ -1,48 +1,32 @@
-import logging
-
+from typing import TYPE_CHECKING
 import uuid
 
-from typing import (
-    Any,
-    Awaitable,
-    ClassVar,
-    Dict,
-    Generic,
-    List,
-    Protocol,
-    Sequence,
-    TypeVar,
-    TYPE_CHECKING,
-    cast,
-)
-
-from cannula.context import ResolveInfo
+import cannula
+from cannula.datasource.orm import DatabaseRepository
 
 from ..core.database import User as DBUser, Quota as DBQuota
 from ._generated import UserType, QuotaType
 
-from cannula.datasource.orm import DatabaseRepository
-
-LOG = logging.getLogger(__name__)
-
-if TYPE_CHECKING:  # pragma: no cover
+# This is to avoid circular imports, we only need this reference for
+# checking types in like: `cannula.ResolveInfo["Context"]`
+if TYPE_CHECKING:
     from .context import Context
 
 
 class User(UserType):
-    """User instance"""
+    """User Graph Model"""
 
-    async def quota(self, info: ResolveInfo["Context"]) -> List["Quota"] | None:
+    async def quota(self, info: cannula.ResolveInfo["Context"]) -> list["Quota"] | None:
         return await info.context.quota_repo.get_quota_for_user(self.id)
 
     async def overQuota(
-        self, info: ResolveInfo["Context"], *, resource: str
+        self, info: cannula.ResolveInfo["Context"], *, resource: str
     ) -> "Quota | None":
         return await info.context.quota_repo.get_over_quota(self.id, resource=resource)
 
 
 class Quota(QuotaType):
-    pass
+    """Quota Graph Model"""
 
 
 class UserRepository(
@@ -59,7 +43,7 @@ class QuotaRepository(
     graph_model=Quota,
 ):
 
-    async def get_quota_for_user(self, id: uuid.UUID) -> List[Quota]:
+    async def get_quota_for_user(self, id: uuid.UUID) -> list[Quota]:
         return await self.get_models(DBQuota.user_id == id)
 
     async def get_over_quota(self, id: uuid.UUID, resource: str) -> Quota | None:

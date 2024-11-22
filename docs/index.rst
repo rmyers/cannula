@@ -42,3 +42,4 @@ Read More About It
 
    tutorial/index
    ref/index
+   ref/cli/index

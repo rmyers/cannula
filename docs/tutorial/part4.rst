@@ -24,7 +24,7 @@ Here is our example schema:
 Now when we run `cannula codegen` we get this:
 
 .. literalinclude:: ../examples/tutorial/dashboard/part4/_generated.py
-    :emphasize-lines: 36,37,40,41
+    :emphasize-lines: 26,27,30,31
 
 Our `UserTypeBase` now has the fields represented with an abstract method which we just
 need to implement. The `Quota` type is a foreign key relation so it is easy to add that
@@ -42,7 +42,7 @@ data then the relation is not queried. In sqlalchemy this is exposed via the `As
 Here is how we can use that in our updated `models.py`:
 
 .. literalinclude:: ../examples/tutorial/dashboard/part4/models.py
-    :emphasize-lines: 18,19,20,21,22,24,25,26,27,28,29,30,31,32
+    :emphasize-lines: 35,36,37,38,39,41,42,43,44,45,46,47,48,49
 
 The graph changes slightly because we simplied the schema:
 

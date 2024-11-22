@@ -11,11 +11,6 @@ a database model that represents your data. The great thing about resolvers
 are they are completely flexible as long as the type you are returning is correct.
 Which means you can combine loosly related items into a single parent.
 
-.. toctree::
-   :maxdepth: 2
 
 .. automodule:: cannula.api
-   :members:
-
-.. automodule:: cannula.scalars
    :members:
