@@ -34,9 +34,7 @@ class UserRepository(
     db_model=DBUser,
     graph_model=User,
 ):
-
-    async def add_user(self, name: str, email: str) -> User:
-        return await self.add(name=name, email=email)
+    pass
 
 
 class QuotaRepository(
