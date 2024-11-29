@@ -2,8 +2,10 @@ FROM python:3.10
 
 WORKDIR /app
 
-COPY . .
+COPY requirements.txt .
 
-RUN make setup
+RUN pip install -r requirements.txt
+
+COPY dashboard/ dashboard/
 
 CMD ["python", "-m", "dashboard", "run"]
