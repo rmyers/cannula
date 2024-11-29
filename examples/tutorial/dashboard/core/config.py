@@ -13,6 +13,7 @@ class Config(BaseSettings):
     debug: bool = True
     template_dir: str = "templates"
     port: int = 8000
+    host: str = "0.0.0.0"
 
     @functools.cached_property
     def root(self):

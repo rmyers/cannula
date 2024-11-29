@@ -22,7 +22,7 @@ def initdb():  # pragma: no cover
 
 @click.command()
 def run():  # pragma: no cover
-    uvicorn.run("dashboard.main:app", port=config.port, reload=True)
+    uvicorn.run("dashboard.main:app", port=config.port, host=config.host, reload=True)
 
 
 async def _add_users():  # pragma: no cover
