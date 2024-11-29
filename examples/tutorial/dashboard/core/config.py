@@ -12,6 +12,7 @@ class Config(BaseSettings):
     database_uri: str = "sqlite+aiosqlite:///db.sqlite"
     debug: bool = True
     template_dir: str = "templates"
+    port: int = 8000
 
     @functools.cached_property
     def root(self):
