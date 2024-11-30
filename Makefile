@@ -27,7 +27,6 @@ PYTHON_MODULES           := $(shell find . -name '*.py')
 DOCKER_COMPOSE           := $(shell which docker-compose)
 
 export HATCH_INDEX_USER = __token__
-export RUFF_CMD = $(VIRTUAL_ENV)/bin/ruff
 
 .SILENT: help
 .PHONY: setup docs clean
@@ -43,7 +42,7 @@ $(VIRTUAL_ENV):
 
 # Check for the existence of reqs-(md5) and run pip install if missing.
 $(VIRTUAL_ENV)/.requirements-installed: $(REQUIREMENTS) $(ENVIRONMENT)
-	$(VIRTUAL_ENV)/bin/pip install -e .[test,httpx]
+	$(VIRTUAL_ENV)/bin/pip install -e .[codegen,test,httpx]
 	touch $(VIRTUAL_ENV)/.requirements-installed
 
 reports:
@@ -89,12 +88,13 @@ watch:  ## Watch for changes to python modules and re-run the tests
 docs: setup  ## Build the documentation
 	$(VIRTUAL_ENV)/bin/sphinx-build -a docs docs/_build
 
-publish-test: setup  ## Publish the library to test pypi
+build: setup  ## Build the python wheel
 	$(VIRTUAL_ENV)/bin/hatch build -t sdist -t wheel
+
+publish-test: build  ## Publish the library to test pypi
 	$(VIRTUAL_ENV)/bin/hatch publish --repo https://test.pypi.org/legacy/
 
-publish: setup  ## Publish the library to pypi
-	$(VIRTUAL_ENV)/bin/hatch build -t sdist -t wheel
+publish: build ## Publish the library to pypi
 	$(VIRTUAL_ENV)/bin/hatch publish
 
 format:

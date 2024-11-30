@@ -92,7 +92,7 @@ def run_codegen(dry_run: bool, schema: str, dest: str, scalars: list[str] | None
     _scalars = resolve_scalars(scalars or [])
     cannula.render_file(
         type_defs=documents,
-        path=destination,
+        dest=destination,
         dry_run=dry_run,
         scalars=_scalars,
     )

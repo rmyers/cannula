@@ -16,7 +16,7 @@ from graphql import (
     Node,
 )
 
-from cannula.format import format_with_ruff
+from cannula.format import format_code
 from cannula.schema import concat_documents
 from cannula.types import Argument, Directive, Field, FieldType, ObjectType
 
@@ -540,12 +540,10 @@ def ast_for_root_type(fields: list[Field]) -> ast.ClassDef:
     )
 
 
-def render_file(
+def render_code(
     type_defs: typing.Iterable[typing.Union[str, DocumentNode]],
-    path: pathlib.Path,
     scalars: list[ScalarInterface] = [],
-    dry_run: bool = False,
-) -> None:
+) -> str:
     # first setup custom scalars so the parsed schema includes them
     add_custom_scalar_handlers(scalars)
 
@@ -608,8 +606,20 @@ def render_file(
     if operation_fields:
         root.body.append(ast_for_root_type(operation_fields))
 
+    return format_code(root)
+
+
+def render_file(
+    type_defs: typing.Iterable[typing.Union[str, DocumentNode]],
+    dest: pathlib.Path,
+    scalars: list[ScalarInterface] = [],
+    dry_run: bool = False,
+) -> None:
+    formatted_code = render_code(type_defs=type_defs, scalars=scalars)
+
     if dry_run:
-        LOG.info(f"DRY_RUN would produce: \n{ast.dump(root, indent=4)}")
+        LOG.info(f"DRY_RUN would produce: \n{formatted_code}")
         return
 
-    format_with_ruff(root, path)
+    with open(dest, "w") as final_file:
+        final_file.write(formatted_code)

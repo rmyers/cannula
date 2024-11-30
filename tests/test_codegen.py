@@ -82,18 +82,21 @@ class SenderType(ABC):
 
 
 class get_sender_by_emailQuery(Protocol):
+
     async def __call__(
         self, info: ResolveInfo, *, input: Optional[EmailSearchInput] = None
     ) -> Optional[SenderType]: ...
 
 
 class messageMutation(Protocol):
+
     async def __call__(
         self, info: ResolveInfo, text: str, sender: str
     ) -> Optional[MessageType]: ...
 
 
 class messagesQuery(Protocol):
+
     async def __call__(
         self, info: ResolveInfo, limit: int
     ) -> Optional[Sequence[MessageType]]: ...
@@ -235,8 +238,8 @@ async def test_render_file(
 ):
     with tempfile.NamedTemporaryFile() as generated_file:
         render_file(
-            schema,
-            path=pathlib.Path(generated_file.name),
+            type_defs=schema,
+            dest=pathlib.Path(generated_file.name),
             dry_run=dry_run,
             scalars=scalars,
         )

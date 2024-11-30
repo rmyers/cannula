@@ -45,16 +45,19 @@ class MovieType(ABC):
 
 
 class booksQuery(Protocol):
+
     async def __call__(self, info: ResolveInfo) -> Optional[Sequence[BookType]]: ...
 
 
 class mediaQuery(Protocol):
+
     async def __call__(
         self, info: ResolveInfo, *, limit: Optional[int] = 100
     ) -> Optional[Sequence[GenericType]]: ...
 
 
 class movieQuery(Protocol):
+
     async def __call__(self, info: ResolveInfo, name: str) -> Optional[MovieType]: ...
 
 

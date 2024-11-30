@@ -19,6 +19,7 @@ class ScaledType(ABC):
 
 
 class scaledQuery(Protocol):
+
     async def __call__(self, info: ResolveInfo) -> Optional[ScaledType]: ...
 
 

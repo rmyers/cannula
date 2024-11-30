@@ -22,12 +22,15 @@ classifiers = [
 ]
 dependencies = [
     "graphql-core<=3.2.5",
-    "typing-extensions<=4.12.2",
-    "ruff<=0.7.1",
-    "tomli<=2.0.2",
 ]
 
 [project.optional-dependencies]
+codegen = [
+    "autoflake<=2.3.1",
+    "black<=24.10.0",
+    "tomli<=2.0.2",
+    "typing-extensions<=4.12.2",
+]
 httpx = [
     "httpx",
     "fastapi",
