@@ -94,3 +94,8 @@ async def test_part_five_graph(client: httpx.AsyncClient, mocker):
     # Make sure we only called the database the correct amount
     assert user_from_db.call_count == 2
     assert quotas_from_db.call_count == 3
+
+
+async def test_part5_root(client):
+    resp = await client.get("/part5/")
+    assert resp.status_code == 200, resp.text

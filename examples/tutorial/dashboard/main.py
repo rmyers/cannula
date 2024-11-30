@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from .core.config import config
 from .core.database import create_tables
@@ -40,6 +41,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(SessionMiddleware)
+
+app.mount("/static", StaticFiles(directory=config.static_files), name="static")
 
 
 @app.get("/")
