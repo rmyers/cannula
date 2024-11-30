@@ -1,15 +1,16 @@
 <!DOCTYPE html>
 <html>
 
-<head>
+<head class="h-dvh">
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="https://pyscript.net/releases/2024.10.1/core.css">
     <script src="https://cdn.tailwindcss.com"></script>
     {% block head %}{% endblock %}
     <title>Dashboard</title>
 </head>
 
-<body class="text-blueGray-700 antialiased">
+<body class="text-blueGray-700 antialiased bg-indigo-100">
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root">
         <nav
@@ -62,9 +63,9 @@
                 {% endif %}
             </div>
         </nav>
-        <div class="relative md:ml-64 bg-blueGray-50">
-            <div class="relative bg-indigo-100 md:pt-32 pb-32 pt-12">
-                <main role="main" class="px-4 md:px-10 mx-auto w-full overflow-auto">
+        <div class="relative md:ml-64 bg-blueGray-50 overflow-hidden">
+            <div class="relative bg-indigo-100 pt-12 overflow-hidden">
+                <main role="main" class="px-4 md:px-10 mx-auto w-full overflow-hidden">
                     {% block content %}{% endblock %}
                 </main>
             </div>
