@@ -31,7 +31,7 @@ def test_codegen(mocker: MockerFixture):
     main()
     mock_render.assert_called_with(
         type_defs=mock_schema,
-        path=mocker.ANY,
+        dest=mocker.ANY,
         dry_run=False,
         scalars=[],
     )
@@ -53,7 +53,7 @@ def test_codegen_dry_run(mocker: MockerFixture):
     main()
     mock_render.assert_called_with(
         type_defs=mock_schema,
-        path=mocker.ANY,
+        dest=mocker.ANY,
         scalars=[],
         dry_run=True,
     )
@@ -76,7 +76,7 @@ def test_codegen_scalars(mocker: MockerFixture):
     main()
     mock_render.assert_called_with(
         type_defs=mock_schema,
-        path=mocker.ANY,
+        dest=mocker.ANY,
         scalars=expected_scalars,
         dry_run=False,
     )

@@ -1,32 +1,27 @@
 import ast
-import os
-import pathlib
-import subprocess
-import tempfile
+import logging
 
-RUFF_CMD = os.getenv("RUFF_CMD", "ruff")
+import autoflake
+import black
+
+# Disable noisy debug logs
+black_log = logging.getLogger("blib2to3")
+black_log.setLevel(logging.ERROR)
 
 
-def format_with_ruff(root: ast.Module, dest: pathlib.Path):
+def format_code(root: ast.Module):
     # Convert AST to source code
     source_code = ast.unparse(root)
 
-    # Write the unformatted source code to a temporary file
-    with tempfile.NamedTemporaryFile(delete=False, mode="w", suffix=".py") as tmp:
-        tmp_path = pathlib.Path(tmp.name)
-        tmp.write(source_code)
+    # Remove unused imports and variables
+    fixed_code = autoflake.fix_code(
+        source=source_code,
+        remove_all_unused_imports=True,
+        remove_unused_variables=True,
+        remove_duplicate_keys=True,
+    )
 
-    # Format the temporary file using ruff
-    subprocess.run([RUFF_CMD, "check", "--fix-only", tmp_path], check=True)
-    subprocess.run([RUFF_CMD, "format", tmp_path], check=True)
+    # format with black
+    formatted_code = black.format_str(fixed_code, mode=black.FileMode())
 
-    # Read back the formatted code
-    with open(tmp_path, "r") as tmp:
-        formatted_code = tmp.read()
-
-    # Write the formatted code to the desired file
-    with open(dest, "w") as final_file:
-        final_file.write(formatted_code)
-
-    # Clean up the temporary file
-    tmp_path.unlink()
+    return formatted_code
