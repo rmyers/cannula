@@ -50,7 +50,7 @@ test = [
     "sphinx-autodoc-typehints",
     "sphinx-argparse==0.5.2",
     "sqlalchemy==2.0.36",
-    "aiosqlite==0.19.0",
+    "aiosqlite==0.20.0",
     "pydata-sphinx-theme",
     "twine==5.1.1",
     "types-python-dateutil",
