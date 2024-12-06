@@ -115,7 +115,8 @@ async def get_cannula_app(
 
 
 async def test_performance():
-    client = httpx.AsyncClient(app=api, base_url="http://localhost")
+    transport = httpx.ASGITransport(app=api)
+    client = httpx.AsyncClient(transport=transport, base_url="http://localhost")
 
     start = time.perf_counter()
     for x in range(NUM_RUNS):

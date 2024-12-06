@@ -1,14 +1,14 @@
 import pathlib
 import functools
 
+from cannula.contrib.config import BaseConfig
 from fastapi.templating import Jinja2Templates
-from pydantic_settings import BaseSettings
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine, async_sessionmaker
 
 DASHBOARD_ROOT = pathlib.Path(__file__).parent.parent
 
 
-class Config(BaseSettings):
+class Config(BaseConfig):
     database_uri: str = "sqlite+aiosqlite:///db.sqlite"
     debug: bool = True
     template_dir: str = "templates"

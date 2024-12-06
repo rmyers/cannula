@@ -1,1 +1,0 @@
-packages = ["cannula", "autoflake", "black", "typing_extensions"]

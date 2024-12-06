@@ -35,7 +35,8 @@ async def session():
 
 @pytest.fixture
 def client() -> httpx.AsyncClient:
-    return httpx.AsyncClient(app=app, base_url="http://localhost")
+    transport = httpx.ASGITransport(app=app)
+    return httpx.AsyncClient(base_url="http://localhost", transport=transport)
 
 
 @pytest.fixture
