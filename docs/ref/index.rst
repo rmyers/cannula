@@ -24,5 +24,6 @@ different parts of cannula to assist in creating a well structued GraphQL API.
    :maxdepth: 2
    :caption: Advanced Tools
 
+   contrib
    middleware
    testing

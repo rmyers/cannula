@@ -8,21 +8,15 @@ dynamic = ["version"]
 description = "Async GraphQL Helper Library"
 readme = "README.md"
 requires-python = ">=3.10"
-authors = [
-    { name = "Robert Myers", email = "robert@julython.org" },
-]
-keywords = [
-    "graphql",
-]
+authors = [{ name = "Robert Myers", email = "robert@julython.org" }]
+keywords = ["graphql"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3.10",
 ]
-dependencies = [
-    "graphql-core<=3.2.5",
-]
+dependencies = ["graphql-core<=3.2.5"]
 
 [project.optional-dependencies]
 codegen = [
@@ -30,11 +24,9 @@ codegen = [
     "black<=24.10.0",
     "tomli<=2.2.1",
     "typing-extensions<=4.12.2",
+    "python-dotenv==1.0.1",
 ]
-httpx = [
-    "httpx",
-    "fastapi",
-]
+httpx = ["httpx", "fastapi"]
 test = [
     "black",
     "coverage==7.6.8",
@@ -81,9 +73,7 @@ only-include = ["cannula"]
 path = "cannula/__init__.py"
 
 [tool.hatch.build.targets.sdist]
-include = [
-    "/cannula",
-]
+include = ["/cannula"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -98,16 +88,13 @@ addopts = [
     "--junit-xml=reports/junit.xml",
     "--ignore=tests/fixtures/examples",
 ]
-testpaths = [
-    "tests",
-    "integration",
-]
+testpaths = ["tests", "integration"]
 
 [tool.isort]
-profile="black"
+profile = "black"
 
 [tool.flake8]
-max_line_length=120
+max_line_length = 120
 
 [tool.mypy]
 python_version = "3.10"
