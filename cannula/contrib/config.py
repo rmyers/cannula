@@ -92,7 +92,7 @@ class BaseConfig:
 
         if _origin is typing.Annotated:
             args = typing.get_args(hint)
-            return cls._resolve_value(*args, prefix="")
+            return cls._resolve_value(hint=args[0], name=args[1], prefix="")
 
         _value_set: typing.Any = None
         if hint is str:
