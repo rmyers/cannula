@@ -52,7 +52,7 @@ test = [
     "sqlalchemy==2.0.36",
     "aiosqlite==0.20.0",
     "pydata-sphinx-theme",
-    "twine==5.1.1",
+    "twine==6.0.1",
     "types-python-dateutil",
     "types-requests",
     "hatch",
