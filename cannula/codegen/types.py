@@ -59,6 +59,7 @@ class ObjectType:
     types: typing.List[FieldType]
     directives: typing.Dict[str, typing.List[Directive]]
     description: typing.Optional[str] = None
+    defined_scalar_type: bool = False
 
 
 @dataclasses.dataclass

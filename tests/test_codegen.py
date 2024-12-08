@@ -4,8 +4,14 @@ import pathlib
 
 import pytest
 
-from cannula.codegen import parse_schema, render_file, render_object
-from cannula.types import Argument, Directive, Field
+from cannula.codegen import (
+    Argument,
+    Directive,
+    Field,
+    parse_schema,
+    render_file,
+    render_object,
+)
 from cannula.scalars import ScalarInterface
 from cannula.scalars.date import Datetime
 
@@ -35,23 +41,23 @@ type Mutation {
 }
 '''
 
-EXTENTIONS = """
-    extend type Sender {
-        email: String!
-    }
-    input EmailSearch {
-        "email to search"
-        email: String!
-        limit: Int = 100
-        other: String = "blah"
-        include: Boolean = false
-    }
-    extend type Query {
-        get_sender_by_email(input: EmailSearch): Sender
-    }
+EXTENTIONS = """\
+extend type Sender {
+    email: String!
+}
+input EmailSearch {
+    "email to search"
+    email: String!
+    limit: Int = 100
+    other: String = "blah"
+    include: Boolean = false
+}
+extend type Query {
+    get_sender_by_email(input: EmailSearch): Sender
+}
 """
 
-expected_output = """\
+expected_output = '''\
 from __future__ import annotations
 from abc import ABC
 from cannula import ResolveInfo
@@ -76,6 +82,14 @@ class MessageType(ABC):
 
 @dataclass(kw_only=True)
 class SenderType(ABC):
+    """
+    Some sender action:
+
+    ```
+    Sender(foo)
+    ```
+    """
+
     __typename = "Sender"
     name: Optional[str] = None
     email: str
@@ -106,7 +120,69 @@ class RootType(TypedDict, total=False):
     get_sender_by_email: Optional[get_sender_by_emailQuery]
     message: Optional[messageMutation]
     messages: Optional[messagesQuery]
-"""
+'''
+
+expected_pydantic = '''\
+from __future__ import annotations
+from cannula import ResolveInfo
+from pydantic import BaseModel
+from typing import Optional, Protocol, Sequence
+from typing_extensions import TypedDict
+
+
+class EmailSearchInput(TypedDict):
+    email: str
+    limit: int
+    other: str
+    include: bool
+
+
+class MessageType(BaseModel):
+    __typename = "Message"
+    text: Optional[str] = None
+    sender: Optional[SenderType] = None
+
+
+class SenderType(BaseModel):
+    """
+    Some sender action:
+
+    ```
+    Sender(foo)
+    ```
+    """
+
+    __typename = "Sender"
+    name: Optional[str] = None
+    email: str
+
+
+class get_sender_by_emailQuery(Protocol):
+
+    async def __call__(
+        self, info: ResolveInfo, *, input: Optional[EmailSearchInput] = None
+    ) -> Optional[SenderType]: ...
+
+
+class messageMutation(Protocol):
+
+    async def __call__(
+        self, info: ResolveInfo, text: str, sender: str
+    ) -> Optional[MessageType]: ...
+
+
+class messagesQuery(Protocol):
+
+    async def __call__(
+        self, info: ResolveInfo, limit: int
+    ) -> Optional[Sequence[MessageType]]: ...
+
+
+class RootType(TypedDict, total=False):
+    get_sender_by_email: Optional[get_sender_by_emailQuery]
+    message: Optional[messageMutation]
+    messages: Optional[messagesQuery]
+'''
 
 schema_interface = """\
 scalar Datetime
@@ -215,26 +291,56 @@ async def test_parse_schema_dict():
 
 
 @pytest.mark.parametrize(
-    "dry_run, schema, scalars, expected",
+    "dry_run, schema, scalars, use_pydantic, expected",
     [
-        pytest.param(True, [SCHEMA, EXTENTIONS], [], "", id="dry-run:True"),
         pytest.param(
-            False, [SCHEMA, EXTENTIONS], [], expected_output, id="dry-run:False"
+            True,
+            [SCHEMA, EXTENTIONS],
+            [],
+            False,
+            "",
+            id="dry-run:True",
         ),
         pytest.param(
-            False, [schema_interface], [], expected_interface, id="interfaces"
+            False,
+            [SCHEMA, EXTENTIONS],
+            [],
+            False,
+            expected_output,
+            id="dry-run:False",
+        ),
+        pytest.param(
+            False,
+            [schema_interface],
+            [],
+            False,
+            expected_interface,
+            id="interfaces",
         ),
         pytest.param(
             False,
             [schema_scalars],
             [Datetime],
+            False,
             expected_scalars,
             id="scalars",
+        ),
+        pytest.param(
+            False,
+            [SCHEMA, EXTENTIONS],
+            [Datetime],
+            True,
+            expected_pydantic,
+            id="pydantic",
         ),
     ],
 )
 async def test_render_file(
-    dry_run: bool, schema: list[str], expected: str, scalars: list[ScalarInterface]
+    dry_run: bool,
+    schema: list[str],
+    scalars: list[ScalarInterface],
+    use_pydantic: bool,
+    expected: str,
 ):
     with tempfile.NamedTemporaryFile() as generated_file:
         render_file(
@@ -242,6 +348,7 @@ async def test_render_file(
             dest=pathlib.Path(generated_file.name),
             dry_run=dry_run,
             scalars=scalars,
+            use_pydantic=use_pydantic,
         )
         with open(generated_file.name, "r") as rendered:
             content = rendered.read()

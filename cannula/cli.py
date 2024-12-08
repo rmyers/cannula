@@ -7,6 +7,7 @@ import sys
 import tomli
 
 import cannula
+from cannula.codegen import render_file
 from cannula.scalars import ScalarInterface
 
 # create the top-level parser for global options
@@ -58,6 +59,12 @@ codegen_parser.add_argument(
     action="append",
     dest="scalars",
 )
+codegen_parser.add_argument(
+    "--use-pydantic",
+    "--use_pydantic",
+    action="store_true",
+    help="Use Pydantic models for generated classes.",
+)
 
 
 def load_config(config) -> dict:
@@ -85,16 +92,19 @@ def resolve_scalars(scalars: list[str]) -> list[ScalarInterface]:
     return _scalars
 
 
-def run_codegen(dry_run: bool, schema: str, dest: str, scalars: list[str] | None):
+def run_codegen(
+    dry_run: bool, schema: str, dest: str, scalars: list[str] | None, use_pydantic: bool
+):
     source = pathlib.Path(schema)
     documents = cannula.load_schema(source)
     destination = pathlib.Path(dest)
     _scalars = resolve_scalars(scalars or [])
-    cannula.render_file(
+    render_file(
         type_defs=documents,
         dest=destination,
         dry_run=dry_run,
         scalars=_scalars,
+        use_pydantic=use_pydantic,
     )
 
 
@@ -115,9 +125,11 @@ def main():
             schema = codegen_config.get("schema", options.schema)
             dest = codegen_config.get("dest", options.dest)
             scalars = codegen_config.get("scalars", options.scalars)
+            use_pydantic = codegen_config.get("use_pydantic", options.use_pydantic)
             run_codegen(
                 dry_run=options.dry_run,
                 schema=schema,
                 dest=dest,
                 scalars=scalars,
+                use_pydantic=use_pydantic,
             )

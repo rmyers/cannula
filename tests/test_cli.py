@@ -18,7 +18,7 @@ def test_help(mocker: MockerFixture):
 
 
 def test_invalid_command_does_not_hang(mocker: MockerFixture):
-    mocker.patch("cannula.render_file")
+    mocker.patch("cannula.cli.render_file")
     mocker.patch.object(sys, "argv", ["cli", "codegen", "--invalid"])
     main()
 
@@ -26,7 +26,7 @@ def test_invalid_command_does_not_hang(mocker: MockerFixture):
 def test_codegen(mocker: MockerFixture):
     mock_schema = mocker.Mock()
     mocker.patch("cannula.load_schema", return_value=mock_schema)
-    mock_render = mocker.patch("cannula.render_file")
+    mock_render = mocker.patch("cannula.cli.render_file")
     mocker.patch.object(sys, "argv", ["cli", "codegen"])
     main()
     mock_render.assert_called_with(
@@ -34,13 +34,14 @@ def test_codegen(mocker: MockerFixture):
         dest=mocker.ANY,
         dry_run=False,
         scalars=[],
+        use_pydantic=False,
     )
 
 
 def test_codegen_dry_run(mocker: MockerFixture):
     mock_schema = mocker.Mock()
     mocker.patch("cannula.load_schema", return_value=mock_schema)
-    mock_render = mocker.patch("cannula.render_file")
+    mock_render = mocker.patch("cannula.cli.render_file")
     mocker.patch.object(
         sys,
         "argv",
@@ -56,6 +57,7 @@ def test_codegen_dry_run(mocker: MockerFixture):
         dest=mocker.ANY,
         scalars=[],
         dry_run=True,
+        use_pydantic=False,
     )
 
 
@@ -63,7 +65,7 @@ def test_codegen_scalars(mocker: MockerFixture):
     expected_scalars = resolve_scalars(["cannula.scalars.date.Datetime"])
     mock_schema = mocker.Mock()
     mocker.patch("cannula.load_schema", return_value=mock_schema)
-    mock_render = mocker.patch("cannula.render_file")
+    mock_render = mocker.patch("cannula.cli.render_file")
     mocker.patch.object(
         sys,
         "argv",
@@ -79,6 +81,7 @@ def test_codegen_scalars(mocker: MockerFixture):
         dest=mocker.ANY,
         scalars=expected_scalars,
         dry_run=False,
+        use_pydantic=False,
     )
 
 
