@@ -6,12 +6,12 @@
 
 > GraphQL for people who like Python!
 
-* [Why Cannula](#why)
-* [Installation](#install)
-* [Quick Start](#start)
-* [Performance](#performance)
-* [Examples](#examples)
-* [Documentation](https://cannula.readthedocs.io/)
+- [Why Cannula](#why)
+- [Installation](#install)
+- [Quick Start](#start)
+- [Performance](#performance)
+- [Examples](#examples)
+- [Documentation](https://cannula.readthedocs.io/)
 
 <h2 id="why">Why Cannula?</h2>
 
@@ -34,6 +34,7 @@ a schema to define your application you can auto generate much of the code
 you need to interact with it.
 
 Our Philosophy:
+
 1. Make your site easy to maintain.
 2. Document your code.
 3. Don't lock yourself into a framework.
@@ -41,8 +42,8 @@ Our Philosophy:
 
 <h2 id="install">Installation</h2>
 
-Requires Python 3.8 or greater! The only dependency is
-[graphql-core-next](https://graphql-core-next.readthedocs.io/en/latest/).
+Requires Python 3.10 or greater! The only dependency is
+[graphql-core](https://graphql-core-3.readthedocs.io/en/latest/).
 
 ```bash
 pip3 install cannula
@@ -64,22 +65,24 @@ SCHEMA = """
     }
 """
 
-# Basic API setup with the schema we defined
-api = cannula.CannulaAPI(schema=SCHEMA)
-
-
-# The query resolver takes a `source` and `info` objects
-# and any arguments defined by the schema. Here we
-# only accept a single argument `who`.
-@api.query()
+# The query resolver takes an `info` object and any arguments
+# defined by the schema. Here we only accept a single argument `who`.
 async def hello(
-    source: typing.Any,
     info: cannula.ResolveInfo,
     who: str,
 ) -> str:
     # Here the field_name is 'hello' so we'll
     # return 'hello {who}!'
     return f"{info.field_name} {who}!"
+
+
+# Basic API setup with the schema we defined and root_value
+api = cannula.CannulaAPI(
+    schema=SCHEMA,
+    root_value={
+        "hello": hello,  # Set the resolver function we defined
+    }
+)
 
 
 # Pre-parse your query to speed up your requests.
@@ -132,21 +135,21 @@ You can view the tests in [performance](performance/test_performance.py). We hav
 
 test_performance.py::test_performance
 performance test results:
-fastapi: 0.41961031800019555
-ariadne results: 1.8639117470011115
-cannula results: 0.5465521310106851
+fastapi: 0.4401752959993246
+ariadne results: 1.8754248120003467
+cannula results: 0.5984569250003915
 PASSED
 test_performance.py::test_performance_invalid_request
 performance test results:
-fastapi: 0.375848950992804
-ariadne results: 0.8494849189883098
-cannula results: 0.4427280649833847
+fastapi: 0.3655707629995959
+ariadne results: 0.8345384459998968
+cannula results: 0.42288053700031014
 PASSED
 test_performance.py::test_performance_invalid_query
 performance test results:
-fastapi: 0.37241295698913746
-ariadne results: 2.1828249279933516
-cannula results: 0.4591125229781028
+fastapi: 0.3692567819998658
+ariadne results: 2.08707908300039
+cannula results: 0.4372879369993825
 PASSED
 ```
 
@@ -154,7 +157,7 @@ As you can see Cannula is close to the raw performance of FastAPI. Granted real 
 
 <h2 id="examples">Examples and Documentation</h2>
 
-* [hello world](examples/hello.py)
-* [using mocks](examples/mocks.py)
+- [hello world](examples/hello.py)
+- [using mocks](examples/mocks.py)
 
 [Documentation](https://cannula.readthedocs.io/)
