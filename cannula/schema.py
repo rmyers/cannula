@@ -5,7 +5,6 @@ Schema Utilities
 
 import logging
 import pathlib
-import pprint
 import typing
 import itertools
 
@@ -90,6 +89,7 @@ def concat_documents(
 
 def build_and_extend_schema(
     type_defs: typing.Iterable[typing.Union[str, DocumentNode]],
+    scalars: typing.Optional[typing.List[ScalarInterface]] = None,
     extensions: typing.Optional[typing.Dict[str, typing.Any]] = None,
 ) -> GraphQLSchema:
     """
@@ -138,14 +138,7 @@ def build_and_extend_schema(
     if extensions:
         schema.extensions = extensions
 
-    return schema
-
-
-def set_scalars(
-    schema: GraphQLSchema,
-    scalars: typing.List[ScalarInterface],
-) -> GraphQLSchema:
-    scalar_map = {s.name: s for s in scalars}
+    scalar_map = {s.name: s for s in scalars or []}
     for name, definition in schema.type_map.items():
         if not is_scalar_type(definition):
             continue
@@ -161,11 +154,6 @@ def set_scalars(
             scalar.extensions = {
                 "py_type": extended_scalar.input_module.klass,
             }
-
-            LOG.debug(
-                "set extended_scalar: %s",
-                pprint.pformat(schema.type_map[extended_scalar.name]),
-            )
 
             if "imports" in schema.extensions:
                 schema.extensions["imports"][extended_scalar.input_module.module].add(

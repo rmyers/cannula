@@ -15,7 +15,7 @@ from graphql import (
     is_union_type,
 )
 
-from cannula.schema import build_and_extend_schema, set_scalars
+from cannula.schema import build_and_extend_schema
 from cannula.codegen.types import (
     Argument,
     Directive,
@@ -75,8 +75,11 @@ class Schema:
         type_defs: typing.Iterable[typing.Union[str, DocumentNode]],
         scalars: typing.List[ScalarInterface],
     ):
-        schema = build_and_extend_schema(type_defs, {"imports": _IMPORTS})
-        self._schema = set_scalars(schema, scalars)
+        self._schema = build_and_extend_schema(
+            type_defs,
+            scalars,
+            {"imports": _IMPORTS},
+        )
         self._set_object_types()
         self._types = self._schema.type_map
         self.object_types = []

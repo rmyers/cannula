@@ -32,7 +32,6 @@ from .schema import (
     build_and_extend_schema,
     load_schema,
     maybe_parse,
-    set_scalars,
 )
 
 LOG = logging.getLogger(__name__)
@@ -201,8 +200,7 @@ class CannulaAPI(typing.Generic[RootType]):
         return schemas
 
     def _build_schema(self) -> GraphQLSchema:
-        schema = build_and_extend_schema(self._find_schema())
-        schema = set_scalars(schema, self._scalars)
+        schema = build_and_extend_schema(self._find_schema(), self._scalars)
 
         schema_validation_errors = validate_schema(schema)
         if schema_validation_errors:
