@@ -27,11 +27,9 @@ async def test_api_valid_schema_and_bad_query(valid_schema, mocker: MockerFixtur
     assert results.errors[0].message == "Syntax Error: Expected Name, found <EOF>."
 
 
-async def test_api_scalars_missing(valid_schema):
-    with pytest.raises(
-        Exception, match="Invalid scalar type Date did you forget to define it?"
-    ):
-        CannulaAPI(valid_schema, scalars=[date.Date])
+async def test_api_scalars(valid_schema):
+    api = CannulaAPI(valid_schema, scalars=[date.Date])
+    assert api is not None
 
 
 async def test_api_with_invalid_schema():

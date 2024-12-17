@@ -5,15 +5,15 @@ from dataclasses import dataclass
 from typing import Any, Optional, Protocol, Sequence
 from typing_extensions import TypedDict
 
-DatetimeType = Any
 
-
-class GenericType(Protocol):
+class Generic(Protocol):
     name: Optional[str] = None
 
 
 @dataclass(kw_only=True)
 class BookType(ABC):
+    """books are cool"""
+
     __typename = "Book"
     name: Optional[str] = None
     author: Optional[str] = None
@@ -41,7 +41,7 @@ class MovieType(ABC):
     director: Optional[str] = None
     book: Optional[BookType] = None
     views: Optional[int] = None
-    created: Optional[DatetimeType] = None
+    created: Optional[Any] = None
 
 
 class booksQuery(Protocol):
@@ -53,7 +53,7 @@ class mediaQuery(Protocol):
 
     async def __call__(
         self, info: ResolveInfo, *, limit: Optional[int] = 100
-    ) -> Optional[Sequence[GenericType]]: ...
+    ) -> Optional[Sequence[Generic]]: ...
 
 
 class movieQuery(Protocol):

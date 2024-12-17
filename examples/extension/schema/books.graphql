@@ -1,8 +1,9 @@
-type Book  implements Generic {
-    name: String
-    author: String
+"books are cool"
+type Book implements Generic {
+  name: String
+  author: String
 }
 
 extend type Query {
-    books: [Book]
+  books: [Book]
 }
