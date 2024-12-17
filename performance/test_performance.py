@@ -107,9 +107,7 @@ async def get_ariadne_app(request: fastapi.Request) -> typing.Any:
 async def get_cannula_app(
     request: fastapi.Request, payload: cannula.contrib.asgi.GraphQLPayload
 ) -> typing.Any:
-    results = await cannula_app.call(
-        payload.query, request, variables=payload.variables
-    )
+    results = await cannula_app.call(payload.query, variables=payload.variables)
     errors = [e.formatted for e in results.errors] if results.errors else None
     return {"data": results.data, "errors": errors}
 

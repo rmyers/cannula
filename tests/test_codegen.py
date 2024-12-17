@@ -208,10 +208,8 @@ from abc import ABC
 from dataclasses import dataclass
 from typing import Any, Optional, Protocol, Union
 
-DatetimeType = Any
 
-
-class PersonaType(Protocol):
+class Persona(Protocol):
     id: str
 
 
@@ -219,7 +217,7 @@ class PersonaType(Protocol):
 class AdminType(ABC):
     __typename = "Admin"
     id: str
-    created: Optional[DatetimeType] = None
+    created: Optional[Any] = None
 
 
 @dataclass(kw_only=True)
@@ -265,10 +263,10 @@ class ThingType(ABC):
 
 async def test_parse_schema_dict():
     schema = 'type Test { "name field" name: String @deprecated(reason: "not valid")}'
-    actual = parse_schema([schema])
+    actual = parse_schema([schema], [Datetime])
 
     assert actual is not None
-    obj = actual["Test"]
+    obj = actual.object_types[0]
     assert obj.name == "Test"
     assert obj.description is None
     assert obj.fields == [
@@ -401,10 +399,10 @@ Module(
 
 async def test_render_object_handles_computed_directive():
     schema = "type Test { name: String @computed}"
-    actual = parse_schema([schema])
+    actual = parse_schema([schema], [])
 
     assert actual is not None
-    obj = actual["Test"]
+    obj = actual.object_types[0]
     rendered = render_object(obj)
     root = ast.Module(body=[*rendered], type_ignores=[])
     assert ast.dump(root, indent=4) == EXPECTED_OBJECT

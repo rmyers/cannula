@@ -4,89 +4,24 @@ Code Generation
 """
 
 import ast
-import collections
-import contextvars
 import logging
 import pathlib
-import pprint
 import typing
 
 from cannula.scalars import ScalarInterface
 from graphql import (
     DocumentNode,
-    Node,
 )
 
 from cannula.format import format_code
-from cannula.schema import concat_documents
-from cannula.codegen.types import Argument, Directive, Field, FieldType, ObjectType
+from cannula.codegen.types import Argument, Field, ObjectType, UnionType
+from cannula.codegen.parse import parse_schema
 
 LOG = logging.getLogger(__name__)
-
-_TYPES = {
-    "Boolean": "bool",
-    "Float": "float",
-    "ID": "str",
-    "Int": "int",
-    "String": "str",
-}
-TYPES = contextvars.ContextVar("types", default=_TYPES)
-
-VALUE_FUNCS = {
-    "boolean_value": lambda value: value in ["true", "True"],
-    "int_value": lambda value: int(value),
-    "float_value": lambda value: float(value),
-}
-
-_IMPORTS: typing.DefaultDict[str, set[str]] = collections.defaultdict(set[str])
-_IMPORTS.update(
-    {
-        "__future__": set(["annotations"]),
-        "abc": set(["ABC", "abstractmethod"]),
-        "cannula": set(["ResolveInfo"]),
-        "dataclasses": set(["dataclass"]),
-        "pydantic": set(["BaseModel"]),
-        "typing": set(
-            [
-                "Any",
-                "Awaitable",
-                "Sequence",
-                "Optional",
-                "Protocol",
-                # In python < 3.12 pydantic wants us to use typing_extensions
-                # "TypedDict",
-                "Union",
-            ]
-        ),
-        "typing_extensions": set(["TypedDict", "NotRequired"]),
-    }
-)
 
 # AST contants for common values
 NONE = ast.Constant(value=None)
 ELLIPSIS = ast.Expr(value=ast.Constant(value=Ellipsis))
-
-
-def add_custom_scalar_types(
-    scalars: list[ScalarInterface],
-) -> dict[str, str]:
-    _types = _TYPES.copy()
-    for scalar in scalars:
-        _types[scalar.name] = scalar.input_module.klass
-        _types[f"{scalar.name}InputType"] = scalar.output_module.klass
-
-    return _types
-
-
-def add_custom_scalar_imports(
-    scalars: list[ScalarInterface],
-) -> dict[str, set[str]]:
-    _imports = _IMPORTS.copy()
-    for scalar in scalars:
-        _imports[scalar.input_module.module].add(scalar.input_module.klass)
-        _imports[scalar.output_module.module].add(scalar.output_module.klass)
-
-    return _imports
 
 
 def ast_for_import_from(module: str, names: set[str]) -> ast.ImportFrom:
@@ -250,192 +185,6 @@ def render_operation_field_ast(field: Field) -> ast.AsyncFunctionDef:
     return func_node
 
 
-def parse_description(obj: dict) -> typing.Optional[str]:
-    raw_description = obj.get("description") or {}
-    is_block = raw_description.get("block", False)
-    desc = raw_description.get("value")
-    if not desc:
-        return None
-
-    # Format blocks with newlines so the doc strings look correct.
-    return f"\n{desc}\n" if is_block else desc
-
-
-def parse_name(obj: dict) -> str:
-    raw_name = obj.get("name") or {}
-    return raw_name.get("value", "unknown")
-
-
-def parse_value(obj: dict) -> typing.Any:
-    kind = obj["kind"]
-    value = obj["value"]
-
-    if func := VALUE_FUNCS.get(kind):
-        return func(value)
-
-    return value
-
-
-def parse_default(obj: typing.Dict[str, typing.Any]) -> typing.Any:
-    default_value = obj.get("default_value")
-    if not default_value:
-        return None
-
-    # LOG.debug(f"Default Value: {default_value}")
-    return parse_value(default_value)
-
-
-def parse_args(obj: dict) -> list[Argument]:
-    args: list[Argument] = []
-    raw_args = obj.get("arguments") or []
-    for arg in raw_args:
-        name = parse_name(arg)
-        arg_type = FieldType(value=None, required=False)
-        raw_type = arg.get("type")
-        if raw_type:
-            arg_type = parse_type(raw_type)
-        value = None
-        raw_value = arg.get("value")
-        if raw_value:
-            value = parse_value(raw_value)
-        default = parse_default(arg)
-        args.append(
-            Argument(
-                name=name,
-                type=arg_type.value,
-                required=arg_type.required,
-                value=value,
-                default=default,
-            )
-        )
-
-    return args
-
-
-def parse_type(type_obj: dict) -> FieldType:
-    required = False
-    value = None
-    _types = TYPES.get()
-
-    if type_obj["kind"] == "non_null_type":
-        required = True
-        value = parse_type(type_obj["type"]).value
-
-    if type_obj["kind"] == "list_type":
-        list_type = parse_type(type_obj["type"]).value
-        value = f"Sequence[{list_type}]"
-
-    if type_obj["kind"] == "named_type":
-        name = type_obj["name"]
-        value = name["value"]
-        if value in _types:
-            value = _types[value]
-        else:
-            value = f"{value}Type"
-
-    return FieldType(value=value, required=required)
-
-
-def parse_directives(field: typing.Dict[str, typing.Any]) -> list[Directive]:
-    directives: list[Directive] = []
-    for directive in field.get("directives", []):
-        name = parse_name(directive)
-        args = parse_args(directive)
-        directives.append(Directive(name=name, args=args))
-    return directives
-
-
-def parse_field(field: typing.Dict[str, typing.Any], parent: str) -> Field:
-    # LOG.debug("Field: %s", pprint.pformat(field))
-    name = parse_name(field)
-    field_type = parse_type(field["type"])
-    default = parse_default(field)
-    directives = parse_directives(field)
-    args = parse_args(field)
-    func_name = f"{name}{parent}"
-
-    return Field(
-        name=name,
-        value=field_type.value,
-        func_name=func_name,
-        description=parse_description(field),
-        directives=directives,
-        args=args,
-        default=default,
-        required=field_type.required,
-    )
-
-
-def parse_node(node: Node):
-    details = node.to_dict()
-    LOG.debug("%s: %s", node.kind, pprint.pformat(details))
-    name = parse_name(details)
-    raw_fields = details.get("fields", [])
-
-    description = parse_description(details)
-    # Check if this has Union types
-    raw_types = details.get("types", [])
-    types = [parse_type(t) for t in raw_types]
-    directives: typing.Dict[str, list[Directive]] = {}
-    # Check for name in defined scalar types
-    _types = TYPES.get()
-    defined_scalar_type = name in _types
-
-    fields: list[Field] = []
-    for field in raw_fields:
-        parsed = parse_field(field, parent=name)
-        fields.append(parsed)
-        if parsed.directives:
-            directives[parsed.name] = parsed.directives
-
-    return ObjectType(
-        name=name,
-        kind=node.kind,
-        fields=fields,
-        directives=directives,
-        description=description,
-        types=types,
-        defined_scalar_type=defined_scalar_type,
-    )
-
-
-def parse_schema(
-    type_defs: typing.Iterable[typing.Union[str, DocumentNode]],
-    _types: dict[str, str] = _TYPES,
-) -> typing.Dict[str, ObjectType]:
-    document = concat_documents(type_defs)
-    types: typing.Dict[str, ObjectType] = {}
-
-    # First we need to pull out the input types since the default
-    # names are different than normal object types.
-    for definition in document.definitions:
-        if definition.kind == "input_object_type_definition":
-            details = definition.to_dict()
-            name = parse_name(details)
-            _types[name] = f"{name}Input"
-
-    # Set the contextvar for types so the parse functions can access it.
-    token = TYPES.set(_types)
-
-    for definition in document.definitions:
-        node = parse_node(definition)
-        if node.name in types:
-            types[node.name].fields.extend(node.fields)
-            types[node.name].directives.update(node.directives)
-            # Descriptions are only allowed on the type and not extensions
-            # however we might get the extention first. So only update
-            # if we have a description. Skipping coverage on this as it
-            # is really hard to test this scenario.
-            if node.description:  # pragma: no cover
-                types[node.name].description = node.description
-        else:
-            types[node.name] = node
-
-    LOG.debug("TYPES: %s", pprint.pformat(types))
-    TYPES.reset(token)
-    return types
-
-
 def ast_for_class_field(field: Field) -> ast.AnnAssign:
     field_type = ast_for_name(field.type)
 
@@ -472,8 +221,6 @@ def render_object(
         else:
             non_computed.append(field)
 
-    type_name = f"{obj.name}Type"
-
     type_def = ast_for_assign("__typename", ast_for_constant(obj.name))
     klass_fields = [ast_for_class_field(f) for f in non_computed]
     computed_fields = [render_computed_field_ast(f) for f in computed]
@@ -487,7 +234,7 @@ def render_object(
     if use_pydantic:
         return [
             ast.ClassDef(
-                name=type_name,
+                name=obj.py_type,
                 body=[*constants, *klass_fields, *computed_fields],
                 bases=[ast_for_name("BaseModel")],
                 keywords=[],
@@ -498,7 +245,7 @@ def render_object(
 
     return [
         ast.ClassDef(
-            name=type_name,
+            name=obj.py_type,
             body=[*constants, *klass_fields, *computed_fields],
             bases=[ast_for_name("ABC")],
             keywords=[],
@@ -531,12 +278,10 @@ def render_input(obj: ObjectType) -> list[ast.ClassDef | ast.Assign]:
 
 
 def render_interface(obj: ObjectType) -> list[ast.ClassDef | ast.Assign]:
-    type_name = f"{obj.name}Type"
-
     klass_fields = [ast_for_class_field(f) for f in obj.fields]
     return [
         ast.ClassDef(
-            name=type_name,
+            name=obj.py_type,
             body=[*klass_fields],
             bases=[ast_for_name("Protocol")],
             keywords=[],
@@ -546,7 +291,7 @@ def render_interface(obj: ObjectType) -> list[ast.ClassDef | ast.Assign]:
     ]
 
 
-def render_union(obj: ObjectType) -> list[ast.ClassDef | ast.Assign]:
+def render_union(obj: UnionType) -> list[ast.ClassDef | ast.Assign]:
     items = [field.value for field in obj.types]
     return [
         ast_for_assign(
@@ -585,35 +330,9 @@ def render_code(
     scalars: list[ScalarInterface] = [],
     use_pydantic: bool = False,
 ) -> str:
-    # first setup custom scalars so the parsed schema includes them
-    _types = add_custom_scalar_types(scalars)
-    _imports = add_custom_scalar_imports(scalars)
 
-    parsed = parse_schema(type_defs, _types)
-
-    object_types: list[ObjectType] = []
-    interface_types: list[ObjectType] = []
-    input_types: list[ObjectType] = []
-    union_types: list[ObjectType] = []
-    scalar_types: list[ObjectType] = []
-    operation_fields: list[Field] = []
-    for obj in parsed.values():
-        if obj.name in ["Query", "Mutation", "Subscription"]:
-            for field in obj.fields:
-                operation_fields.append(field)
-        elif obj.kind == "scalar_type_definition":
-            scalar_types.append(obj)
-        elif obj.kind in [
-            "object_type_definition",
-            "object_type_extension",
-        ]:
-            object_types.append(obj)
-        elif obj.kind == "input_object_type_definition":
-            input_types.append(obj)
-        elif obj.kind == "interface_type_definition":
-            interface_types.append(obj)
-        elif obj.kind == "union_type_definition":
-            union_types.append(obj)
+    parsed = parse_schema(type_defs, scalars)
+    _imports = parsed._schema.extensions.get("imports", {})
 
     root = ast.Module(body=[], type_ignores=[])
 
@@ -624,29 +343,22 @@ def render_code(
             continue
         root.body.append(ast_for_import_from(module=module, names=_imports[module]))
 
-    for obj in scalar_types:
-        if obj.defined_scalar_type:
-            continue
-        root.body.append(ast_for_assign(f"{obj.name}Type", ast_for_name("Any")))
-
-    for obj in interface_types:
+    for obj in parsed.interface_types:
         root.body.extend(render_interface(obj))
 
-    for obj in input_types:
+    for obj in parsed.input_types:
         root.body.extend(render_input(obj))
 
-    object_types.sort(key=lambda o: o.name)
-    for obj in object_types:
+    for obj in parsed.object_types:
         root.body.extend(render_object(obj, use_pydantic))
 
-    for obj in union_types:
-        root.body.extend(render_union(obj))
+    for union_obj in parsed.union_types:
+        root.body.extend(render_union(union_obj))
 
-    operation_fields.sort(key=lambda f: f.name)
-    root.body.extend([ast_for_operation(f) for f in operation_fields])
+    root.body.extend([ast_for_operation(f) for f in parsed.operation_fields])
 
-    if operation_fields:
-        root.body.append(ast_for_root_type(operation_fields))
+    if parsed.operation_fields:
+        root.body.append(ast_for_root_type(parsed.operation_fields))
 
     return format_code(root)
 

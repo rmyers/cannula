@@ -7,7 +7,7 @@ import cannula
 import cannula.middleware
 from ._generated import (
     BookType,
-    GenericType,
+    Generic,
     MovieType,
     RootType,
 )
@@ -36,7 +36,7 @@ async def get_books(info: cannula.ResolveInfo) -> Sequence[BookType]:
 
 async def get_media(
     info: cannula.ResolveInfo, limit: int | None = 100
-) -> list[GenericType]:
+) -> list[Generic]:
     return [
         Book(name="the Best Movies", author="Jane"),
         Movie(name="the Best Books", director="Sally"),

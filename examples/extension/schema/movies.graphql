@@ -4,21 +4,21 @@ Movie Type
 Includes a book reference defined in other schema file.
 """
 type Movie implements Generic {
-    name: String
-    director: String
-    book: Book
-    views: Int
-    created: Datetime
+  name: String
+  director: String
+  book: Book
+  views: Int
+  created: Datetime
 }
 
 extend type Book {
-    """
-    Get all the movies for a given book. This is will be added to the BookType.
-    """
-    movies(limit: Int = 100): [Movie]
+  """
+  Get all the movies for a given book. This is will be added to the BookType.
+  """
+  movies(limit: Int = 100): [Movie]
 }
 
 extend type Query {
-    media(limit: Int = 100): [Generic]
-    movie(name: String!): Movie
+  media(limit: Int = 100): [Generic]
+  movie(name: String!): Movie
 }

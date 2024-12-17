@@ -19,7 +19,6 @@ from graphql import (
     GraphQLField,
     GraphQLFieldMap,
     GraphQLObjectType,
-    GraphQLScalarType,
     execute,
     ExecutionResult,
     GraphQLSchema,
@@ -200,23 +199,8 @@ class CannulaAPI(typing.Generic[RootType]):
 
         return schemas
 
-    def _set_scalars(self, schema: GraphQLSchema) -> GraphQLSchema:
-        for scalar in self._scalars:
-            object_type = schema.get_type(scalar.name)
-            if object_type is None:
-                raise Exception(
-                    f"Invalid scalar type {scalar.name} did you forget to define it?"
-                )
-
-            object_type = typing.cast(GraphQLScalarType, object_type)
-            object_type.serialize = scalar.serialize  # type: ignore
-            object_type.parse_value = scalar.parse_value  # type: ignore
-
-        return schema
-
     def _build_schema(self) -> GraphQLSchema:
-        schema = build_and_extend_schema(self._find_schema())
-        schema = self._set_scalars(schema)
+        schema = build_and_extend_schema(self._find_schema(), self._scalars)
 
         schema_validation_errors = validate_schema(schema)
         if schema_validation_errors:

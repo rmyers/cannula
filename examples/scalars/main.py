@@ -22,14 +22,18 @@ LOG = logging.getLogger("scalars")
 uid = uuid.UUID("e0c2c649-9c66-4f55-a2d4-966cc4f7d186")
 
 
-async def get_scaled(info: cannula.ResolveInfo) -> ScaledType:
-    return {
-        "id": uid,
-        "created": datetime.datetime(year=2024, month=2, day=5, hour=6, minute=47),
-        "birthday": datetime.date(year=2019, month=3, day=8),
-        "smoke": datetime.time(hour=4, minute=20),
-        "meta": {"fancy": "pants"},
-    }
+class Scaled(ScaledType):
+    pass
+
+
+async def get_scaled(info: cannula.ResolveInfo) -> Scaled:
+    return Scaled(
+        id=uid,
+        created=datetime.datetime(year=2024, month=2, day=5, hour=6, minute=47),
+        birthday=datetime.date(year=2019, month=3, day=8),
+        smoke=datetime.time(hour=4, minute=20),
+        meta={"fancy": "pants"},
+    )
 
 
 api = cannula.CannulaAPI[RootType](
@@ -60,6 +64,6 @@ QUERY = cannula.gql(
 
 
 if __name__ == "__main__":
-    results = api.call_sync(QUERY, None)
+    results = api.call_sync(QUERY)
     pprint.pprint(results.data)
     pprint.pprint(results.errors)

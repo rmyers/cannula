@@ -54,12 +54,19 @@ class FieldType:
 @dataclasses.dataclass
 class ObjectType:
     name: str
-    kind: str
+    py_type: str
     fields: typing.List[Field]
-    types: typing.List[FieldType]
     directives: typing.Dict[str, typing.List[Directive]]
     description: typing.Optional[str] = None
     defined_scalar_type: bool = False
+
+
+@dataclasses.dataclass
+class UnionType:
+    name: str
+    py_type: str
+    types: typing.List[FieldType]
+    description: typing.Optional[str] = None
 
 
 @dataclasses.dataclass

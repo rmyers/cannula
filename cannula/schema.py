@@ -9,22 +9,34 @@ import typing
 import itertools
 
 from graphql import (
+    GraphQLScalarType,
     GraphQLSchema,
     DocumentNode,
     TypeDefinitionNode,
-    parse,
     build_ast_schema,
-    extend_schema,
     concat_ast,
+    extend_schema,
+    is_scalar_type,
+    is_type_definition_node,
     is_type_extension_node,
     is_type_system_extension_node,
-    is_type_definition_node,
+    parse,
 )
+
+from cannula.scalars import ScalarInterface
 
 LOG = logging.getLogger(__name__)
 QUERY_TYPE = parse("type Query { _empty: String }")
 MUTATION_TYPE = parse("type Mutation { _empty: String }")
 COMPUTED_DIRECTIVE = parse("directive @computed(weight: Int = 1) on FIELD_DEFINITION")
+
+_TYPES = {
+    "Boolean": "bool",
+    "Float": "float",
+    "ID": "str",
+    "Int": "int",
+    "String": "str",
+}
 
 
 def extract_extensions(ast: DocumentNode) -> DocumentNode:
@@ -77,6 +89,8 @@ def concat_documents(
 
 def build_and_extend_schema(
     type_defs: typing.Iterable[typing.Union[str, DocumentNode]],
+    scalars: typing.Optional[typing.List[ScalarInterface]] = None,
+    extensions: typing.Optional[typing.Dict[str, typing.Any]] = None,
 ) -> GraphQLSchema:
     """
     Build and Extend Schema
@@ -120,6 +134,34 @@ def build_and_extend_schema(
         schema = extend_schema(
             schema, extension_ast, assume_valid=True, assume_valid_sdl=True
         )
+
+    if extensions:
+        schema.extensions = extensions
+
+    scalar_map = {s.name: s for s in scalars or []}
+    for name, definition in schema.type_map.items():
+        if not is_scalar_type(definition):
+            continue
+
+        scalar = typing.cast(GraphQLScalarType, definition)
+
+        _py_type = _TYPES.get(name, "Any")
+        scalar.extensions["py_type"] = _py_type
+
+        if extended_scalar := scalar_map.get(name):
+            scalar.serialize = extended_scalar.serialize  # type: ignore
+            scalar.parse_value = extended_scalar.parse_value  # type: ignore
+            scalar.extensions = {
+                "py_type": extended_scalar.input_module.klass,
+            }
+
+            if "imports" in schema.extensions:
+                schema.extensions["imports"][extended_scalar.input_module.module].add(
+                    extended_scalar.input_module.klass
+                )
+                schema.extensions["imports"][extended_scalar.output_module.module].add(
+                    extended_scalar.output_module.klass
+                )
 
     return schema
 
