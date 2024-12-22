@@ -15,7 +15,7 @@ from graphql import (
     is_union_type,
 )
 
-from cannula.schema import build_and_extend_schema
+from cannula.schema import Imports, build_and_extend_schema
 from cannula.codegen.types import (
     Argument,
     Directive,
@@ -27,27 +27,33 @@ from cannula.codegen.types import (
 
 LOG = logging.getLogger(__name__)
 
-_IMPORTS: typing.DefaultDict[str, set[str]] = collections.defaultdict(set[str])
+_IMPORTS: Imports = collections.defaultdict(set[str])
 _IMPORTS.update(
     {
-        "__future__": set(["annotations"]),
-        "abc": set(["ABC", "abstractmethod"]),
-        "cannula": set(["ResolveInfo"]),
-        "dataclasses": set(["dataclass"]),
-        "pydantic": set(["BaseModel"]),
-        "typing": set(
-            [
-                "Any",
-                "Awaitable",
-                "Sequence",
-                "Optional",
-                "Protocol",
-                # In python < 3.12 pydantic wants us to use typing_extensions
-                # "TypedDict",
-                "Union",
-            ]
-        ),
-        "typing_extensions": set(["TypedDict", "NotRequired"]),
+        "__future__": {"annotations"},
+        "abc": {"ABC", "abstractmethod"},
+        "cannula": {"ResolveInfo"},
+        "dataclasses": {"dataclass"},
+        "pydantic": {"BaseModel"},
+        "typing": {
+            "Any",
+            "Awaitable",
+            "Sequence",
+            "Optional",
+            "Protocol",
+            # In python < 3.12 pydantic wants us to use typing_extensions
+            # "TypedDict",
+            "Union",
+        },
+        "typing_extensions": {"TypedDict", "NotRequired"},
+        "sqlalchemy": {"ForeignKey", "select", "func"},
+        "sqlalchemy.ext.asyncio": {"AsyncAttrs"},
+        "sqlalchemy.orm": {
+            "DeclarativeBase",
+            "mapped_column",
+            "Mapped",
+            "relationship",
+        },
     }
 )
 VALUE_FUNCS = {
@@ -128,7 +134,9 @@ class Schema:
                 self.operation_fields.extend(operation.fields)
 
             elif is_object_type(definition) and not is_private:
-                self.object_types.append(self.parse_node(definition))
+                fields_metadata = self._schema.extensions.get("field_metadata", {})
+                field_metadata = fields_metadata.get(name, {})
+                self.object_types.append(self.parse_node(definition, field_metadata))
 
         for d in self._schema.directives:
             if d.ast_node:
@@ -222,8 +230,16 @@ class Schema:
             directives.append(Directive(name=name, args=args))
         return directives
 
-    def parse_field(self, field: typing.Dict[str, typing.Any], parent: str) -> Field:
-        # LOG.debug("Field: %s", pprint.pformat(field))
+    def parse_field(
+        self,
+        field: typing.Dict[str, typing.Any],
+        parent: str,
+        meta: typing.Optional[dict] = None,
+    ) -> Field:
+        meta = meta or {}
+        metadata = meta.get("metadata", {})
+        description = meta.get("description")
+
         name = self.parse_name(field)
         field_type = self.parse_type(field["type"])
         default = self.parse_default(field)
@@ -231,15 +247,17 @@ class Schema:
         args = self.parse_args(field)
         func_name = f"{name}{parent}"
 
+        print(metadata)
         return Field(
             name=name,
             value=field_type.value,
             func_name=func_name,
-            description=self.parse_description(field),
+            description=description,
             directives=directives,
             args=args,
             default=default,
             required=field_type.required,
+            computed=metadata.get("computed", False),
         )
 
     def parse_union(self, node: GraphQLUnionType) -> UnionType:
@@ -257,7 +275,10 @@ class Schema:
             types=types,
         )
 
-    def parse_node(self, node: GraphQLNamedType):
+    def parse_node(
+        self, node: GraphQLNamedType, field_metadata: typing.Optional[dict] = None
+    ) -> ObjectType:
+        field_metadata = field_metadata or {}
         assert node.ast_node is not None
         details = node.ast_node.to_dict()
         LOG.debug("%s: %s", node.name, pprint.pformat(details))
@@ -266,16 +287,19 @@ class Schema:
         py_type = node.extensions.get("py_type", node.name)
 
         description = self.parse_description(details)
-        directives: typing.Dict[str, list[Directive]] = {}
+        directives = self.parse_directives(details)
 
         fields: list[Field] = []
         for field_name, field in raw_fields.items():
             if field_name == "_empty":
                 continue
-            parsed = self.parse_field(field.ast_node.to_dict(), parent=name)
+            metadata = field_metadata.get(field_name, {})
+            parsed = self.parse_field(
+                field.ast_node.to_dict(),
+                parent=name,
+                meta=metadata,
+            )
             fields.append(parsed)
-            if parsed.directives:
-                directives[parsed.name] = parsed.directives
 
         return ObjectType(
             name=name,

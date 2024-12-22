@@ -22,9 +22,7 @@ class BookType(ABC):
     async def movies(
         self, info: ResolveInfo, *, limit: Optional[int] = 100
     ) -> Optional[Sequence[MovieType]]:
-        """
-        Get all the movies for a given book. This is will be added to the BookType.
-        """
+        """Get all the movies for a given book. This is will be added to the BookType."""
         ...
 
 

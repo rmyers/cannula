@@ -3,10 +3,10 @@ Schema Utilities
 ----------------
 """
 
+import collections
 import logging
 import pathlib
 import typing
-import itertools
 
 from graphql import (
     GraphQLScalarType,
@@ -15,20 +15,26 @@ from graphql import (
     TypeDefinitionNode,
     build_ast_schema,
     concat_ast,
-    extend_schema,
     is_scalar_type,
     is_type_definition_node,
-    is_type_extension_node,
-    is_type_system_extension_node,
     parse,
 )
+from typing_extensions import TypedDict
 
 from cannula.scalars import ScalarInterface
+from cannula.schema_processor import SchemaProcessor
+
 
 LOG = logging.getLogger(__name__)
 QUERY_TYPE = parse("type Query { _empty: String }")
 MUTATION_TYPE = parse("type Mutation { _empty: String }")
-COMPUTED_DIRECTIVE = parse("directive @computed(weight: Int = 1) on FIELD_DEFINITION")
+
+Imports = typing.DefaultDict[str, set[str]]
+
+
+class Extension(TypedDict):
+    imports: Imports
+
 
 _TYPES = {
     "Boolean": "bool",
@@ -37,13 +43,6 @@ _TYPES = {
     "Int": "int",
     "String": "str",
 }
-
-
-def extract_extensions(ast: DocumentNode) -> DocumentNode:
-    type_extensions = filter(is_type_extension_node, ast.definitions)
-    system_extensions = filter(is_type_system_extension_node, ast.definitions)
-    extensions = itertools.chain(type_extensions, system_extensions)
-    return DocumentNode(definitions=list(extensions))
 
 
 def assert_has_query_and_mutation(ast: DocumentNode) -> DocumentNode:
@@ -67,9 +66,6 @@ def assert_has_query_and_mutation(ast: DocumentNode) -> DocumentNode:
         LOG.debug("Adding default empty Query type")
         ast = concat_ast([ast, QUERY_TYPE])
 
-    LOG.debug("Adding computed directive")
-    ast = concat_ast([ast, COMPUTED_DIRECTIVE])
-
     return ast
 
 
@@ -90,7 +86,7 @@ def concat_documents(
 def build_and_extend_schema(
     type_defs: typing.Iterable[typing.Union[str, DocumentNode]],
     scalars: typing.Optional[typing.List[ScalarInterface]] = None,
-    extensions: typing.Optional[typing.Dict[str, typing.Any]] = None,
+    extensions: typing.Optional[Extension] = None,
 ) -> GraphQLSchema:
     """
     Build and Extend Schema
@@ -125,18 +121,19 @@ def build_and_extend_schema(
 
     ast_document = assert_has_query_and_mutation(ast_document)
 
+    processor = SchemaProcessor()
+    metadata = processor.process_schema(ast_document)
+
     schema = build_ast_schema(ast_document)
 
-    extension_ast = extract_extensions(ast_document)
-
-    if extension_ast.definitions:
-        LOG.debug("Extending schema")
-        schema = extend_schema(
-            schema, extension_ast, assume_valid=True, assume_valid_sdl=True
-        )
+    schema.extensions = {
+        "imports": collections.defaultdict(set[str]),
+        "type_metadata": metadata.type_metadata,
+        "field_metadata": metadata.field_metadata,
+    }
 
     if extensions:
-        schema.extensions = extensions
+        schema.extensions.update(extensions)
 
     scalar_map = {s.name: s for s in scalars or []}
     for name, definition in schema.type_map.items():
@@ -155,13 +152,12 @@ def build_and_extend_schema(
                 "py_type": extended_scalar.input_module.klass,
             }
 
-            if "imports" in schema.extensions:
-                schema.extensions["imports"][extended_scalar.input_module.module].add(
-                    extended_scalar.input_module.klass
-                )
-                schema.extensions["imports"][extended_scalar.output_module.module].add(
-                    extended_scalar.output_module.klass
-                )
+            schema.extensions["imports"][extended_scalar.input_module.module].add(
+                extended_scalar.input_module.klass
+            )
+            schema.extensions["imports"][extended_scalar.output_module.module].add(
+                extended_scalar.output_module.klass
+            )
 
     return schema
 

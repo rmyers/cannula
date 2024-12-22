@@ -27,6 +27,7 @@ class Field:
     args: typing.List[Argument]
     default: typing.Any = None
     required: bool = False
+    computed: bool = False
 
     @property
     def type(self) -> str:
@@ -39,10 +40,7 @@ class Field:
     @property
     def is_computed(self) -> bool:
         has_args = bool(self.args)
-        has_computed_directive = any(
-            directive.name == "computed" for directive in self.directives
-        )
-        return has_args or has_computed_directive
+        return has_args or self.computed
 
 
 @dataclasses.dataclass
@@ -56,7 +54,7 @@ class ObjectType:
     name: str
     py_type: str
     fields: typing.List[Field]
-    directives: typing.Dict[str, typing.List[Directive]]
+    directives: typing.List[Directive]
     description: typing.Optional[str] = None
     defined_scalar_type: bool = False
 

@@ -1,17 +1,18 @@
 type User {
-    id: ID
-    name: String
-    email: String
-    widgets: [Widget] @computed
+  id: ID
+  name: String
+  email: String
+  "@metadata(computed: true)"
+  widgets: [Widget]
 }
 
 type Widget {
-    id: ID
-    name: String
-    user_id: ID
-    type: String
+  id: ID
+  name: String
+  user_id: ID
+  type: String
 }
 
 type Query {
-    user(id: Int!): User
+  user(id: Int!): User
 }
