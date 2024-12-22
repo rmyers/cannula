@@ -85,7 +85,7 @@ def create_column_args(
     field_name: str, field: GraphQLField, field_metadata: Dict[str, Any]
 ) -> list:
     """Create SQLAlchemy Column arguments based on field metadata."""
-    args = []
+    args: List[ast.expr | ast.keyword] = []
     metadata = field_metadata.get("metadata", {})
 
     # Validate metadata against schema
@@ -136,8 +136,7 @@ def create_model_class(
     if len(primary_keys) > 1 and not metadata.get("composite_primary_key"):
         error_msg = (
             f"Multiple primary keys found in type '{type_name}': {', '.join(primary_keys)}. "
-            "To create a composite primary key, add a metadata directive to the type definition. "
-            "Example: type User @metadata(composite_primary_key: true) {"
+            "To create a composite primary key, add 'composite_primary_key: true' to the type's metadata."
         )
         raise SchemaValidationError(error_msg)
 
@@ -252,10 +251,16 @@ def generate_sqlalchemy_models(schema: GraphQLSchema) -> ast.Module:
         if not isinstance(type_def, GraphQLObjectType) or type_name.startswith("__"):
             continue
 
+        meta = type_metadata.get(type_name, {})
+        _metadata = meta.get("metadata", {})
+        # Skip types without a db_table metadata key
+        if "db_table" not in _metadata:
+            continue
+
         model_class = create_model_class(
             type_name,
             type_def.fields,
-            type_metadata.get(type_name, {}),
+            meta,
             field_metadata.get(type_name, {}),
         )
         model_classes.append(model_class)
@@ -270,9 +275,3 @@ def generate_sqlalchemy_models(schema: GraphQLSchema) -> ast.Module:
     fixed_module = fix_missing_locations(module)
 
     return fixed_module
-
-
-def generate_models_source(schema: GraphQLSchema) -> str:
-    """Generate source code for SQLAlchemy models from a GraphQL schema."""
-    module = generate_sqlalchemy_models(schema)
-    return ast.unparse(module)
