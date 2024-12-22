@@ -9,7 +9,7 @@ black_log = logging.getLogger("blib2to3")
 black_log.setLevel(logging.ERROR)
 
 
-def format_code(root: ast.Module):
+def format_code(root: ast.Module) -> str:
     # Convert AST to source code
     source_code = ast.unparse(root)
 

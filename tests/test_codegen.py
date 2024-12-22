@@ -14,6 +14,7 @@ from cannula.codegen import (
 )
 from cannula.scalars import ScalarInterface
 from cannula.scalars.date import Datetime
+from cannula.format import format_code
 
 SCHEMA = '''
 """
@@ -354,55 +355,29 @@ async def test_render_file(
             assert content == expected
 
 
+COMPUTED_SCHEMA = """\
+type Test {
+    "@metadata(computed: true)"
+    name: String
+}
+"""
+
+
 EXPECTED_OBJECT = """\
-Module(
-    body=[
-        ClassDef(
-            name='TestType',
-            bases=[
-                Name(id='ABC', ctx=Load())],
-            keywords=[],
-            body=[
-                Assign(
-                    targets=[
-                        Name(id='__typename', ctx=Load())],
-                    value=Constant(value='Test')),
-                AsyncFunctionDef(
-                    name='name',
-                    args=arguments(
-                        posonlyargs=[],
-                        args=[
-                            arg(arg='self'),
-                            arg(
-                                arg='info',
-                                annotation=Name(id='ResolveInfo', ctx=Load()))],
-                        kwonlyargs=[],
-                        kw_defaults=[],
-                        defaults=[]),
-                    body=[
-                        Expr(
-                            value=Constant(value=Ellipsis))],
-                    decorator_list=[
-                        Name(id='abstractmethod', ctx=Load())],
-                    returns=Name(id='Optional[str]', ctx=Load()))],
-            decorator_list=[
-                Call(
-                    func=Name(id='dataclass', ctx=Load()),
-                    args=[],
-                    keywords=[
-                        keyword(
-                            arg='kw_only',
-                            value=Constant(value=True))])])],
-    type_ignores=[])\
+@dataclass(kw_only=True)
+class TestType(ABC):
+    __typename = "Test"
+
+    @abstractmethod
+    async def name(self, info: ResolveInfo) -> Optional[str]: ...
 """
 
 
 async def test_render_object_handles_computed_directive():
-    schema = "type Test { name: String @computed}"
-    actual = parse_schema([schema], [])
+    actual = parse_schema([COMPUTED_SCHEMA], [])
 
     assert actual is not None
     obj = actual.object_types[0]
     rendered = render_object(obj)
     root = ast.Module(body=[*rendered], type_ignores=[])
-    assert ast.dump(root, indent=4) == EXPECTED_OBJECT
+    assert format_code(root) == EXPECTED_OBJECT
