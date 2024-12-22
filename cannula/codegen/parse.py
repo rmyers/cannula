@@ -243,7 +243,6 @@ class Schema:
         args = self.parse_args(field)
         func_name = f"{name}{parent}"
 
-        print(metadata)
         return Field(
             name=name,
             value=field_type.value,
