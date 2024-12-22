@@ -12,12 +12,12 @@ SCHEMA = gql(
 """
 User in the system
 
-@metadata(
-    db_table:"users",
+---
+metadata:
+    db_table: users
     cache: false
     ttl: 0
     weight: 1.2
-)
 """
 type User {
     "User ID @metadata(primary_key: true)"
@@ -26,7 +26,7 @@ type User {
     name: String!
     "@metadata(db_column: email_address, unique: true)"
     email: String!
-    "@metadata(nullable: true)"
+    "@metadata(nullable: true, cache: false)"
     age: Int
     projects(limit: Int = 10): [Project]
     is_active: Boolean
@@ -42,6 +42,7 @@ type Project {
     id: ID!
     name: String!
     description: String
+    "@metadata(wieght: 1.5, fancy: $100)"
     is_active: Boolean
 }
 '''

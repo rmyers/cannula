@@ -1,7 +1,38 @@
+'''
+Schema Processor
+================
+
+Process a GraphQL schema DocumentNode and extract metadata.
+Returns a SchemaMetadata object containing type and field metadata.
+
+Supports metadata in the following formats:
+
+1. YAML metadata (must be preceded by ---)::
+
+    """
+    Description text
+
+    ---
+    metadata:
+        cached: true
+        ttl: 3600
+    """
+
+2. Inline field metadata (single line only)::
+
+    type Test {
+        "@metadata(computed: true)"
+        field: String
+    }
+'''
+
+import yaml
 from dataclasses import dataclass, field
-from graphql import DocumentNode, visit, GraphQLError, Visitor
-from typing import Dict, Any, Optional
-import re
+from typing import Dict, Any
+
+from graphql import DocumentNode, visit, Visitor
+
+from cannula.utils import parse_metadata_to_yaml
 
 
 @dataclass
@@ -19,113 +50,54 @@ class SchemaProcessor:
 
     def process_schema(self, document: DocumentNode) -> SchemaMetadata:
         '''
-        Process a GraphQL schema DocumentNode and extract metadata from documentation strings.
+        Process a GraphQL schema DocumentNode and extract metadata.
         Returns a SchemaMetadata object containing type and field metadata.
 
-        The processor looks for specially formatted documentation strings like:
-        ```
+        Supports metadata in the following formats:
+
+        1. YAML metadata (must be preceded by ---):
         """
-        @metadata(
-            cached: true,
-            ttl: 3600,
-            description: "some long
-                         multiline description"
-        )
-        Type description here
+        Description text
+
+        ---
+        metadata:
+          cached: true
+          ttl: 3600
         """
-        ```
+
+        2. Inline field metadata (single line only):
+        type Test {
+            "@metadata(computed: true)"
+            field: String
+        }
         '''
-        try:
-            visitor = SchemaVisitor(self)
-            visit(document, visitor)
-            return SchemaMetadata(
-                type_metadata=self.type_metadata,
-                field_metadata=self.field_metadata,
-            )
+        visitor = SchemaVisitor(self)
+        visit(document, visitor)
+        return SchemaMetadata(
+            type_metadata=self.type_metadata,
+            field_metadata=self.field_metadata,
+        )
 
-        except GraphQLError as e:
-            raise ValueError(f"Invalid GraphQL schema: {str(e)}")
-
-    def _extract_metadata(
-        self, description: Optional[str]
-    ) -> tuple[Dict[str, Any], str]:
+    def _extract_metadata(self, description: str) -> tuple[Dict[str, Any], str]:
         """
         Extract metadata and clean description from a documentation string.
         Returns (metadata_dict, clean_description)
         """
-        if not description:
-            return {}, ""
+        # Handle inline description with @metadata marker
+        description = parse_metadata_to_yaml(description)
 
-        # Look for @metadata(...) directive with possible multiple lines
-        metadata_pattern = r"@metadata\((.*?)\)"
-        match = re.search(metadata_pattern, description, re.DOTALL)
+        # Look for YAML metadata section with separator
+        parts = description.split("\n---\n", 1)
+        if len(parts) == 2:
+            desc, yaml_str = parts
+            try:
+                data = yaml.safe_load(yaml_str)
+                if isinstance(data, dict) and "metadata" in data:
+                    return data["metadata"], desc.strip()
+            except yaml.YAMLError:
+                return {}, description.strip()
 
-        if not match:
-            return {}, description
-
-        metadata_str = match.group(1)
-        clean_desc = re.sub(
-            r"@metadata\(.*?\)\s*", "", description, flags=re.DOTALL
-        ).strip()
-
-        # Parse metadata key-value pairs
-        metadata = {}
-        current_key = None
-        current_value = []
-
-        # Split by commas but preserve commas inside quoted strings
-        lines = re.findall(r'[^,]+|,(?=(?:[^"]*"[^"]*")*[^"]*$)', metadata_str)
-
-        for line in lines:
-            line = line.strip()
-            if not line or line == ",":
-                continue
-
-            # Check if this line contains a key-value pair
-            key_value_match = re.match(r"(\w+)\s*:\s*(.+)", line)
-
-            if key_value_match:
-                # If we have a previous key, save it
-                if current_key:
-                    value = " ".join(current_value).strip()
-                    metadata[current_key] = self._convert_value(value)
-
-                # Start new key-value pair
-                current_key = key_value_match.group(1).strip()
-                current_value = [key_value_match.group(2).strip()]
-            else:
-                # Continue previous value
-                current_value.append(line)
-
-        # Save the last key-value pair
-        if current_key:
-            value = " ".join(current_value).strip()
-            metadata[current_key] = self._convert_value(value)
-
-        return metadata, clean_desc
-
-    def _convert_value(self, value: str) -> Any:
-        """Convert string values to appropriate Python types"""
-        # Remove quotes from quoted strings
-        if value.startswith('"') and value.endswith('"'):
-            return value[1:-1]
-
-        # Handle boolean values
-        if value.lower() == "true":
-            return True
-        if value.lower() == "false":
-            return False
-
-        # Handle numeric values
-        try:
-            if value.isdigit():
-                return int(value)
-            if value.replace(".", "").isdigit():
-                return float(value)
-        except ValueError:
-            pass
-
-        return value
+        return {}, description.strip()
 
     def _merge_metadata(
         self, existing: Dict[str, Any], new: Dict[str, Any]
@@ -133,8 +105,6 @@ class SchemaProcessor:
         """Merge new metadata with existing metadata, updating values"""
         merged = existing.copy()
         merged["metadata"].update(new["metadata"])
-        if new["description"]:
-            merged["description"] = new["description"]
         return merged
 
 
@@ -193,14 +163,4 @@ class SchemaVisitor(Visitor):
                 self.processor.field_metadata[parent_type] = {}
 
             new_field_data = {"metadata": metadata, "description": clean_desc}
-
-            # If field already exists, merge the metadata
-            if field_name in self.processor.field_metadata[parent_type]:
-                self.processor.field_metadata[parent_type][field_name] = (
-                    self.processor._merge_metadata(
-                        self.processor.field_metadata[parent_type][field_name],
-                        new_field_data,
-                    )
-                )
-            else:
-                self.processor.field_metadata[parent_type][field_name] = new_field_data
+            self.processor.field_metadata[parent_type][field_name] = new_field_data

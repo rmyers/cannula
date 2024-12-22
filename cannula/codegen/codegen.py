@@ -284,7 +284,7 @@ def render_code(
 def render_code_new(
     type_defs: typing.Iterable[typing.Union[str, DocumentNode]],
     scalars: list[ScalarInterface] = [],
-) -> str:
+) -> str:  # pragma: no cover
 
     parsed = parse_schema(type_defs, scalars)
 

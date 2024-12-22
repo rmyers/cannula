@@ -138,10 +138,6 @@ class Schema:
                 field_metadata = fields_metadata.get(name, {})
                 self.object_types.append(self.parse_node(definition, field_metadata))
 
-        for d in self._schema.directives:
-            if d.ast_node:
-                pprint.pprint(d.ast_node.to_dict())
-
         self.object_types.sort(key=lambda o: o.name)
         self.operation_fields.sort(key=lambda o: o.name)
 
