@@ -93,5 +93,5 @@ def parse_value(value: str) -> typing.Union[str, bool, int, float]:
 def need_quotes(value: str) -> bool:
     """Check if a string value needs to be quoted in YAML."""
     # Add characters or patterns that would make YAML invalid
-    special_chars = ":,[]{}#&*!|>'\"%@`"
+    special_chars = ":,[]{}#&*!|>'\"%@`/ "
     return any(c in value for c in special_chars) or value.strip() != value
