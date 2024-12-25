@@ -100,11 +100,11 @@ class SchemaAnalyzer:
 
     def _analyze(self) -> None:
         """Analyze schema and categorize types"""
-        self.object_types: Dict[str, TypeInfo[GraphQLObjectType]] = {}
-        self.interface_types: Dict[str, TypeInfo[GraphQLInterfaceType]] = {}
-        self.input_types: Dict[str, TypeInfo[GraphQLInputObjectType]] = {}
+        self.object_types: List[TypeInfo[GraphQLObjectType]] = []
+        self.interface_types: List[TypeInfo[GraphQLInterfaceType]] = []
+        self.input_types: List[TypeInfo[GraphQLInputObjectType]] = []
         self.union_types: List[UnionType] = []
-        self.operation_types: Dict[str, TypeInfo[GraphQLObjectType]] = {}
+        self.operation_types: List[TypeInfo[GraphQLObjectType]] = []
         self.operation_fields: List[Field] = []
 
         for name, type_def in self.schema.type_map.items():
@@ -116,20 +116,28 @@ class SchemaAnalyzer:
             elif is_operation:
                 type_def = cast(GraphQLObjectType, type_def)
                 type_info = self.get_type_info(type_def)
-                self.operation_types[name] = type_info
+                self.operation_types.append(type_info)
                 self.operation_fields.extend(type_info.fields)
             elif is_object_type(type_def):
                 type_def = cast(GraphQLObjectType, type_def)
-                self.object_types[name] = self.get_type_info(type_def)
+                self.object_types.append(self.get_type_info(type_def))
             elif is_interface_type(type_def):
                 type_def = cast(GraphQLInterfaceType, type_def)
-                self.interface_types[name] = self.get_type_info(type_def)
+                self.interface_types.append(self.get_type_info(type_def))
             elif is_input_object_type(type_def):
                 type_def = cast(GraphQLInputObjectType, type_def)
-                self.input_types[name] = self.get_type_info(type_def)
+                self.input_types.append(self.get_type_info(type_def))
             elif is_union_type(type_def):
                 type_def = cast(GraphQLUnionType, type_def)
                 self.union_types.append(self.parse_union(type_def))
+
+        # Sort types and fields
+        self.input_types.sort(key=lambda o: o.name)
+        self.interface_types.sort(key=lambda o: o.name)
+        self.object_types.sort(key=lambda o: o.name)
+        self.operation_fields.sort(key=lambda o: o.name)
+        self.operation_types.sort(key=lambda o: o.name)
+        self.union_types.sort(key=lambda o: o.name)
 
     def parse_union(self, node: GraphQLUnionType) -> UnionType:
         """Parse a GraphQL Union type into a UnionType object"""

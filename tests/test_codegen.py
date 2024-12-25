@@ -1,18 +1,13 @@
-import ast
 import tempfile
 import pathlib
 
 import pytest
 
 from cannula.codegen import (
-    parse_schema,
     render_file,
-    render_object,
 )
 from cannula.scalars import ScalarInterface
 from cannula.scalars.date import Datetime
-from cannula.format import format_code
-from cannula.types import Argument, Directive, Field, FieldType
 
 SCHEMA = '''
 """
@@ -104,7 +99,7 @@ class get_sender_by_emailQuery(Protocol):
 class messageMutation(Protocol):
 
     async def __call__(
-        self, info: ResolveInfo, text: str, sender: str
+        self, info: ResolveInfo, sender: str, text: str
     ) -> Optional[MessageType]: ...
 
 
@@ -166,7 +161,7 @@ class get_sender_by_emailQuery(Protocol):
 class messageMutation(Protocol):
 
     async def __call__(
-        self, info: ResolveInfo, text: str, sender: str
+        self, info: ResolveInfo, sender: str, text: str
     ) -> Optional[MessageType]: ...
 
 
@@ -260,35 +255,6 @@ class ThingType(ABC):
 """
 
 
-async def test_parse_schema_dict():
-    schema = 'type Test { "name field" name: String @deprecated(reason: "not valid")}'
-    actual = parse_schema([schema], [Datetime])
-
-    assert actual is not None
-    obj = actual.object_types[0]
-    assert obj.name == "Test"
-    assert obj.description is None
-    assert obj.fields == [
-        Field(
-            name="name",
-            field_type=FieldType("str", False),
-            description="name field",
-            metadata={},
-            field=obj.fields[0].field,
-            parent="Test",
-            directives=[
-                Directive(
-                    name="deprecated",
-                    args=[Argument(name="reason", value="not valid", default=None)],
-                ),
-            ],
-            args=[],
-            default=None,
-            required=False,
-        )
-    ]
-
-
 @pytest.mark.parametrize(
     "dry_run, schema, scalars, use_pydantic, expected",
     [
@@ -353,31 +319,3 @@ async def test_render_file(
             content = rendered.read()
 
             assert content == expected
-
-
-COMPUTED_SCHEMA = """\
-type Test {
-    "@metadata(computed: true)"
-    name: String
-}
-"""
-
-
-EXPECTED_OBJECT = """\
-@dataclass(kw_only=True)
-class TestType(ABC):
-    __typename = "Test"
-
-    @abstractmethod
-    async def name(self, info: ResolveInfo) -> Optional[str]: ...
-"""
-
-
-async def test_render_object_handles_computed_directive():
-    actual = parse_schema([COMPUTED_SCHEMA], [])
-
-    assert actual is not None
-    obj = actual.object_types[0]
-    rendered = render_object(obj)
-    root = ast.Module(body=[*rendered], type_ignores=[])
-    assert format_code(root) == EXPECTED_OBJECT

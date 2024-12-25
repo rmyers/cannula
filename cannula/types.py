@@ -46,7 +46,6 @@ class Field:
     args: typing.List[Argument]
     directives: typing.List[Directive] = dataclasses.field(default_factory=list)
     default: typing.Any = None
-    required: bool = False
     computed: bool = False
 
     @classmethod
@@ -81,6 +80,10 @@ class Field:
     @property
     def func_name(self) -> str:
         return f"{self.name}{self.parent}"
+
+    @property
+    def required(self) -> bool:
+        return self.field_type.required
 
     @property
     def operation_type(self) -> str:

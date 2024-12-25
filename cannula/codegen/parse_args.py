@@ -51,7 +51,7 @@ def parse_field_arguments(
     arguments: list[Argument] = []
 
     # Some fields might not have arguments
-    if not field.args:
+    if not hasattr(field, "args") or not field.args:
         return arguments
 
     for arg_name, arg in field.args.items():

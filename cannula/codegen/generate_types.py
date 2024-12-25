@@ -17,6 +17,7 @@ from cannula.codegen.base import (
     ast_for_annotation_assignment,
     ast_for_argument,
     ast_for_assign,
+    ast_for_class_field,
     ast_for_docstring,
     ast_for_constant,
     ast_for_function_body,
@@ -120,15 +121,6 @@ class PythonCodeGenerator:
             returns=ast.Name(id=field.type, ctx=ast.Load()),
         )
 
-    def render_class_field(self, field: Field) -> ast.AnnAssign:
-        """Create an AST node for a class field"""
-        field_type = ast_for_name(field.type)
-        default = ast_for_constant(None) if not field.required else None
-
-        return ast_for_annotation_assignment(
-            field.name, annotation=field_type, default=default
-        )
-
     def render_interface_type(
         self, type_info: TypeInfo[GraphQLInterfaceType]
     ) -> list[ast.stmt]:
@@ -140,7 +132,7 @@ class PythonCodeGenerator:
 
         # Add fields as stmts
         body.extend(
-            cast(list[ast.stmt], [self.render_class_field(f) for f in type_info.fields])
+            cast(list[ast.stmt], [ast_for_class_field(f) for f in type_info.fields])
         )
 
         return [
@@ -177,7 +169,7 @@ class PythonCodeGenerator:
 
         # Add fields as stmts
         body.extend(
-            cast(list[ast.stmt], [self.render_class_field(f) for f in normal_fields])
+            cast(list[ast.stmt], [ast_for_class_field(f) for f in normal_fields])
         )
         body.extend(
             cast(
@@ -235,7 +227,12 @@ class PythonCodeGenerator:
         body: list[ast.stmt] = [
             cast(
                 ast.stmt,
-                ast_for_annotation_assignment(f.name, annotation=ast_for_name(f.type)),
+                ast_for_annotation_assignment(
+                    f.name,
+                    # For input types we need to include all fields as required
+                    # since the resolver will fill in the default values if not provided
+                    annotation=ast_for_name(f.field_type.safe_value),
+                ),
             )
             for f in type_info.fields
         ]
@@ -328,21 +325,23 @@ class PythonCodeGenerator:
         module = ast.Module(body=[], type_ignores=[])
 
         # Add imports
-        for module_name, names in self.analyzer.extensions.imports.items():
-            if module_name == "builtins":
+        _imports = self.analyzer.extensions.imports
+        module_imports = sorted(_imports.keys())
+        for mod in module_imports:
+            if mod == "builtins":
                 continue
-            module.body.append(ast_for_import_from(module=module_name, names=names))
+            module.body.append(ast_for_import_from(module=mod, names=_imports[mod]))
 
         # Generate code for each type
-        for interface in self.analyzer.interface_types.values():
+        for interface in self.analyzer.interface_types:
             module.body.extend(
                 cast(list[ast.stmt], self.render_interface_type(interface))
             )
 
-        for input_type in self.analyzer.input_types.values():
+        for input_type in self.analyzer.input_types:
             module.body.extend(cast(list[ast.stmt], self.render_input_type(input_type)))
 
-        for obj_type in self.analyzer.object_types.values():
+        for obj_type in self.analyzer.object_types:
             module.body.extend(cast(list[ast.stmt], self.render_object_type(obj_type)))
 
         for union_type in self.analyzer.union_types:

@@ -226,7 +226,6 @@ class Schema:
             directives=directives,
             args=args,
             default=default,
-            required=field_type.required,
             computed=metadata.get("computed", False),
             metadata=metadata,
         )
