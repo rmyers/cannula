@@ -1,10 +1,12 @@
 import ast
 import collections
 import logging
-from typing import Iterable, Tuple, Union, List
+from typing import Iterable, Tuple, Union, List, TypeVar, cast
 from graphql import (
     DocumentNode,
     GraphQLObjectType,
+    GraphQLInputObjectType,
+    GraphQLInterfaceType,
 )
 
 from cannula.scalars import ScalarInterface
@@ -23,7 +25,7 @@ from cannula.codegen.base import (
     ast_for_union_subscript,
     fix_missing_locations,
 )
-from cannula.types import Argument, Field
+from cannula.types import Argument, Field, UnionType
 from cannula.codegen.schema_analyzer import SchemaAnalyzer, TypeInfo
 
 LOG = logging.getLogger(__name__)
@@ -42,8 +44,6 @@ _IMPORTS.update(
             "Sequence",
             "Optional",
             "Protocol",
-            # In python < 3.12 pydantic wants us to use typing_extensions
-            # "TypedDict",
             "Union",
         },
         "typing_extensions": {"TypedDict", "NotRequired"},
@@ -57,6 +57,8 @@ _IMPORTS.update(
         },
     }
 )
+
+T = TypeVar("T")
 
 
 class PythonCodeGenerator:
@@ -72,10 +74,6 @@ class PythonCodeGenerator:
     ) -> Tuple[list[ast.arg], list[ast.arg], list[ast.expr | None]]:
         """
         Render function arguments as AST nodes.
-
-        This returns a tuple of lists (args, kwargs, defaults). If the field is required
-        it is added to args, if it is not required then it is added to kwargs along
-        with a default in the defaults list.
         """
         pos_args_ast: list[ast.arg] = [
             ast_for_argument(arg) for arg in args if arg.required
@@ -99,7 +97,6 @@ class PythonCodeGenerator:
             *pos_args,
         ]
 
-        # Create function arguments node
         args_node = ast.arguments(
             args=args,
             vararg=None,
@@ -110,8 +107,7 @@ class PythonCodeGenerator:
             defaults=[],
         )
 
-        # Create function body
-        body = []
+        body: list[ast.stmt] = []
         if field.description:
             body.append(ast_for_docstring(field.description))
         body.append(ast.Expr(value=ast.Constant(value=Ellipsis)))
@@ -133,33 +129,68 @@ class PythonCodeGenerator:
             field.name, annotation=field_type, default=default
         )
 
+    def render_interface_type(
+        self, type_info: TypeInfo[GraphQLInterfaceType]
+    ) -> list[ast.stmt]:
+        """Create AST nodes for an interface type"""
+        # Create class body
+        body: list[ast.stmt] = []
+        if type_info.description:
+            body.append(ast_for_docstring(type_info.description))
+
+        # Add fields as stmts
+        body.extend(
+            cast(list[ast.stmt], [self.render_class_field(f) for f in type_info.fields])
+        )
+
+        return [
+            cast(
+                ast.stmt,
+                ast.ClassDef(
+                    name=type_info.py_type,
+                    bases=[ast_for_name("Protocol")],
+                    keywords=[],
+                    body=body,
+                    decorator_list=[],
+                ),
+            )
+        ]
+
     def render_object_type(
         self, type_info: TypeInfo[GraphQLObjectType]
-    ) -> List[ast.AST]:
+    ) -> list[ast.stmt]:
         """Create AST nodes for an object type"""
-        # Separate computed and non-computed fields
-
         computed_fields = [f for f in type_info.fields if f.is_computed]
         normal_fields = [f for f in type_info.fields if not f.is_computed]
 
-        # Create type definition constant
-        type_def = ast_for_assign("__typename", ast_for_constant(type_info.name))
-
         # Create class body
-        body = []
+        body: list[ast.stmt] = []
         if type_info.description:
             body.append(ast_for_docstring(type_info.description))
-        body.append(type_def)
 
-        # Add fields
-        body.extend(self.render_class_field(f) for f in normal_fields)
-        body.extend(
-            self.render_computed_field(f, type_info.name) for f in computed_fields
+        # Add type definition as stmt
+        body.append(
+            cast(
+                ast.stmt, ast_for_assign("__typename", ast_for_constant(type_info.name))
+            )
         )
 
-        # Create class definition
+        # Add fields as stmts
+        body.extend(
+            cast(list[ast.stmt], [self.render_class_field(f) for f in normal_fields])
+        )
+        body.extend(
+            cast(
+                list[ast.stmt],
+                [
+                    self.render_computed_field(f, type_info.name)
+                    for f in computed_fields
+                ],
+            )
+        )
+
         base_class = "BaseModel" if self.use_pydantic else "ABC"
-        decorators = []
+        decorators: list[ast.expr] = []
         if not self.use_pydantic:
             decorators.append(
                 ast.Call(
@@ -172,39 +203,53 @@ class PythonCodeGenerator:
             )
 
         return [
-            ast.ClassDef(
-                name=type_info.py_type,
-                bases=[ast_for_name(base_class)],
-                keywords=[],
-                body=body,
-                decorator_list=decorators,
+            cast(
+                ast.stmt,
+                ast.ClassDef(
+                    name=type_info.py_type,
+                    bases=[ast_for_name(base_class)],
+                    keywords=[],
+                    body=body,
+                    decorator_list=decorators,
+                ),
             )
         ]
 
-    def render_union_type(self, type_info) -> List[ast.AST]:
+    def render_union_type(self, type_info: UnionType) -> list[ast.stmt]:
         """Create AST nodes for a union type"""
-        member_types = [t.name for t in type_info.type_def.types]
+        member_types = [t.safe_value for t in type_info.types]
         return [
-            ast_for_assign(
-                type_info.name,
-                ast_for_union_subscript(*member_types),
+            cast(
+                ast.stmt,
+                ast_for_assign(
+                    type_info.name,
+                    ast_for_union_subscript(*member_types),
+                ),
             )
         ]
 
-    def render_input_type(self, type_info: TypeInfo) -> List[ast.ClassDef]:
+    def render_input_type(
+        self, type_info: TypeInfo[GraphQLInputObjectType]
+    ) -> list[ast.stmt]:
         """Create AST nodes for an input type"""
-        body = [
-            ast_for_annotation_assignment(f.name, annotation=ast_for_name(f.type))
+        body: list[ast.stmt] = [
+            cast(
+                ast.stmt,
+                ast_for_annotation_assignment(f.name, annotation=ast_for_name(f.type)),
+            )
             for f in type_info.fields
         ]
 
         return [
-            ast.ClassDef(
-                name=type_info.py_type,
-                bases=[ast_for_name("TypedDict")],
-                keywords=[],
-                body=[*body],
-                decorator_list=[],
+            cast(
+                ast.stmt,
+                ast.ClassDef(
+                    name=type_info.py_type,
+                    bases=[ast_for_name("TypedDict")],
+                    keywords=[],
+                    body=body,
+                    decorator_list=[],
+                ),
             )
         ]
 
@@ -216,7 +261,6 @@ class PythonCodeGenerator:
             bases=[ast_for_name("Protocol")],
             keywords=[],
             decorator_list=[],
-            # type_params=[],
         )
 
     def render_operation_field_ast(self, field: Field) -> ast.AsyncFunctionDef:
@@ -229,7 +273,6 @@ class PythonCodeGenerator:
             ast.arg("info", annotation=ast_for_name("ResolveInfo")),
             *pos_args,
         ]
-        # value = field.value if field.required else f"Optional[{field.value}]"
         args_node = ast.arguments(
             args=args,
             vararg=None,
@@ -248,34 +291,35 @@ class PythonCodeGenerator:
         )
         return func_node
 
-    def render_operation_types(self) -> List[ast.AST]:
+    def render_operation_types(self) -> list[ast.stmt]:
         """Create AST nodes for operation (Query/Mutation) types"""
         operation_fields: List[Field] = []
-        field_classes = []
+        field_classes: list[ast.stmt] = []
 
         for field in self.analyzer.operation_fields:
             if field.name == "_empty":
                 continue
 
             operation_fields.append(field)
-            # Create operation class
-            field_classes.append(self.ast_for_operation(field))
+            field_classes.append(cast(ast.stmt, self.ast_for_operation(field)))
 
-        # Create root type if we have operations
         if field_classes:
             root_type = ast.ClassDef(
                 name="RootType",
-                body=[
-                    ast_for_annotation_assignment(
-                        f.name, annotation=ast_for_name(f.operation_type)
-                    )
-                    for f in operation_fields
-                ],
+                body=cast(
+                    list[ast.stmt],
+                    [
+                        ast_for_annotation_assignment(
+                            f.name, annotation=ast_for_name(f.operation_type)
+                        )
+                        for f in operation_fields
+                    ],
+                ),
                 bases=[ast_for_name("TypedDict")],
                 keywords=[ast.keyword(arg="total", value=ast_for_constant(False))],
                 decorator_list=[],
             )
-            field_classes.append(root_type)
+            field_classes.append(cast(ast.stmt, root_type))
 
         return field_classes
 
@@ -290,23 +334,24 @@ class PythonCodeGenerator:
             module.body.append(ast_for_import_from(module=module_name, names=names))
 
         # Generate code for each type
-        for type_info in self.analyzer.interface_types.values():
-            module.body.extend(self.render_object_type(type_info))  # type: ignore
+        for interface in self.analyzer.interface_types.values():
+            module.body.extend(
+                cast(list[ast.stmt], self.render_interface_type(interface))
+            )
 
-        for type_info in self.analyzer.input_types.values():
-            module.body.extend(self.render_input_type(type_info))  # type: ignore
+        for input_type in self.analyzer.input_types.values():
+            module.body.extend(cast(list[ast.stmt], self.render_input_type(input_type)))
 
-        for type_info in self.analyzer.object_types.values():
-            module.body.extend(self.render_object_type(type_info))  # type: ignore
+        for obj_type in self.analyzer.object_types.values():
+            module.body.extend(cast(list[ast.stmt], self.render_object_type(obj_type)))
 
-        for type_info in self.analyzer.union_types:
-            module.body.extend(self.render_union_type(type_info))  # type: ignore
+        for union_type in self.analyzer.union_types:
+            module.body.extend(cast(list[ast.stmt], self.render_union_type(union_type)))
 
         # Generate operation types
-        module.body.extend(self.render_operation_types())  # type: ignore
+        module.body.extend(cast(list[ast.stmt], self.render_operation_types()))
 
         module = fix_missing_locations(module)
-        # return ast.unparse(module)
         return format_code(module)
 
 

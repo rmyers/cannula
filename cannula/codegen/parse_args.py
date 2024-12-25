@@ -1,13 +1,12 @@
 from typing import Any, Dict
 from graphql import (
-    DirectiveNode,
     GraphQLArgument,
     GraphQLField,
     GraphQLNamedType,
     Undefined,
 )
 
-from .parse_type import parse_argument_type, parse_graphql_type
+from .parse_type import parse_graphql_type
 from ..types import Argument
 
 
@@ -73,43 +72,3 @@ def parse_field_arguments(
         )
 
     return sorted(arguments, key=lambda x: x.name)
-
-
-def parse_directive_arguments(
-    directive: DirectiveNode, schema_types: Dict[str, GraphQLNamedType]
-) -> list[Argument]:
-    """
-    Parse a GraphQL Directive's arguments into Python argument definitions.
-
-    Args:
-        directive: The GraphQL directive whose arguments to parse
-        schema_types: Dictionary of all types in the schema
-
-    Returns:
-        List of Argument objects representing the directives's arguments
-    """
-    arguments: list[Argument] = []
-
-    # Some fields might not have arguments
-    if not directive.arguments:
-        return arguments
-
-    for arg in directive.arguments:
-        # Parse the argument type
-        field_type = parse_argument_type(arg, schema_types)
-
-        print(dir(arg))
-        # Get the default value using GraphQL's parser
-        default_value = parse_default_value(arg, field_type.type)
-
-        arguments.append(
-            Argument(
-                name=arg.name.value,
-                type=field_type.value or "Any",  # Fallback to Any if no type
-                value=None,  # GraphQL args don't have values, only defaults
-                default=default_value,
-                required=field_type.required,
-            )
-        )
-
-    return arguments

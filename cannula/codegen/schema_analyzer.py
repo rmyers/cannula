@@ -25,9 +25,9 @@ from graphql import (
     is_union_type,
 )
 
-from cannula.codegen.parse_args import parse_directive_arguments, parse_field_arguments
+from cannula.codegen.parse_args import parse_field_arguments
 from cannula.codegen.parse_type import parse_graphql_type
-from cannula.types import Directive, Field, UnionType
+from cannula.types import Field, UnionType
 
 LOG = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ class MetadataProvider(Protocol):
 class SchemaExtension:
     """Container for schema-wide extensions and metadata"""
 
-    def __init__(self, schema: GraphQLSchema):
+    def __init__(self, schema: GraphQLSchema) -> None:
         self.schema = schema
         self._type_metadata = schema.extensions.get("type_metadata", {})
         self._field_metadata = schema.extensions.get("field_metadata", {})
@@ -93,12 +93,12 @@ class SchemaAnalyzer:
     with associated metadata.
     """
 
-    def __init__(self, schema: GraphQLSchema):
+    def __init__(self, schema: GraphQLSchema) -> None:
         self.schema = schema
         self.extensions = SchemaExtension(schema)
         self._analyze()
 
-    def _analyze(self):
+    def _analyze(self) -> None:
         """Analyze schema and categorize types"""
         self.object_types: Dict[str, TypeInfo[GraphQLObjectType]] = {}
         self.interface_types: Dict[str, TypeInfo[GraphQLInterfaceType]] = {}
@@ -143,21 +143,10 @@ class SchemaAnalyzer:
             types=types,
         )
 
-    def parse_directives(self, field: GraphQLField) -> list[Directive]:
-        directives: list[Directive] = []
-        if not field.ast_node:
-            return directives
-
-        for directive in field.ast_node.directives:
-            name = directive.name.value
-            args = parse_directive_arguments(directive, self.schema.type_map)
-            directives.append(Directive(name=name, args=args))
-        return directives
-
     def get_field(self, field_name: str, field_def: GraphQLField, parent: str) -> Field:
         field_type = parse_graphql_type(field_def.type, self.schema.type_map)
         metadata = self.extensions.get_field_metadata(parent, field_name)
-        directives = self.parse_directives(field_def)
+        directives = metadata.get("directives", [])
         args = parse_field_arguments(field_def, self.schema.type_map)
         return Field.from_field(
             name=field_name,
@@ -195,7 +184,7 @@ class SchemaAnalyzer:
 class CodeGenerator:
     """Base class for code generators"""
 
-    def __init__(self, analyzer: SchemaAnalyzer):
+    def __init__(self, analyzer: SchemaAnalyzer) -> None:
         self.analyzer = analyzer
 
     def generate(self) -> str:

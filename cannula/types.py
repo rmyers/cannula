@@ -10,6 +10,10 @@ class FieldType:
     required: bool = False
 
     @property
+    def safe_value(self) -> str:
+        return self.value or "Any"
+
+    @property
     def type(self) -> str:
         if self.value is None:
             return "Any"

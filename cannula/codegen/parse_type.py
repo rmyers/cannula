@@ -1,6 +1,5 @@
 from typing import cast
 from graphql import (
-    ArgumentNode,
     GraphQLType,
     GraphQLNonNull,
     GraphQLList,
@@ -10,7 +9,7 @@ from graphql import (
     is_list_type,
 )
 
-from ..types import FieldType
+from cannula.types import FieldType
 
 
 def parse_graphql_type(
@@ -47,27 +46,3 @@ def parse_graphql_type(
         type_name = schema_types[type_name].extensions.get("py_type", type_name)
 
     return FieldType(value=type_name, required=False)
-
-
-def parse_argument_type(
-    argument: ArgumentNode, schema_types: dict[str, GraphQLNamedType]
-) -> FieldType:
-    type_obj = argument.to_dict()
-    required = False
-    value = None
-
-    if type_obj["kind"] == "non_null_type":
-        required = True
-        value = parse_argument_type(type_obj["type"], schema_types).value
-
-    if type_obj["kind"] == "list_type":
-        list_type = parse_argument_type(type_obj["type"], schema_types).value
-        value = f"Sequence[{list_type}]"
-
-    if type_obj["kind"] == "named_type":
-        name = type_obj["name"]
-        value = name["value"]
-        if value in schema_types:
-            value = schema_types[value].extensions["py_type"]
-
-    return FieldType(value=value, required=required)
