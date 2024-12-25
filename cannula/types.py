@@ -15,9 +15,7 @@ class FieldType:
 
     @property
     def type(self) -> str:
-        if self.value is None:
-            return "Any"
-        return self.value if self.required else f"Optional[{self.value}]"
+        return self.safe_value if self.required else f"Optional[{self.safe_value}]"
 
 
 @dataclasses.dataclass

@@ -152,6 +152,14 @@ class SchemaVisitor(Visitor):
             "description": self._parse_description(clean_desc),
         }
 
+    def enter_interface_type_definition(self, node, *args) -> None:
+        metadata, clean_desc = self._process_node(node)
+        type_name = node.name.value
+        self.processor.type_metadata[type_name] = {
+            "metadata": metadata,
+            "description": self._parse_description(clean_desc),
+        }
+
     def enter_object_type_extension(self, node, *args) -> None:
         metadata, clean_desc = self._process_node(node)
         type_name = node.name.value

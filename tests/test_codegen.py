@@ -184,6 +184,11 @@ interface Persona {
     id: ID!
 }
 
+"Just a comment"
+interface Other {
+    id: ID!
+}
+
 type User implements Persona {
     id: ID!
 }
@@ -196,11 +201,17 @@ type Admin implements Persona {
 union Person = User | Admin
 """
 
-expected_interface = """\
+expected_interface = '''\
 from __future__ import annotations
 from abc import ABC
 from dataclasses import dataclass
 from typing import Any, Optional, Protocol, Union
+
+
+class Other(Protocol):
+    """Just a comment"""
+
+    id: str
 
 
 class Persona(Protocol):
@@ -221,7 +232,7 @@ class UserType(ABC):
 
 
 Person = Union[UserType, AdminType]
-"""
+'''
 
 schema_scalars = """\
 scalar Datetime

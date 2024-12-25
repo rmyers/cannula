@@ -68,11 +68,11 @@ class SchemaExtension:
 
     def get_type_metadata(self, type_name: str) -> Dict[str, Any]:
         """Get metadata for a specific type"""
-        return self._type_metadata.get(type_name, {})
+        return self.type_metadata.get(type_name, {})
 
     def get_field_metadata(self, type_name: str, field_name: str) -> Dict[str, Any]:
         """Get metadata for a specific field"""
-        return self._field_metadata.get(type_name, {}).get(str(field_name), {})
+        return self.field_metadata.get(type_name, {}).get(str(field_name), {})
 
 
 @dataclass
@@ -189,7 +189,8 @@ class SchemaAnalyzer:
         )
 
 
-class CodeGenerator:
+# TODO: make this useful and use it in the code generator
+class CodeGenerator:  # pragma: no cover
     """Base class for code generators"""
 
     def __init__(self, analyzer: SchemaAnalyzer) -> None:
