@@ -29,7 +29,7 @@ from cannula.codegen.base import (
 )
 
 from cannula.codegen.generate_sql import generate_sqlalchemy_models
-from cannula.codegen.types import Argument, Field, ObjectType, UnionType
+from cannula.types import Argument, Field, ObjectType, UnionType
 from cannula.codegen.parse import parse_schema
 
 LOG = logging.getLogger(__name__)
@@ -119,7 +119,7 @@ def render_operation_field_ast(field: Field) -> ast.AsyncFunctionDef:
 
 
 def ast_for_dict_field(field: Field) -> ast.AnnAssign:
-    field_type = ast_for_name(field.value)
+    field_type = ast_for_name(field.field_type.value or "Any")
     return ast_for_annotation_assignment(field.name, annotation=field_type)
 
 
@@ -214,9 +214,9 @@ def render_union(obj: UnionType) -> list[ast.ClassDef | ast.Assign]:
     return [
         ast_for_assign(
             obj.name,
-            ast_for_union_subscript(*items),
+            ast_for_union_subscript(*items),  # type: ignore
         )
-    ]
+    ]  # type: ignore
 
 
 def ast_for_operation(field: Field) -> ast.ClassDef:

@@ -130,4 +130,5 @@ def test_parse_schema_metadata_invalid_yaml():
     assert metadata.field_metadata["Sender"]["name"] == {
         "description": "",
         "metadata": {},
+        "directives": [],
     }

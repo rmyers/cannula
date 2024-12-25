@@ -5,9 +5,6 @@ import pathlib
 import pytest
 
 from cannula.codegen import (
-    Argument,
-    Directive,
-    Field,
     parse_schema,
     render_file,
     render_object,
@@ -15,6 +12,7 @@ from cannula.codegen import (
 from cannula.scalars import ScalarInterface
 from cannula.scalars.date import Datetime
 from cannula.format import format_code
+from cannula.types import Argument, Directive, Field, FieldType
 
 SCHEMA = '''
 """
@@ -273,8 +271,11 @@ async def test_parse_schema_dict():
     assert obj.fields == [
         Field(
             name="name",
-            value="str",
+            field_type=FieldType("str", False),
             description="name field",
+            metadata={},
+            field=obj.fields[0].field,
+            parent="Test",
             directives=[
                 Directive(
                     name="deprecated",
@@ -282,7 +283,6 @@ async def test_parse_schema_dict():
                 ),
             ],
             args=[],
-            func_name="nameTest",
             default=None,
             required=False,
         )

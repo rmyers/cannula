@@ -30,9 +30,17 @@ import yaml
 from dataclasses import dataclass, field
 from typing import Dict, Any
 
-from graphql import DocumentNode, visit, Visitor
+from graphql import (
+    ArgumentNode,
+    DirectiveNode,
+    DocumentNode,
+    Visitor,
+    visit,
+    value_from_ast_untyped,
+)
 
 from cannula.utils import parse_metadata_to_yaml
+from cannula.types import Argument, Directive
 
 
 @dataclass
@@ -113,6 +121,18 @@ class SchemaVisitor(Visitor):
         self.processor = processor
         super().__init__()
 
+    def _parse_argument(self, arg: ArgumentNode) -> Argument:
+        """Parse an argument from a directive"""
+        return Argument(
+            name=arg.name.value,
+            value=value_from_ast_untyped(arg.value) if arg.value else None,
+        )
+
+    def _parse_directive(self, directive: DirectiveNode) -> Directive:
+        """Parse a directive node into a Directive type"""
+        args = [self._parse_argument(arg) for arg in (directive.arguments or [])]
+        return Directive(name=directive.name.value, args=args)
+
     def _process_node(self, node):
         """Helper method to process nodes with descriptions"""
         if hasattr(node, "description") and node.description:
@@ -162,5 +182,12 @@ class SchemaVisitor(Visitor):
             if parent_type not in self.processor.field_metadata:
                 self.processor.field_metadata[parent_type] = {}
 
-            new_field_data = {"metadata": metadata, "description": clean_desc}
+            # Parse directives into our custom type
+            directives = [self._parse_directive(d) for d in (node.directives or [])]
+
+            new_field_data = {
+                "metadata": metadata,
+                "description": clean_desc,
+                "directives": directives,
+            }
             self.processor.field_metadata[parent_type][field_name] = new_field_data

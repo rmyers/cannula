@@ -8,26 +8,13 @@ from graphql import (
     GraphQLNonNull,
     get_named_type,
 )
+from cannula.codegen.base import fix_missing_locations
 
 
 class SchemaValidationError(Exception):
     """Raised when the GraphQL schema metadata is invalid for SQLAlchemy model generation."""
 
     pass
-
-
-def fix_missing_locations(node: ast.Module) -> ast.Module:
-    """Add missing line numbers and column offsets to the AST."""
-    for child in ast.walk(node):
-        if not hasattr(child, "lineno"):
-            child.lineno = 1  # type: ignore
-        if not hasattr(child, "col_offset"):
-            child.col_offset = 0  # type: ignore
-        if not hasattr(child, "end_lineno"):
-            child.end_lineno = 1  # type: ignore
-        if not hasattr(child, "end_col_offset"):
-            child.end_col_offset = 0  # type: ignore
-    return node
 
 
 def is_non_null_type(type_: GraphQLType) -> bool:
