@@ -49,6 +49,7 @@ test = [
     "types-requests",
     "types-PyYAML",
     "hatch",
+    "greenlet",
 ]
 performance = [
     "pytest<9",

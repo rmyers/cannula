@@ -7,10 +7,13 @@ Key changes:
 4. Type-safe schema extensions
 """
 
+from abc import ABC, abstractmethod
+import ast
 import logging
 from dataclasses import dataclass
 from typing import Any, Dict, Generic, List, Optional, Protocol, TypeVar, cast
 
+from cannula.codegen.base import ast_for_import_from
 from graphql import (
     GraphQLField,
     GraphQLSchema,
@@ -189,13 +192,30 @@ class SchemaAnalyzer:
         )
 
 
-# TODO: make this useful and use it in the code generator
-class CodeGenerator:  # pragma: no cover
-    """Base class for code generators"""
+class CodeGenerator(ABC):
+    """Base class for code generators with common functionality."""
 
-    def __init__(self, analyzer: SchemaAnalyzer) -> None:
+    def __init__(self, analyzer: SchemaAnalyzer):
         self.analyzer = analyzer
+        self.schema = analyzer.schema
+        self.imports = analyzer.extensions.imports
 
-    def generate(self) -> str:
-        """Generate code from the analyzed schema"""
-        raise NotImplementedError
+    def create_import_statements(self) -> List[ast.ImportFrom]:
+        """Create AST nodes for import statements."""
+        module_imports = sorted(self.imports.keys())
+        return [
+            ast_for_import_from(module=mod, names=self.imports[mod])
+            for mod in module_imports
+            if mod != "builtins"
+        ]
+
+    def create_module(self, body: List[ast.stmt]) -> ast.Module:
+        """Create an AST module with imports and body."""
+        imports = self.create_import_statements()
+        module = ast.Module(body=imports + body, type_ignores=[])
+        return ast.fix_missing_locations(module)
+
+    @abstractmethod
+    def generate(self, *args, **kwargs) -> str:  # pragma: no cover
+        """Generate the complete code output."""
+        raise NotImplementedError("subclasses must provide a generate function")
