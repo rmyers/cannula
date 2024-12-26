@@ -16,9 +16,8 @@ from graphql import (
 )
 
 from cannula.schema import Imports, build_and_extend_schema
-from cannula.codegen.types import (
+from cannula.types import (
     Argument,
-    Directive,
     Field,
     FieldType,
     ObjectType,
@@ -86,7 +85,6 @@ class Schema:
             scalars,
             {"imports": _IMPORTS},
         )
-        self._set_object_types()
         self._types = self._schema.type_map
         self.object_types = []
         self.input_types = []
@@ -95,23 +93,6 @@ class Schema:
         self.scalar_types = []
         self.operation_fields = []
         self._parse_definitions()
-
-    def _set_object_types(self):
-        # Set all the py_types for schema types
-        for name, definition in self._schema.type_map.items():
-            is_private = name.startswith("__")
-
-            if is_input_object_type(definition):
-                definition.extensions["py_type"] = f"{name}Input"
-
-            elif is_union_type(definition):
-                definition.extensions["py_type"] = name
-
-            elif is_object_type(definition) and not is_private:
-                definition.extensions["py_type"] = f"{name}Type"
-
-            elif is_interface_type(definition):
-                definition.extensions["py_type"] = name
 
     def _parse_definitions(self):
         # Parse the object types and sort them
@@ -218,41 +199,35 @@ class Schema:
 
         return FieldType(value=value, required=required)
 
-    def parse_directives(self, field: typing.Dict[str, typing.Any]) -> list[Directive]:
-        directives: list[Directive] = []
-        for directive in field.get("directives", []):
-            name = self.parse_name(directive)
-            args = self.parse_args(directive)
-            directives.append(Directive(name=name, args=args))
-        return directives
-
     def parse_field(
         self,
-        field: typing.Dict[str, typing.Any],
+        field: typing.Any,
         parent: str,
         meta: typing.Optional[dict] = None,
     ) -> Field:
         meta = meta or {}
         metadata = meta.get("metadata", {})
         description = meta.get("description")
+        directives = meta.get("directives", [])
 
-        name = self.parse_name(field)
-        field_type = self.parse_type(field["type"])
-        default = self.parse_default(field)
-        directives = self.parse_directives(field)
-        args = self.parse_args(field)
-        func_name = f"{name}{parent}"
+        details = field.ast_node.to_dict()
+        name = self.parse_name(details)
+        field_type = self.parse_type(details["type"])
+        default = self.parse_default(details)
+        args = self.parse_args(details)
+        # directives = self.parse_directives(details)
 
         return Field(
+            field=field,
             name=name,
-            value=field_type.value,
-            func_name=func_name,
+            parent=parent,
+            field_type=field_type,
             description=description,
             directives=directives,
             args=args,
             default=default,
-            required=field_type.required,
             computed=metadata.get("computed", False),
+            metadata=metadata,
         )
 
     def parse_union(self, node: GraphQLUnionType) -> UnionType:
@@ -282,7 +257,6 @@ class Schema:
         py_type = node.extensions.get("py_type", node.name)
 
         description = self.parse_description(details)
-        directives = self.parse_directives(details)
 
         fields: list[Field] = []
         for field_name, field in raw_fields.items():
@@ -290,7 +264,7 @@ class Schema:
                 continue
             metadata = field_metadata.get(field_name, {})
             parsed = self.parse_field(
-                field.ast_node.to_dict(),
+                field,
                 parent=name,
                 meta=metadata,
             )
@@ -300,7 +274,7 @@ class Schema:
             name=name,
             py_type=py_type,
             fields=fields,
-            directives=directives,
+            directives=[],
             description=description,
         )
 

@@ -15,8 +15,12 @@ from graphql import (
     TypeDefinitionNode,
     build_ast_schema,
     concat_ast,
+    is_input_object_type,
+    is_interface_type,
+    is_object_type,
     is_scalar_type,
     is_type_definition_node,
+    is_union_type,
     parse,
 )
 from typing_extensions import TypedDict
@@ -135,29 +139,48 @@ def build_and_extend_schema(
     if extensions:
         schema.extensions.update(extensions)
 
+    # Custom scalar mapping used to apply 'serialize' and 'parse_value'
+    # functions as we loop through the type map setting the Python types.
     scalar_map = {s.name: s for s in scalars or []}
+
+    # Set the Python types for all the objects in the schema,
+    # scalars should map a builtin or custom scalar type like 'datetime'.
     for name, definition in schema.type_map.items():
-        if not is_scalar_type(definition):
-            continue
+        is_private = name.startswith("__")
 
-        scalar = typing.cast(GraphQLScalarType, definition)
+        if is_input_object_type(definition):
+            definition.extensions["py_type"] = f"{name}Input"
 
-        _py_type = _TYPES.get(name, "Any")
-        scalar.extensions["py_type"] = _py_type
+        elif is_union_type(definition):
+            definition.extensions["py_type"] = name
 
-        if extended_scalar := scalar_map.get(name):
-            scalar.serialize = extended_scalar.serialize  # type: ignore
-            scalar.parse_value = extended_scalar.parse_value  # type: ignore
-            scalar.extensions = {
-                "py_type": extended_scalar.input_module.klass,
-            }
+        elif is_object_type(definition) and not is_private:
+            definition.extensions["py_type"] = f"{name}Type"
+            definition.extensions["db_type"] = f"DB{name}"
 
-            schema.extensions["imports"][extended_scalar.input_module.module].add(
-                extended_scalar.input_module.klass
-            )
-            schema.extensions["imports"][extended_scalar.output_module.module].add(
-                extended_scalar.output_module.klass
-            )
+        elif is_interface_type(definition):
+            definition.extensions["py_type"] = name
+
+        elif is_scalar_type(definition):
+
+            scalar = typing.cast(GraphQLScalarType, definition)
+
+            _py_type = _TYPES.get(name, "Any")
+            scalar.extensions["py_type"] = _py_type
+
+            if extended_scalar := scalar_map.get(name):
+                scalar.serialize = extended_scalar.serialize  # type: ignore
+                scalar.parse_value = extended_scalar.parse_value  # type: ignore
+                scalar.extensions = {
+                    "py_type": extended_scalar.input_module.klass,
+                }
+
+                schema.extensions["imports"][extended_scalar.input_module.module].add(
+                    extended_scalar.input_module.klass
+                )
+                schema.extensions["imports"][extended_scalar.output_module.module].add(
+                    extended_scalar.output_module.klass
+                )
 
     return schema
 

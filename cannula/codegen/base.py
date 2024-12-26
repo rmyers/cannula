@@ -1,7 +1,7 @@
 import ast
 import typing
 
-from cannula.codegen.types import Argument, Field
+from cannula.types import Argument, Field
 
 # AST contants for common values
 NONE = ast.Constant(value=None)
@@ -99,3 +99,17 @@ def ast_for_class_field(field: Field) -> ast.AnnAssign:
     return ast_for_annotation_assignment(
         field.name, annotation=field_type, default=default
     )
+
+
+def fix_missing_locations(node: ast.Module) -> ast.Module:
+    """Add missing line numbers and column offsets to the AST."""
+    for child in ast.walk(node):
+        if not hasattr(child, "lineno"):
+            child.lineno = 1  # type: ignore
+        if not hasattr(child, "col_offset"):
+            child.col_offset = 0  # type: ignore
+        if not hasattr(child, "end_lineno"):
+            child.end_lineno = 1  # type: ignore
+        if not hasattr(child, "end_col_offset"):
+            child.end_col_offset = 0  # type: ignore
+    return node

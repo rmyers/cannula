@@ -30,9 +30,17 @@ import yaml
 from dataclasses import dataclass, field
 from typing import Dict, Any
 
-from graphql import DocumentNode, visit, Visitor
+from graphql import (
+    ArgumentNode,
+    DirectiveNode,
+    DocumentNode,
+    Visitor,
+    visit,
+    value_from_ast_untyped,
+)
 
 from cannula.utils import parse_metadata_to_yaml
+from cannula.types import Argument, Directive
 
 
 @dataclass
@@ -113,21 +121,46 @@ class SchemaVisitor(Visitor):
         self.processor = processor
         super().__init__()
 
-    def _process_node(self, node):
+    def _parse_argument(self, arg: ArgumentNode) -> Argument:
+        """Parse an argument from a directive"""
+        return Argument(
+            name=arg.name.value,
+            value=value_from_ast_untyped(arg.value) if arg.value else None,
+        )
+
+    def _parse_directive(self, directive: DirectiveNode) -> Directive:
+        """Parse a directive node into a Directive type"""
+        args = [self._parse_argument(arg) for arg in (directive.arguments or [])]
+        return Directive(name=directive.name.value, args=args)
+
+    def _process_node(self, node) -> tuple[Dict[str, Any], str]:
         """Helper method to process nodes with descriptions"""
         if hasattr(node, "description") and node.description:
             return self.processor._extract_metadata(node.description.value)
         return {}, ""
 
-    def enter_object_type_definition(self, node, *args):
+    def _parse_description(self, description: str) -> str:
+        """Check if the description is multiline and format it accordingly"""
+        newline = "\n" if "\n" in description else ""
+        return f"{newline}{description}{newline}"
+
+    def enter_object_type_definition(self, node, *args) -> None:
         metadata, clean_desc = self._process_node(node)
         type_name = node.name.value
         self.processor.type_metadata[type_name] = {
             "metadata": metadata,
-            "description": clean_desc,
+            "description": self._parse_description(clean_desc),
         }
 
-    def enter_object_type_extension(self, node, *args):
+    def enter_interface_type_definition(self, node, *args) -> None:
+        metadata, clean_desc = self._process_node(node)
+        type_name = node.name.value
+        self.processor.type_metadata[type_name] = {
+            "metadata": metadata,
+            "description": self._parse_description(clean_desc),
+        }
+
+    def enter_object_type_extension(self, node, *args) -> None:
         metadata, clean_desc = self._process_node(node)
         type_name = node.name.value
 
@@ -135,16 +168,19 @@ class SchemaVisitor(Visitor):
         if type_name in self.processor.type_metadata:
             self.processor.type_metadata[type_name] = self.processor._merge_metadata(
                 self.processor.type_metadata[type_name],
-                {"metadata": metadata, "description": clean_desc},
+                {
+                    "metadata": metadata,
+                    "description": self._parse_description(clean_desc),
+                },
             )
         else:
             # Create new type metadata if it doesn't exist
             self.processor.type_metadata[type_name] = {
                 "metadata": metadata,
-                "description": clean_desc,
+                "description": self._parse_description(clean_desc),
             }
 
-    def enter_field_definition(self, node, key, parent, path, ancestors):
+    def enter_field_definition(self, node, key, parent, path, ancestors) -> None:
         metadata, clean_desc = self._process_node(node)
 
         parent_type = None
@@ -162,5 +198,12 @@ class SchemaVisitor(Visitor):
             if parent_type not in self.processor.field_metadata:
                 self.processor.field_metadata[parent_type] = {}
 
-            new_field_data = {"metadata": metadata, "description": clean_desc}
+            # Parse directives into our custom type
+            directives = [self._parse_directive(d) for d in (node.directives or [])]
+
+            new_field_data = {
+                "metadata": metadata,
+                "description": self._parse_description(clean_desc),
+                "directives": directives,
+            }
             self.processor.field_metadata[parent_type][field_name] = new_field_data

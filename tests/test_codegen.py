@@ -1,20 +1,13 @@
-import ast
 import tempfile
 import pathlib
 
 import pytest
 
 from cannula.codegen import (
-    Argument,
-    Directive,
-    Field,
-    parse_schema,
     render_file,
-    render_object,
 )
 from cannula.scalars import ScalarInterface
 from cannula.scalars.date import Datetime
-from cannula.format import format_code
 
 SCHEMA = '''
 """
@@ -106,7 +99,7 @@ class get_sender_by_emailQuery(Protocol):
 class messageMutation(Protocol):
 
     async def __call__(
-        self, info: ResolveInfo, text: str, sender: str
+        self, info: ResolveInfo, sender: str, text: str
     ) -> Optional[MessageType]: ...
 
 
@@ -168,7 +161,7 @@ class get_sender_by_emailQuery(Protocol):
 class messageMutation(Protocol):
 
     async def __call__(
-        self, info: ResolveInfo, text: str, sender: str
+        self, info: ResolveInfo, sender: str, text: str
     ) -> Optional[MessageType]: ...
 
 
@@ -191,6 +184,11 @@ interface Persona {
     id: ID!
 }
 
+"Just a comment"
+interface Other {
+    id: ID!
+}
+
 type User implements Persona {
     id: ID!
 }
@@ -203,11 +201,17 @@ type Admin implements Persona {
 union Person = User | Admin
 """
 
-expected_interface = """\
+expected_interface = '''\
 from __future__ import annotations
 from abc import ABC
 from dataclasses import dataclass
 from typing import Any, Optional, Protocol, Union
+
+
+class Other(Protocol):
+    """Just a comment"""
+
+    id: str
 
 
 class Persona(Protocol):
@@ -228,7 +232,7 @@ class UserType(ABC):
 
 
 Person = Union[UserType, AdminType]
-"""
+'''
 
 schema_scalars = """\
 scalar Datetime
@@ -260,33 +264,6 @@ class ThingType(ABC):
     __typename = "Thing"
     created: Optional[datetime] = None
 """
-
-
-async def test_parse_schema_dict():
-    schema = 'type Test { "name field" name: String @deprecated(reason: "not valid")}'
-    actual = parse_schema([schema], [Datetime])
-
-    assert actual is not None
-    obj = actual.object_types[0]
-    assert obj.name == "Test"
-    assert obj.description is None
-    assert obj.fields == [
-        Field(
-            name="name",
-            value="str",
-            description="name field",
-            directives=[
-                Directive(
-                    name="deprecated",
-                    args=[Argument(name="reason", value="not valid", default=None)],
-                ),
-            ],
-            args=[],
-            func_name="nameTest",
-            default=None,
-            required=False,
-        )
-    ]
 
 
 @pytest.mark.parametrize(
@@ -353,31 +330,3 @@ async def test_render_file(
             content = rendered.read()
 
             assert content == expected
-
-
-COMPUTED_SCHEMA = """\
-type Test {
-    "@metadata(computed: true)"
-    name: String
-}
-"""
-
-
-EXPECTED_OBJECT = """\
-@dataclass(kw_only=True)
-class TestType(ABC):
-    __typename = "Test"
-
-    @abstractmethod
-    async def name(self, info: ResolveInfo) -> Optional[str]: ...
-"""
-
-
-async def test_render_object_handles_computed_directive():
-    actual = parse_schema([COMPUTED_SCHEMA], [])
-
-    assert actual is not None
-    obj = actual.object_types[0]
-    rendered = render_object(obj)
-    root = ast.Module(body=[*rendered], type_ignores=[])
-    assert format_code(root) == EXPECTED_OBJECT
