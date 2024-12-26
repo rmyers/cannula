@@ -3,7 +3,7 @@ import ast
 
 from graphql import GraphQLObjectType, DocumentNode
 from cannula.scalars import ScalarInterface
-from cannula.codegen.base import ast_for_docstring
+from cannula.codegen.base import ast_for_docstring, ast_for_keyword
 from cannula.codegen.schema_analyzer import SchemaAnalyzer, TypeInfo, CodeGenerator
 from cannula.schema import build_and_extend_schema
 from cannula.format import format_code
@@ -55,23 +55,19 @@ class SQLAlchemyGenerator(CodeGenerator):
         # Handle primary key
         is_primary_key = metadata.get("primary_key", False)
         if is_primary_key:
-            keywords.append(
-                ast.keyword(arg="primary_key", value=ast.Constant(value=True))
-            )
+            keywords.append(ast_for_keyword("primary_key", True))
 
         # Handle index
         if not is_primary_key and metadata.get("index"):
-            keywords.append(ast.keyword(arg="index", value=ast.Constant(value=True)))
+            keywords.append(ast_for_keyword("index", True))
 
         # Handle unique constraint
         if not is_primary_key and metadata.get("unique"):
-            keywords.append(ast.keyword(arg="unique", value=ast.Constant(value=True)))
+            keywords.append(ast_for_keyword("unique", True))
 
         # Handle custom column name
         if db_column := metadata.get("db_column"):
-            keywords.append(
-                ast.keyword(arg="name", value=ast.Constant(value=db_column))
-            )
+            keywords.append(ast_for_keyword("name", db_column))
 
         # Handle nullable based on GraphQL schema
         if not is_primary_key:
@@ -80,9 +76,7 @@ class SQLAlchemyGenerator(CodeGenerator):
             nullable = (
                 not is_required if metadata_nullable is None else metadata_nullable
             )
-            keywords.append(
-                ast.keyword(arg="nullable", value=ast.Constant(value=nullable))
-            )
+            keywords.append(ast_for_keyword("nullable", nullable))
 
         return args, keywords
 

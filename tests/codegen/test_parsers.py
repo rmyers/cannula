@@ -2,6 +2,7 @@ import pytest
 from graphql import (
     GraphQLField,
     GraphQLArgument,
+    GraphQLInputObjectType,
     GraphQLString,
     GraphQLInt,
     GraphQLFloat,
@@ -31,6 +32,9 @@ type User {
 type Post {
     id: ID!
 }
+input CreateUser {
+    name: String!
+}
 """
 
 mock_schema = build_and_extend_schema([SCHEMA])
@@ -42,6 +46,9 @@ mock_types = {
     ),
     "Post": GraphQLObjectType(
         name="Post", fields={}, extensions={"py_type": "PostType"}
+    ),
+    "CreateUser": GraphQLInputObjectType(
+        name="CreateUser", fields={}, extensions={"py_type": "CreateUserInput"}
     ),
 }
 
@@ -114,6 +121,18 @@ def test_parse_graphql_type(type_obj: Any, expected: FieldType):
             GraphQLField(
                 type_=GraphQLString,
                 args={
+                    "count": GraphQLArgument(
+                        type_=GraphQLNonNull(GraphQLInt), default_value=None
+                    )
+                },
+            ),
+            [Argument(name="count", type="int", required=True, default=None)],
+            id="required-default-none",
+        ),
+        pytest.param(
+            GraphQLField(
+                type_=GraphQLString,
+                args={
                     "name": GraphQLArgument(type_=GraphQLString),
                     "active": GraphQLArgument(type_=GraphQLBoolean, default_value=True),
                     "score": GraphQLArgument(type_=GraphQLFloat, default_value=3.14),
@@ -126,16 +145,18 @@ def test_parse_graphql_type(type_obj: Any, expected: FieldType):
             ],
             id="multiple-args",
         ),
-        # pytest.param(
-        #     GraphQLField(
-        #         type_=GraphQLString,
-        #         args={
-        #             "user": GraphQLArgument(type_=GraphQLNonNull(mock_types["User"]))
-        #         },
-        #     ),
-        #     [Argument(name="user", type="UserType", required=True)],
-        #     id="custom-type-arg",
-        # ),
+        pytest.param(
+            GraphQLField(
+                type_=GraphQLString,
+                args={
+                    "user": GraphQLArgument(
+                        type_=GraphQLNonNull(mock_types["CreateUser"])
+                    )
+                },
+            ),
+            [Argument(name="user", type="CreateUserInput", required=True)],
+            id="custom-type-arg",
+        ),
         pytest.param(
             GraphQLField(
                 type_=GraphQLString,

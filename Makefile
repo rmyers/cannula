@@ -21,7 +21,7 @@
 REQUIREMENTS             := $(shell find . -name 'pyproject.toml')
 ENVIRONMENT              := $(shell find . -name 'environment.yml')
 SHELL                    := /bin/bash
-CONDA_PREFIX             ?= venv
+CONDA_PREFIX             := venv
 VIRTUAL_ENV              ?= $(CONDA_PREFIX)
 PYTHON_MODULES           := $(shell find . -name '*.py')
 DOCKER_COMPOSE           := $(shell which docker-compose)

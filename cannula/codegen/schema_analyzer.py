@@ -216,6 +216,6 @@ class CodeGenerator(ABC):
         return ast.fix_missing_locations(module)
 
     @abstractmethod
-    def generate(self, *args, **kwargs) -> str:
+    def generate(self, *args, **kwargs) -> str:  # pragma: no cover
         """Generate the complete code output."""
-        pass
+        raise NotImplementedError("subclasses must provide a generate function")

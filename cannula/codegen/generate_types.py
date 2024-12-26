@@ -18,9 +18,10 @@ from cannula.codegen.base import (
     ast_for_argument,
     ast_for_assign,
     ast_for_class_field,
-    ast_for_docstring,
     ast_for_constant,
+    ast_for_docstring,
     ast_for_function_body,
+    ast_for_keyword,
     ast_for_name,
     ast_for_union_subscript,
 )
@@ -104,15 +105,10 @@ class PythonCodeGenerator(CodeGenerator):
             defaults=[],
         )
 
-        body: list[ast.stmt] = []
-        if field.description:
-            body.append(ast_for_docstring(field.description))
-        body.append(ast.Expr(value=ast.Constant(value=Ellipsis)))
-
         return ast.AsyncFunctionDef(
             name=field.name,
             args=args_node,
-            body=body,
+            body=ast_for_function_body(field),
             decorator_list=[ast.Name(id="abstractmethod", ctx=ast.Load())],
             returns=ast.Name(id=field.type, ctx=ast.Load()),
         )
@@ -145,7 +141,9 @@ class PythonCodeGenerator(CodeGenerator):
         ]
 
     def render_object_type(
-        self, type_info: TypeInfo[GraphQLObjectType]
+        self,
+        type_info: TypeInfo[GraphQLObjectType],
+        use_pydantic: bool,
     ) -> list[ast.stmt]:
         """Create AST nodes for an object type"""
         computed_fields = [f for f in type_info.fields if f.is_computed]
@@ -177,16 +175,14 @@ class PythonCodeGenerator(CodeGenerator):
             )
         )
 
-        base_class = "BaseModel" if self.use_pydantic else "ABC"
+        base_class = "BaseModel" if use_pydantic else "ABC"
         decorators: list[ast.expr] = []
-        if not self.use_pydantic:
+        if not use_pydantic:
             decorators.append(
                 ast.Call(
                     func=ast_for_name("dataclass"),
                     args=[],
-                    keywords=[
-                        ast.keyword(arg="kw_only", value=ast.Constant(value=True))
-                    ],
+                    keywords=[ast_for_keyword("kw_only", True)],
                 )
             )
 
@@ -309,7 +305,7 @@ class PythonCodeGenerator(CodeGenerator):
                     ],
                 ),
                 bases=[ast_for_name("TypedDict")],
-                keywords=[ast.keyword(arg="total", value=ast_for_constant(False))],
+                keywords=[ast_for_keyword("total", False)],
                 decorator_list=[],
             )
             field_classes.append(cast(ast.stmt, root_type))
@@ -318,7 +314,6 @@ class PythonCodeGenerator(CodeGenerator):
 
     def generate(self, use_pydantic: bool) -> str:
         """Generate complete Python code from the schema"""
-        self.use_pydantic = use_pydantic
         body: list[ast.stmt] = []
 
         # Generate code for each type
@@ -329,7 +324,8 @@ class PythonCodeGenerator(CodeGenerator):
             body.extend(cast(list[ast.stmt], self.render_input_type(input_type)))
 
         for obj_type in self.analyzer.object_types:
-            body.extend(cast(list[ast.stmt], self.render_object_type(obj_type)))
+            obj = self.render_object_type(obj_type, use_pydantic)
+            body.extend(cast(list[ast.stmt], obj))
 
         for union_type in self.analyzer.union_types:
             body.extend(cast(list[ast.stmt], self.render_union_type(union_type)))

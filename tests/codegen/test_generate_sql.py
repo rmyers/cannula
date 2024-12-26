@@ -43,6 +43,16 @@ type Project {
     "@metadata(wieght: 1.5, fancy: $100)"
     is_active: Boolean
 }
+
+"""
+Remote Resource that is not connected to a database table
+"""
+type RemoteResourceWithoutDB {
+    id: ID!
+    name: String!
+    description: String
+    is_active: Boolean
+}
 '''
 )
 

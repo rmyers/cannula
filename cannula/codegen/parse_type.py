@@ -33,8 +33,6 @@ def parse_graphql_type(
     if is_list_type(type_obj):
         list_type = cast(GraphQLList, type_obj)
         inner = parse_graphql_type(list_type.of_type, schema_types)
-        if inner.value is None:
-            return FieldType(value=None, required=False)
         return FieldType(value=f"Sequence[{inner.value}]", required=False)
 
     # At this point we have a named type
