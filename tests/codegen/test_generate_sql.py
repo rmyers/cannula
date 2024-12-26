@@ -1,10 +1,8 @@
 from cannula import gql
-from cannula.codegen import parse_schema
 from cannula.codegen.generate_sql import (
     SchemaValidationError,
-    generate_sqlalchemy_models,
+    render_sql_models,
 )
-from cannula.format import format_code
 import pytest
 
 SCHEMA = gql(
@@ -58,49 +56,42 @@ extend type Query {
 )
 
 EXPECTED = '''\
-from sqlalchemy import Integer, String, Boolean
+from __future__ import annotations
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from typing import Optional, Sequence
 
 
 class Base(DeclarativeBase):
     pass
 
 
-class User(Base):
-    """User in the system
-
-    Args:
-        id: User ID"""
-
-    __tablename__ = "users"
-    id: Mapped = mapped_column(String, primary_key=True)
-    name: Mapped = mapped_column(String, index=True, nullable=False)
-    email: Mapped = mapped_column(
-        String, unique=True, name="email_address", nullable=False
-    )
-    age: Mapped = mapped_column(Integer, nullable=True)
-    projects: Mapped = mapped_column(String, nullable=True)
-    is_active: Mapped = mapped_column(Boolean, nullable=True)
-
-
 class Project(Base):
-    """Project for users to work on
-
-    Args:
-        id: Project ID"""
+    """Project for users to work on"""
 
     __tablename__ = "projects"
-    id: Mapped = mapped_column(String, primary_key=True)
-    name: Mapped = mapped_column(String, nullable=False)
-    description: Mapped = mapped_column(String, nullable=True)
-    is_active: Mapped = mapped_column(Boolean, nullable=True)
+    id: Mapped[str] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(nullable=True)
+    is_active: Mapped[Optional[bool]] = mapped_column(nullable=True)
+
+
+class User(Base):
+    """User in the system"""
+
+    __tablename__ = "users"
+    id: Mapped[str] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(index=True, nullable=False)
+    email: Mapped[str] = mapped_column(
+        unique=True, name="email_address", nullable=False
+    )
+    age: Mapped[Optional[int]] = mapped_column(nullable=True)
+    projects: Mapped[Optional[Sequence[ProjectType]]] = mapped_column(nullable=True)
+    is_active: Mapped[Optional[bool]] = mapped_column(nullable=True)
 '''
 
 
 def test_generate_sql():
-    schema = parse_schema([SCHEMA, EXTENTIONS], [])
-    source_code = generate_sqlalchemy_models(schema._schema)
-    formatted_code = format_code(source_code)
+    formatted_code = render_sql_models([SCHEMA, EXTENTIONS], [])
 
     assert formatted_code == EXPECTED
 
@@ -147,5 +138,4 @@ type User {
 )
 def test_generate_sql_errors(schema, expected):
     with pytest.raises(SchemaValidationError, match=expected):
-        _schema = parse_schema(schema, [])
-        generate_sqlalchemy_models(_schema._schema)
+        render_sql_models(schema, [])

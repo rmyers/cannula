@@ -21,13 +21,11 @@ from cannula.codegen.base import (
     ast_for_docstring,
     ast_for_constant,
     ast_for_function_body,
-    ast_for_import_from,
     ast_for_name,
     ast_for_union_subscript,
-    fix_missing_locations,
 )
 from cannula.types import Argument, Field, UnionType
-from cannula.codegen.schema_analyzer import SchemaAnalyzer, TypeInfo
+from cannula.codegen.schema_analyzer import CodeGenerator, SchemaAnalyzer, TypeInfo
 
 LOG = logging.getLogger(__name__)
 
@@ -62,12 +60,10 @@ _IMPORTS.update(
 T = TypeVar("T")
 
 
-class PythonCodeGenerator:
+class PythonCodeGenerator(CodeGenerator):
     """Generates Python code from analyzed GraphQL schema"""
 
-    def __init__(self, analyzer: SchemaAnalyzer, use_pydantic: bool = False):
-        self.analyzer = analyzer
-        self.use_pydantic = use_pydantic
+    use_pydantic: bool
 
     def render_function_args_ast(
         self,
@@ -320,37 +316,28 @@ class PythonCodeGenerator:
 
         return field_classes
 
-    def generate(self) -> str:
+    def generate(self, use_pydantic: bool) -> str:
         """Generate complete Python code from the schema"""
-        module = ast.Module(body=[], type_ignores=[])
-
-        # Add imports
-        _imports = self.analyzer.extensions.imports
-        module_imports = sorted(_imports.keys())
-        for mod in module_imports:
-            if mod == "builtins":
-                continue
-            module.body.append(ast_for_import_from(module=mod, names=_imports[mod]))
+        self.use_pydantic = use_pydantic
+        body: list[ast.stmt] = []
 
         # Generate code for each type
         for interface in self.analyzer.interface_types:
-            module.body.extend(
-                cast(list[ast.stmt], self.render_interface_type(interface))
-            )
+            body.extend(cast(list[ast.stmt], self.render_interface_type(interface)))
 
         for input_type in self.analyzer.input_types:
-            module.body.extend(cast(list[ast.stmt], self.render_input_type(input_type)))
+            body.extend(cast(list[ast.stmt], self.render_input_type(input_type)))
 
         for obj_type in self.analyzer.object_types:
-            module.body.extend(cast(list[ast.stmt], self.render_object_type(obj_type)))
+            body.extend(cast(list[ast.stmt], self.render_object_type(obj_type)))
 
         for union_type in self.analyzer.union_types:
-            module.body.extend(cast(list[ast.stmt], self.render_union_type(union_type)))
+            body.extend(cast(list[ast.stmt], self.render_union_type(union_type)))
 
         # Generate operation types
-        module.body.extend(cast(list[ast.stmt], self.render_operation_types()))
+        body.extend(cast(list[ast.stmt], self.render_operation_types()))
 
-        module = fix_missing_locations(module)
+        module = self.create_module(body)
         return format_code(module)
 
 
@@ -362,5 +349,5 @@ def render_code(
     """Generate Python code from GraphQL schema"""
     schema = build_and_extend_schema(type_defs, scalars, {"imports": _IMPORTS})
     analyzer = SchemaAnalyzer(schema)
-    generator = PythonCodeGenerator(analyzer, use_pydantic)
-    return generator.generate()
+    generator = PythonCodeGenerator(analyzer)
+    return generator.generate(use_pydantic)

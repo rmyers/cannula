@@ -1,4 +1,4 @@
-import abc
+from __future__ import annotations
 import datetime
 import uuid
 import typing
@@ -25,9 +25,9 @@ class User(Base):
 
     email: Mapped[str] = mapped_column(unique=True)
     name: Mapped[str]
-    password: Mapped[str]
+    password: Mapped[typing.Optional[str]]
     is_admin: Mapped[bool] = mapped_column(default=False)
-    quota: Mapped[typing.List["Quota"]] = relationship(
+    quota: Mapped[typing.List[Quota]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
 
@@ -40,7 +40,7 @@ class Quota(Base):
     limit: Mapped[int]
     count: Mapped[int]
 
-    user: Mapped["User"] = relationship(back_populates="quota")
+    user: Mapped[User] = relationship(back_populates="quota")
 
 
 async def create_tables() -> None:
