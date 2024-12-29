@@ -3,7 +3,16 @@ import ast
 
 from graphql import GraphQLObjectType, DocumentNode
 from cannula.scalars import ScalarInterface
-from cannula.codegen.base import ast_for_docstring, ast_for_keyword
+from cannula.codegen.base import (
+    PASS,
+    ast_for_annotation_assignment,
+    ast_for_assign,
+    ast_for_constant,
+    ast_for_docstring,
+    ast_for_keyword,
+    ast_for_name,
+    ast_for_subscript,
+)
 from cannula.codegen.schema_analyzer import SchemaAnalyzer, TypeInfo, CodeGenerator
 from cannula.schema import build_and_extend_schema
 from cannula.format import format_code
@@ -104,12 +113,7 @@ class SQLAlchemyGenerator(CodeGenerator):
 
         # Add table name
         table_name = type_info.metadata.get("db_table", type_info.name.lower())
-        body.append(
-            ast.Assign(
-                targets=[ast.Name(id="__tablename__", ctx=ast.Store())],
-                value=ast.Constant(value=table_name),
-            )
-        )
+        body.append(ast_for_assign("__tablename__", ast_for_constant(table_name)))
 
         # Add columns
         for field in type_info.fields:
@@ -118,27 +122,22 @@ class SQLAlchemyGenerator(CodeGenerator):
             )
 
             # Create the Mapped[Type] annotation
-            mapped_type = ast.Subscript(
-                value=ast.Name(id="Mapped", ctx=ast.Load()),
-                slice=ast.Name(id=field.type, ctx=ast.Load()),
-                ctx=ast.Load(),
-            )
+            mapped_type = ast_for_subscript(ast_for_name("Mapped"), field.type)
 
-            column_def = ast.AnnAssign(
-                target=ast.Name(id=field.name, ctx=ast.Store()),
+            column_def = ast_for_annotation_assignment(
+                target=field.name,
                 annotation=mapped_type,
-                value=ast.Call(
-                    func=ast.Name(id="mapped_column", ctx=ast.Load()),
+                default=ast.Call(
+                    func=ast_for_name("mapped_column"),
                     args=args,
                     keywords=keywords,
                 ),
-                simple=1,
             )
             body.append(column_def)
 
         return ast.ClassDef(
             name=type_info.name,
-            bases=[ast.Name(id="Base", ctx=ast.Load())],
+            bases=[ast_for_name("Base")],
             keywords=[],
             body=body,
             decorator_list=[],
@@ -150,9 +149,9 @@ class SQLAlchemyGenerator(CodeGenerator):
         body: list[ast.stmt] = [
             ast.ClassDef(
                 name="Base",
-                bases=[ast.Name(id="DeclarativeBase", ctx=ast.Load())],
+                bases=[ast_for_name("DeclarativeBase")],
                 keywords=[],
-                body=[ast.Pass()],
+                body=[PASS],
                 decorator_list=[],
             )
         ]
