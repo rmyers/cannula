@@ -39,6 +39,20 @@ type Project {
     "Project ID @metadata(primary_key: true)"
     id: ID!
     name: String!
+    "@metadata(foreign_key: users.id)"
+    author_id: ID!
+    """
+    Author of the project
+
+    ---
+    metadata:
+        inverse: "projects"
+        relation:
+            back_populates: "author"
+            foreign_key: "projects.author_id"
+            cascade: "all, delete-orphan"
+    """
+    author: User!
     description: String
     "@metadata(wieght: 1.5, fancy: $100)"
     is_active: Boolean
@@ -68,14 +82,14 @@ extend type Query {
 EXPECTED = '''\
 from __future__ import annotations
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from typing import Optional, Sequence
+from typing import Optional
 
 
 class Base(DeclarativeBase):
     pass
 
 
-class Project(Base):
+class DBProject(Base):
     """Project for users to work on"""
 
     __tablename__ = "projects"
@@ -85,7 +99,7 @@ class Project(Base):
     is_active: Mapped[Optional[bool]] = mapped_column(nullable=True)
 
 
-class User(Base):
+class DBUser(Base):
     """User in the system"""
 
     __tablename__ = "users"
@@ -95,7 +109,6 @@ class User(Base):
         unique=True, name="email_address", nullable=False
     )
     age: Mapped[Optional[int]] = mapped_column(nullable=True)
-    projects: Mapped[Optional[Sequence[ProjectType]]] = mapped_column(nullable=True)
     is_active: Mapped[Optional[bool]] = mapped_column(nullable=True)
 '''
 

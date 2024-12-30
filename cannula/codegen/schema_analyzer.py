@@ -89,6 +89,10 @@ class TypeInfo(Generic[T]):
     fields: List[Field]
     description: Optional[str] = None
 
+    @property
+    def is_db_type(self) -> bool:
+        return bool(self.metadata.get("db_table", False))
+
 
 class SchemaAnalyzer:
     """
@@ -109,6 +113,8 @@ class SchemaAnalyzer:
         self.union_types: List[UnionType] = []
         self.operation_types: List[TypeInfo[GraphQLObjectType]] = []
         self.operation_fields: List[Field] = []
+        # Add helper to access object types by name
+        self.object_types_by_name: Dict[str, TypeInfo[GraphQLObjectType]] = {}
 
         for name, type_def in self.schema.type_map.items():
             is_operation = name in ("Query", "Mutation", "Subscription")
@@ -141,6 +147,7 @@ class SchemaAnalyzer:
         self.operation_fields.sort(key=lambda o: o.name)
         self.operation_types.sort(key=lambda o: o.name)
         self.union_types.sort(key=lambda o: o.name)
+        self.object_types_by_name = {t.name: t for t in self.object_types}
 
     def parse_union(self, node: GraphQLUnionType) -> UnionType:
         """Parse a GraphQL Union type into a UnionType object"""

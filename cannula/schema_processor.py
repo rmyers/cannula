@@ -26,6 +26,7 @@ Supports metadata in the following formats:
     }
 '''
 
+import logging
 import yaml
 from dataclasses import dataclass, field
 from typing import Dict, Any
@@ -41,6 +42,8 @@ from graphql import (
 
 from cannula.utils import parse_metadata_to_yaml
 from cannula.types import Argument, Directive
+
+LOG = logging.getLogger(__name__)
 
 
 @dataclass
@@ -102,7 +105,8 @@ class SchemaProcessor:
                 data = yaml.safe_load(yaml_str)
                 if isinstance(data, dict) and "metadata" in data:
                     return data["metadata"], desc.strip()
-            except yaml.YAMLError:
+            except yaml.YAMLError as e:
+                LOG.warning(f"Error parsing YAML metadata: {e}")
                 return {}, description.strip()
 
         return {}, description.strip()
