@@ -56,31 +56,37 @@ mock_types = {
 @pytest.mark.parametrize(
     "type_obj,expected",
     [
-        pytest.param(GraphQLString, FieldType("str", False), id="string"),
         pytest.param(
-            GraphQLNonNull(GraphQLString), FieldType("str", True), id="required-string"
+            GraphQLString, FieldType("str", False, of_type="str"), id="string"
+        ),
+        pytest.param(
+            GraphQLNonNull(GraphQLString),
+            FieldType("str", True, of_type="str"),
+            id="required-string",
         ),
         pytest.param(
             GraphQLList(GraphQLString),
-            FieldType("Sequence[str]", False),
+            FieldType("Sequence[str]", False, of_type="str"),
             id="string-list",
         ),
         pytest.param(
             GraphQLNonNull(GraphQLList(GraphQLString)),
-            FieldType("Sequence[str]", True),
+            FieldType("Sequence[str]", True, of_type="str"),
             id="required-string-list",
         ),
         pytest.param(
-            mock_types["User"], FieldType("UserType", False), id="custom-type"
+            mock_types["User"],
+            FieldType("UserType", False, of_type="UserType"),
+            id="custom-type",
         ),
         pytest.param(
             GraphQLNonNull(mock_types["User"]),
-            FieldType("UserType", True),
+            FieldType("UserType", True, of_type="UserType"),
             id="required-custom-type",
         ),
         pytest.param(
             GraphQLList(mock_types["Post"]),
-            FieldType("Sequence[PostType]", False),
+            FieldType("Sequence[PostType]", False, of_type="PostType"),
             id="list-of-custom",
         ),
     ],

@@ -93,6 +93,10 @@ class TypeInfo(Generic[T]):
     def is_db_type(self) -> bool:
         return bool(self.metadata.get("db_table", False))
 
+    @property
+    def db_type(self) -> str:
+        return self.type_def.extensions.get("db_type", f"DB{self.name}")
+
 
 class SchemaAnalyzer:
     """
