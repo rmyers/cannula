@@ -151,7 +151,7 @@ class SchemaAnalyzer:
         self.operation_fields.sort(key=lambda o: o.name)
         self.operation_types.sort(key=lambda o: o.name)
         self.union_types.sort(key=lambda o: o.name)
-        self.object_types_by_name = {t.name: t for t in self.object_types}
+        self.object_types_by_name = {t.py_type: t for t in self.object_types}
 
     def parse_union(self, node: GraphQLUnionType) -> UnionType:
         """Parse a GraphQL Union type into a UnionType object"""

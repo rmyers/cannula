@@ -66,12 +66,12 @@ mock_types = {
         ),
         pytest.param(
             GraphQLList(GraphQLString),
-            FieldType("Sequence[str]", False, of_type="str"),
+            FieldType("Sequence[str]", False, of_type="str", is_list=True),
             id="string-list",
         ),
         pytest.param(
             GraphQLNonNull(GraphQLList(GraphQLString)),
-            FieldType("Sequence[str]", True, of_type="str"),
+            FieldType("Sequence[str]", True, of_type="str", is_list=True),
             id="required-string-list",
         ),
         pytest.param(
@@ -86,7 +86,7 @@ mock_types = {
         ),
         pytest.param(
             GraphQLList(mock_types["Post"]),
-            FieldType("Sequence[PostType]", False, of_type="PostType"),
+            FieldType("Sequence[PostType]", False, of_type="PostType", is_list=True),
             id="list-of-custom",
         ),
     ],

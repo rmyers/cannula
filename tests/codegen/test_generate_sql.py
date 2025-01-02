@@ -48,7 +48,7 @@ type Project {
     metadata:
         inverse: "projects"
         relation:
-            back_populates: "author"
+            back_populates: "projects"
             foreign_key: "projects.author_id"
             cascade: "all, delete-orphan"
     """
@@ -81,7 +81,8 @@ extend type Query {
 
 EXPECTED = '''\
 from __future__ import annotations
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy import ForeignKey
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from typing import Optional
 
 
@@ -95,6 +96,12 @@ class DBProject(Base):
     __tablename__ = "projects"
     id: Mapped[str] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(nullable=False)
+    author_id: Mapped[str] = mapped_column(
+        foreign_key=ForeignKey("users.id"), nullable=False
+    )
+    author: Mapped[DBUser] = relationship(
+        "DBUser", back_populates="projects", cascade="all, delete-orphan"
+    )
     description: Mapped[Optional[str]] = mapped_column(nullable=True)
     is_active: Mapped[Optional[bool]] = mapped_column(nullable=True)
 
