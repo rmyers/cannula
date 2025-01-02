@@ -1,15 +1,14 @@
-from typing import Any, Dict, List, Optional, Set, Union
+from typing import Any, Dict, List, Set, Union
 import ast
 
 from graphql import GraphQLObjectType, DocumentNode
 from cannula.scalars import ScalarInterface
 from cannula.codegen.base import (
     PASS,
-    #  ast_for_annotation_assignment,
-    # ast_for_assign,
-    # ast_for_constant,
+    ast_for_annotation_assignment,
+    ast_for_assign,
     ast_for_docstring,
-    # ast_for_keyword,
+    ast_for_keyword,
     ast_for_name,
     ast_for_subscript,
 )
@@ -17,7 +16,7 @@ from cannula.codegen.schema_analyzer import SchemaAnalyzer, TypeInfo, CodeGenera
 from cannula.schema import build_and_extend_schema
 from cannula.format import format_code
 from cannula.codegen.generate_types import _IMPORTS
-from cannula.types import Field, FieldType
+from cannula.types import Field
 
 
 class SchemaValidationError(Exception):
@@ -28,21 +27,6 @@ class SchemaValidationError(Exception):
 
 class SQLAlchemyGenerator(CodeGenerator):
     """Generates SQLAlchemy models from GraphQL schema."""
-
-    def is_scalar_type(self, type_name: str) -> bool:
-        """Check if a type is a scalar type."""
-        scalar_types = {"str", "int", "float", "bool", "datetime"}
-        return type_name.lower() in scalar_types
-
-    def is_sequence_type(self, field_type: FieldType) -> bool:
-        """Check if a field type is a sequence (list) type."""
-        return field_type.value is not None and field_type.value.startswith("Sequence[")
-
-    def get_sequence_type(self, field_type: FieldType) -> Optional[str]:
-        """Extract the inner type from a sequence type."""
-        if not self.is_sequence_type(field_type):
-            return None
-        return field_type.of_type
 
     def validate_relationship_metadata(
         self, field: Field, type_info: TypeInfo[GraphQLObjectType]
@@ -109,17 +93,16 @@ class SQLAlchemyGenerator(CodeGenerator):
         # Handle primary key
         is_primary_key = metadata.get("primary_key", False)
         if is_primary_key:
-            keywords.append(
-                ast.keyword(arg="primary_key", value=ast.Constant(value=True))
-            )
+            keywords.append(ast_for_keyword("primary_key", True))
 
         # Handle foreign key
         if foreign_key := metadata.get("foreign_key"):
             keywords.append(
+                # This does not use a constant so we cannot use ast_for_keyword
                 ast.keyword(
                     arg="foreign_key",
                     value=ast.Call(
-                        func=ast.Name(id="ForeignKey", ctx=ast.Load()),
+                        func=ast_for_name("ForeignKey"),
                         args=[ast.Constant(value=foreign_key)],
                         keywords=[],
                     ),
@@ -128,17 +111,15 @@ class SQLAlchemyGenerator(CodeGenerator):
 
         # Handle index
         if not is_primary_key and metadata.get("index"):
-            keywords.append(ast.keyword(arg="index", value=ast.Constant(value=True)))
+            keywords.append(ast_for_keyword(arg="index", value=True))
 
         # Handle unique constraint
         if not is_primary_key and metadata.get("unique"):
-            keywords.append(ast.keyword(arg="unique", value=ast.Constant(value=True)))
+            keywords.append(ast_for_keyword(arg="unique", value=True))
 
         # Handle custom column name
         if db_column := metadata.get("db_column"):
-            keywords.append(
-                ast.keyword(arg="name", value=ast.Constant(value=db_column))
-            )
+            keywords.append(ast_for_keyword(arg="name", value=db_column))
 
         # Handle nullable based on GraphQL schema
         if not is_primary_key:
@@ -147,9 +128,7 @@ class SQLAlchemyGenerator(CodeGenerator):
             nullable = (
                 not is_required if metadata_nullable is None else metadata_nullable
             )
-            keywords.append(
-                ast.keyword(arg="nullable", value=ast.Constant(value=nullable))
-            )
+            keywords.append(ast_for_keyword(arg="nullable", value=nullable))
 
         return args, keywords
 
@@ -181,17 +160,11 @@ class SQLAlchemyGenerator(CodeGenerator):
 
         # Add back_populates
         if back_populates := relation_metadata.get("back_populates"):
-            keywords.append(
-                ast.keyword(
-                    arg="back_populates", value=ast.Constant(value=back_populates)
-                )
-            )
+            keywords.append(ast_for_keyword(arg="back_populates", value=back_populates))
 
         # Add cascade if specified
         if cascade := relation_metadata.get("cascade"):
-            keywords.append(
-                ast.keyword(arg="cascade", value=ast.Constant(value=cascade))
-            )
+            keywords.append(ast_for_keyword(arg="cascade", value=cascade))
 
         return args, keywords
 
@@ -221,15 +194,14 @@ class SQLAlchemyGenerator(CodeGenerator):
                 ast_for_name("Mapped"), field.field_type.type
             )
 
-        return ast.AnnAssign(
-            target=ast.Name(id=field.name, ctx=ast.Store()),
+        return ast_for_annotation_assignment(
+            target=field.name,
             annotation=mapped_type,
-            value=ast.Call(
-                func=ast.Name(id=func_name, ctx=ast.Load()),
+            default=ast.Call(
+                func=ast_for_name(func_name),
                 args=args,
                 keywords=keywords,
             ),
-            simple=1,
         )
 
     def create_model_class(
@@ -257,8 +229,8 @@ class SQLAlchemyGenerator(CodeGenerator):
         # Add table name
         table_name = type_info.metadata.get("db_table", type_info.name.lower())
         body.append(
-            ast.Assign(
-                targets=[ast.Name(id="__tablename__", ctx=ast.Store())],
+            ast_for_assign(
+                "__tablename__",
                 value=ast.Constant(value=table_name),
             )
         )
@@ -273,7 +245,7 @@ class SQLAlchemyGenerator(CodeGenerator):
 
         return ast.ClassDef(
             name=type_info.db_type,
-            bases=[ast.Name(id="Base", ctx=ast.Load())],
+            bases=[ast_for_name("Base")],
             keywords=[],
             body=body,
             decorator_list=[],
@@ -326,7 +298,7 @@ class SQLAlchemyGenerator(CodeGenerator):
                         )
 
                 # For many-to-one or one-to-one relationships, ensure there's a foreign key
-                if not self.is_sequence_type(field.field_type):
+                if not field.field_type.is_list:
                     fk_field = next(
                         (f for f in type_info.fields if f.metadata.get("foreign_key")),
                         None,
