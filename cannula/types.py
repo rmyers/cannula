@@ -8,6 +8,8 @@ from graphql import GraphQLField
 class FieldType:
     value: str | None
     required: bool = False
+    of_type: str | None = None
+    is_list: bool = False
 
     @property
     def safe_value(self) -> str:

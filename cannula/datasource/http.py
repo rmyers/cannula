@@ -143,12 +143,12 @@ class HTTPDataSource(typing.Generic[GraphModel]):
     def __init_subclass__(
         cls,
         graph_model: type[GraphModel],
-        base_url: typing.Optional[httpx.URL] = None,
+        base_url: typing.Optional[httpx.URL | str] = None,
         timeout: typing.Optional[httpx.Timeout] = None,
     ) -> None:
         cls._graph_model = graph_model
         cls._expected_fields = expected_fields(graph_model)
-        cls._base_url = base_url
+        cls._base_url = httpx.URL(base_url) if base_url else None
         cls._timeout = timeout
         return super().__init_subclass__()
 

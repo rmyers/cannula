@@ -6,6 +6,7 @@ from cannula.types import Argument, Field
 # AST contants for common values
 NONE = ast.Constant(value=None)
 ELLIPSIS = ast.Expr(value=ast.Constant(value=Ellipsis))
+PASS = ast.Pass()
 
 
 def ast_for_import_from(module: str, names: set[str]) -> ast.ImportFrom:

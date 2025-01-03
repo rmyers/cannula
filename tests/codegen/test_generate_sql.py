@@ -39,6 +39,20 @@ type Project {
     "Project ID @metadata(primary_key: true)"
     id: ID!
     name: String!
+    "@metadata(foreign_key: users.id)"
+    author_id: ID!
+    """
+    Author of the project
+
+    ---
+    metadata:
+        inverse: "projects"
+        relation:
+            back_populates: "projects"
+            foreign_key: "projects.author_id"
+            cascade: "all, delete-orphan"
+    """
+    author: User!
     description: String
     "@metadata(wieght: 1.5, fancy: $100)"
     is_active: Boolean
@@ -67,25 +81,32 @@ extend type Query {
 
 EXPECTED = '''\
 from __future__ import annotations
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from typing import Optional, Sequence
+from sqlalchemy import ForeignKey
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from typing import Optional
 
 
 class Base(DeclarativeBase):
     pass
 
 
-class Project(Base):
+class DBProject(Base):
     """Project for users to work on"""
 
     __tablename__ = "projects"
     id: Mapped[str] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(nullable=False)
+    author_id: Mapped[str] = mapped_column(
+        foreign_key=ForeignKey("users.id"), nullable=False
+    )
+    author: Mapped[DBUser] = relationship(
+        "DBUser", back_populates="projects", cascade="all, delete-orphan"
+    )
     description: Mapped[Optional[str]] = mapped_column(nullable=True)
     is_active: Mapped[Optional[bool]] = mapped_column(nullable=True)
 
 
-class User(Base):
+class DBUser(Base):
     """User in the system"""
 
     __tablename__ = "users"
@@ -95,7 +116,6 @@ class User(Base):
         unique=True, name="email_address", nullable=False
     )
     age: Mapped[Optional[int]] = mapped_column(nullable=True)
-    projects: Mapped[Optional[Sequence[ProjectType]]] = mapped_column(nullable=True)
     is_active: Mapped[Optional[bool]] = mapped_column(nullable=True)
 '''
 
@@ -130,6 +150,78 @@ type User {
 """
 )
 
+INVALID_RELATION = gql(
+    '''
+"@metadata(db_table:users)"
+type User {
+    "User ID @metadata(primary_key: true)"
+    id: ID!
+    "@metadata(foreign_key: projects.id)"
+    project_id: String!
+    """
+    User's project
+
+    ---
+    metadata:
+        relation:
+            back_populates: "author"
+            cascade: "all, delete-orphan"
+    """
+    project: Project
+}
+
+"not a db table"
+type Project {
+    id: ID!
+    name: String!
+}
+'''
+)
+
+INVALID_RELATION_TYPE = gql(
+    '''
+"@metadata(db_table:users)"
+type User {
+    "User ID @metadata(primary_key: true)"
+    id: ID!
+    "@metadata(foreign_key: projects.id)"
+    project_id: String!
+    """
+    User's project @metadata(relation: "projects")
+    """
+    project: String
+}
+'''
+)
+
+INVALID_RELATION_CASCADE = gql(
+    '''
+"@metadata(db_table:users)"
+type User {
+    "User ID @metadata(primary_key: true)"
+    id: ID!
+    "@metadata(foreign_key: projects.id)"
+    project_id: String!
+    """
+    User's project
+
+    ---
+    metadata:
+        relation:
+            back_populates: "author"
+            cascade: true
+    """
+    project: Project
+}
+
+"@metadata(db_table:projects)"
+type Project {
+    id: ID!
+    name: String!
+}
+'''
+)
+
 
 @pytest.mark.parametrize(
     "schema, expected",
@@ -143,6 +235,21 @@ type User {
             [INVALID_COMPOSITE],
             "Multiple primary keys found in type 'User': id, name.",
             id="invalid-composite",
+        ),
+        pytest.param(
+            [INVALID_RELATION],
+            "Relationship User.project references type DBProject which is not marked as a database table",
+            id="invalid-relation",
+        ),
+        pytest.param(
+            [INVALID_RELATION_TYPE],
+            "Relation metadata for User.project must be a dictionary",
+            id="invalid-relation-type",
+        ),
+        pytest.param(
+            [INVALID_RELATION_CASCADE],
+            "Cascade option in relationship User.project must be a string",
+            id="invalid-relation-cascade",
         ),
     ],
 )
