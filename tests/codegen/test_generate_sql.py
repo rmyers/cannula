@@ -150,6 +150,78 @@ type User {
 """
 )
 
+INVALID_RELATION = gql(
+    '''
+"@metadata(db_table:users)"
+type User {
+    "User ID @metadata(primary_key: true)"
+    id: ID!
+    "@metadata(foreign_key: projects.id)"
+    project_id: String!
+    """
+    User's project
+
+    ---
+    metadata:
+        relation:
+            back_populates: "author"
+            cascade: "all, delete-orphan"
+    """
+    project: Project
+}
+
+"not a db table"
+type Project {
+    id: ID!
+    name: String!
+}
+'''
+)
+
+INVALID_RELATION_TYPE = gql(
+    '''
+"@metadata(db_table:users)"
+type User {
+    "User ID @metadata(primary_key: true)"
+    id: ID!
+    "@metadata(foreign_key: projects.id)"
+    project_id: String!
+    """
+    User's project @metadata(relation: "projects")
+    """
+    project: String
+}
+'''
+)
+
+INVALID_RELATION_CASCADE = gql(
+    '''
+"@metadata(db_table:users)"
+type User {
+    "User ID @metadata(primary_key: true)"
+    id: ID!
+    "@metadata(foreign_key: projects.id)"
+    project_id: String!
+    """
+    User's project
+
+    ---
+    metadata:
+        relation:
+            back_populates: "author"
+            cascade: true
+    """
+    project: Project
+}
+
+"@metadata(db_table:projects)"
+type Project {
+    id: ID!
+    name: String!
+}
+'''
+)
+
 
 @pytest.mark.parametrize(
     "schema, expected",
@@ -163,6 +235,21 @@ type User {
             [INVALID_COMPOSITE],
             "Multiple primary keys found in type 'User': id, name.",
             id="invalid-composite",
+        ),
+        pytest.param(
+            [INVALID_RELATION],
+            "Relationship User.project references type DBProject which is not marked as a database table",
+            id="invalid-relation",
+        ),
+        pytest.param(
+            [INVALID_RELATION_TYPE],
+            "Relation metadata for User.project must be a dictionary",
+            id="invalid-relation-type",
+        ),
+        pytest.param(
+            [INVALID_RELATION_CASCADE],
+            "Cascade option in relationship User.project must be a string",
+            id="invalid-relation-cascade",
         ),
     ],
 )
