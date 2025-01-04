@@ -108,12 +108,12 @@ def test_resolve_scalars():
 def test_cli_codegen_in_examples_generates_correct_file(example):
     cannula_exe = CANNULA.absolute()
     example_dir = pathlib.Path(FIXTURES / "examples" / example)
-    with open(example_dir / "_generated.py") as existing:
+    with open(example_dir / "gql" / "types.py") as existing:
         existing_generated = existing.read()
 
     subprocess.call([cannula_exe, "codegen"], cwd=example_dir)
 
-    with open(example_dir / "_generated.py") as after:
+    with open(example_dir / "gql" / "types.py") as after:
         after_generated = after.read()
 
     assert after_generated == existing_generated

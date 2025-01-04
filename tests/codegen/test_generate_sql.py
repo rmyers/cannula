@@ -1,8 +1,6 @@
 from cannula import gql
-from cannula.codegen.generate_sql import (
-    SchemaValidationError,
-    render_sql_models,
-)
+from cannula.codegen import render_code
+from cannula.codegen.generate_sql import SchemaValidationError
 import pytest
 
 SCHEMA = gql(
@@ -119,9 +117,9 @@ class DBUser(Base):
 
 
 def test_generate_sql():
-    formatted_code = render_sql_models([SCHEMA, EXTENTIONS], [])
+    formatted_code = render_code([SCHEMA, EXTENTIONS], [])
 
-    assert formatted_code == EXPECTED
+    assert formatted_code["sql"] == EXPECTED
 
 
 INVALID_NULLABLE = gql(
@@ -220,4 +218,4 @@ type User {
 )
 def test_generate_sql_errors(schema, expected):
     with pytest.raises(SchemaValidationError, match=expected):
-        render_sql_models(schema, [])
+        render_code(schema, [])

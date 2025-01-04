@@ -5,7 +5,7 @@ from typing import Sequence
 
 import cannula
 import cannula.middleware
-from ._generated import (
+from .gql.types import (
     BookType,
     Generic,
     MovieType,

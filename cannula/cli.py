@@ -49,8 +49,8 @@ codegen_parser.add_argument(
 )
 codegen_parser.add_argument(
     "--dest",
-    help="Change the default location of the output file.",
-    default="_generated.py",
+    help="Change the default location of the output folder.",
+    default="gql",
 )
 codegen_parser.add_argument(
     "--scalar",

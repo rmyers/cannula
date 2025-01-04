@@ -1,8 +1,7 @@
-from typing import Any, Dict, List, Set, Union
+from typing import Any, Dict, List, Set
 import ast
 
-from graphql import GraphQLObjectType, DocumentNode
-from cannula.scalars import ScalarInterface
+from graphql import GraphQLObjectType
 from cannula.codegen.base import (
     PASS,
     ast_for_annotation_assignment,
@@ -12,10 +11,8 @@ from cannula.codegen.base import (
     ast_for_name,
     ast_for_subscript,
 )
-from cannula.codegen.schema_analyzer import SchemaAnalyzer, TypeInfo, CodeGenerator
-from cannula.schema import build_and_extend_schema
+from cannula.codegen.schema_analyzer import TypeInfo, CodeGenerator
 from cannula.format import format_code
-from cannula.codegen.generate_types import _IMPORTS
 from cannula.types import Field
 
 
@@ -299,6 +296,10 @@ class SQLAlchemyGenerator(CodeGenerator):
 
     def generate(self) -> str:
         """Generate SQLAlchemy models from the schema."""
+        db_tables = self.get_db_table_types()
+        if not db_tables:
+            return ""
+
         # Create base class definition
         body: list[ast.stmt] = [
             ast.ClassDef(
@@ -324,14 +325,3 @@ class SQLAlchemyGenerator(CodeGenerator):
         # Create and format the complete module
         module = self.create_module(body)
         return format_code(module)
-
-
-def render_sql_models(
-    type_defs: List[Union[str, DocumentNode]],
-    scalars: List[ScalarInterface] = [],
-) -> str:
-    """Generate SQLAlchemy models from GraphQL schema"""
-    schema = build_and_extend_schema(type_defs, scalars, {"imports": _IMPORTS})
-    analyzer = SchemaAnalyzer(schema)
-    generator = SQLAlchemyGenerator(analyzer)
-    return generator.generate()
