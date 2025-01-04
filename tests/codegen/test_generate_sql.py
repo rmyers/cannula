@@ -46,10 +46,8 @@ type Project {
 
     ---
     metadata:
-        inverse: "projects"
         relation:
             back_populates: "projects"
-            foreign_key: "projects.author_id"
             cascade: "all, delete-orphan"
     """
     author: User!
@@ -194,34 +192,6 @@ type User {
 '''
 )
 
-INVALID_RELATION_CASCADE = gql(
-    '''
-"@metadata(db_table:users)"
-type User {
-    "User ID @metadata(primary_key: true)"
-    id: ID!
-    "@metadata(foreign_key: projects.id)"
-    project_id: String!
-    """
-    User's project
-
-    ---
-    metadata:
-        relation:
-            back_populates: "author"
-            cascade: true
-    """
-    project: Project
-}
-
-"@metadata(db_table:projects)"
-type Project {
-    id: ID!
-    name: String!
-}
-'''
-)
-
 
 @pytest.mark.parametrize(
     "schema, expected",
@@ -245,11 +215,6 @@ type Project {
             [INVALID_RELATION_TYPE],
             "Relation metadata for User.project must be a dictionary",
             id="invalid-relation-type",
-        ),
-        pytest.param(
-            [INVALID_RELATION_CASCADE],
-            "Cascade option in relationship User.project must be a string",
-            id="invalid-relation-cascade",
         ),
     ],
 )

@@ -41,14 +41,6 @@ class SQLAlchemyGenerator(CodeGenerator):
                 f"Relation metadata for {type_info.name}.{field.name} must be a dictionary"
             )
 
-        # Validate optional cascade value if present
-        if "cascade" in relation_metadata:
-            cascade = relation_metadata["cascade"]
-            if not isinstance(cascade, str):
-                raise SchemaValidationError(
-                    f"Cascade option in relationship {type_info.name}.{field.name} must be a string"
-                )
-
     def get_db_table_types(self) -> Set[str]:
         """Get all types that have db_table metadata."""
         return {
@@ -158,13 +150,9 @@ class SQLAlchemyGenerator(CodeGenerator):
         )
         args.append(ast.Constant(value=relation_value))
 
-        # Add back_populates
-        if back_populates := relation_metadata.get("back_populates"):
-            keywords.append(ast_for_keyword(arg="back_populates", value=back_populates))
-
-        # Add cascade if specified
-        if cascade := relation_metadata.get("cascade"):
-            keywords.append(ast_for_keyword(arg="cascade", value=cascade))
+        # Add keyword arguments specified in metadata (e.g. back_populates)
+        for key, value in relation_metadata.items():
+            keywords.append(ast_for_keyword(key, value))
 
         return args, keywords
 
