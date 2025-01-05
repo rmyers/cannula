@@ -1,8 +1,7 @@
-from typing import Any, Dict, List, Set, Union
+from typing import Any, Dict, List, Set
 import ast
 
-from graphql import GraphQLObjectType, DocumentNode
-from cannula.scalars import ScalarInterface
+from graphql import GraphQLObjectType
 from cannula.codegen.base import (
     PASS,
     ast_for_annotation_assignment,
@@ -12,10 +11,8 @@ from cannula.codegen.base import (
     ast_for_name,
     ast_for_subscript,
 )
-from cannula.codegen.schema_analyzer import SchemaAnalyzer, TypeInfo, CodeGenerator
-from cannula.schema import build_and_extend_schema
+from cannula.codegen.schema_analyzer import TypeInfo, CodeGenerator
 from cannula.format import format_code
-from cannula.codegen.generate_types import _IMPORTS
 from cannula.types import Field
 
 
@@ -40,14 +37,6 @@ class SQLAlchemyGenerator(CodeGenerator):
             raise SchemaValidationError(
                 f"Relation metadata for {type_info.name}.{field.name} must be a dictionary"
             )
-
-        # Validate optional cascade value if present
-        if "cascade" in relation_metadata:
-            cascade = relation_metadata["cascade"]
-            if not isinstance(cascade, str):
-                raise SchemaValidationError(
-                    f"Cascade option in relationship {type_info.name}.{field.name} must be a string"
-                )
 
     def get_db_table_types(self) -> Set[str]:
         """Get all types that have db_table metadata."""
@@ -158,13 +147,9 @@ class SQLAlchemyGenerator(CodeGenerator):
         )
         args.append(ast.Constant(value=relation_value))
 
-        # Add back_populates
-        if back_populates := relation_metadata.get("back_populates"):
-            keywords.append(ast_for_keyword(arg="back_populates", value=back_populates))
-
-        # Add cascade if specified
-        if cascade := relation_metadata.get("cascade"):
-            keywords.append(ast_for_keyword(arg="cascade", value=cascade))
+        # Add keyword arguments specified in metadata (e.g. back_populates)
+        for key, value in relation_metadata.items():
+            keywords.append(ast_for_keyword(key, value))
 
         return args, keywords
 
@@ -311,6 +296,10 @@ class SQLAlchemyGenerator(CodeGenerator):
 
     def generate(self) -> str:
         """Generate SQLAlchemy models from the schema."""
+        db_tables = self.get_db_table_types()
+        if not db_tables:
+            return ""
+
         # Create base class definition
         body: list[ast.stmt] = [
             ast.ClassDef(
@@ -336,14 +325,3 @@ class SQLAlchemyGenerator(CodeGenerator):
         # Create and format the complete module
         module = self.create_module(body)
         return format_code(module)
-
-
-def render_sql_models(
-    type_defs: List[Union[str, DocumentNode]],
-    scalars: List[ScalarInterface] = [],
-) -> str:
-    """Generate SQLAlchemy models from GraphQL schema"""
-    schema = build_and_extend_schema(type_defs, scalars, {"imports": _IMPORTS})
-    analyzer = SchemaAnalyzer(schema)
-    generator = SQLAlchemyGenerator(analyzer)
-    return generator.generate()

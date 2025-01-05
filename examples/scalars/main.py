@@ -8,7 +8,7 @@ import cannula
 from cannula.scalars.date import Date, Datetime, Time
 from cannula.scalars.util import JSON, UUID
 
-from ._generated import (
+from .gql.types import (
     ScaledType,
     RootType,
 )

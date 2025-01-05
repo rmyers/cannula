@@ -1,16 +1,11 @@
 import ast
-import collections
 import logging
-from typing import Iterable, Tuple, Union, List, TypeVar, cast
+from typing import Tuple, List, TypeVar, cast
 from graphql import (
-    DocumentNode,
     GraphQLObjectType,
     GraphQLInputObjectType,
     GraphQLInterfaceType,
 )
-
-from cannula.scalars import ScalarInterface
-from cannula.schema import Imports, build_and_extend_schema
 
 from cannula.format import format_code
 from cannula.codegen.base import (
@@ -26,37 +21,10 @@ from cannula.codegen.base import (
     ast_for_union_subscript,
 )
 from cannula.types import Argument, Field, UnionType
-from cannula.codegen.schema_analyzer import CodeGenerator, SchemaAnalyzer, TypeInfo
+from cannula.codegen.schema_analyzer import CodeGenerator, TypeInfo
 
 LOG = logging.getLogger(__name__)
 
-_IMPORTS: Imports = collections.defaultdict(set[str])
-_IMPORTS.update(
-    {
-        "__future__": {"annotations"},
-        "abc": {"ABC", "abstractmethod"},
-        "cannula": {"ResolveInfo"},
-        "dataclasses": {"dataclass"},
-        "pydantic": {"BaseModel"},
-        "typing": {
-            "Any",
-            "Awaitable",
-            "Sequence",
-            "Optional",
-            "Protocol",
-            "Union",
-        },
-        "typing_extensions": {"TypedDict", "NotRequired"},
-        "sqlalchemy": {"ForeignKey", "select", "func"},
-        "sqlalchemy.ext.asyncio": {"AsyncAttrs"},
-        "sqlalchemy.orm": {
-            "DeclarativeBase",
-            "mapped_column",
-            "Mapped",
-            "relationship",
-        },
-    }
-)
 
 T = TypeVar("T")
 
@@ -335,15 +303,3 @@ class PythonCodeGenerator(CodeGenerator):
 
         module = self.create_module(body)
         return format_code(module)
-
-
-def render_code(
-    type_defs: Iterable[Union[str, DocumentNode]],
-    scalars: List[ScalarInterface] = [],
-    use_pydantic: bool = False,
-) -> str:
-    """Generate Python code from GraphQL schema"""
-    schema = build_and_extend_schema(type_defs, scalars, {"imports": _IMPORTS})
-    analyzer = SchemaAnalyzer(schema)
-    generator = PythonCodeGenerator(analyzer)
-    return generator.generate(use_pydantic)

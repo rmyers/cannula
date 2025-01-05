@@ -318,15 +318,20 @@ async def test_render_file(
     use_pydantic: bool,
     expected: str,
 ):
-    with tempfile.NamedTemporaryFile() as generated_file:
+    with tempfile.TemporaryDirectory() as generated_dir:
+        destination = pathlib.Path(generated_dir)
         render_file(
             type_defs=schema,
-            dest=pathlib.Path(generated_file.name),
+            dest=destination,
             dry_run=dry_run,
             scalars=scalars,
             use_pydantic=use_pydantic,
         )
-        with open(generated_file.name, "r") as rendered:
+        if dry_run:
+            assert not (destination / "types.py").exists()
+            return
+
+        with open(destination / "types.py", "r") as rendered:
             content = rendered.read()
 
             assert content == expected

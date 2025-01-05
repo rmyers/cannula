@@ -1,20 +1,39 @@
 scalar UUID
 
+"""
+User Model
+
+---
+metadata:
+  db_table: users
+"""
 type User {
-    id: UUID!
-    name: String
-    email: String
-    quota: [Quota!] @computed
-    overQuota(resource: String!): Quota
+  "@metadata(primary_key: true)"
+  id: UUID!
+  name: String
+  email: String
+  "@metadata(computed: true)"
+  quota: [Quota!]
+  overQuota(resource: String!): Quota
 }
 
+"@metadata(db_table: quota)"
 type Quota {
-    user: User
-    resource: String
-    limit: Int
-    count: Int
+  "@metadata(foreign_key: users.id)"
+  user_id: UUID!
+  """
+  User that this quota is for.
+  ---
+  metadata:
+    relation:
+       cascade: "all"
+  """
+  user: User
+  resource: String
+  limit: Int
+  count: Int
 }
 
 type Query {
-    people: [User]
+  people: [User]
 }

@@ -4,9 +4,6 @@
 schema = "myschema.graphql"
 
 # list all the scalars you are using
-scalars = [
-    "cannula.scalars.date.Datetime",
-    "cannula.scalars.util.UUID",
-]
-# Where to put your generated file
-dest="app/models.py"
+scalars = ["cannula.scalars.date.Datetime", "cannula.scalars.util.UUID"]
+# Where to put your generated files
+dest = "app"

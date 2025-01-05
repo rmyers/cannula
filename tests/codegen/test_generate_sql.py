@@ -1,8 +1,6 @@
 from cannula import gql
-from cannula.codegen.generate_sql import (
-    SchemaValidationError,
-    render_sql_models,
-)
+from cannula.codegen import render_code
+from cannula.codegen.generate_sql import SchemaValidationError
 import pytest
 
 SCHEMA = gql(
@@ -46,10 +44,8 @@ type Project {
 
     ---
     metadata:
-        inverse: "projects"
         relation:
             back_populates: "projects"
-            foreign_key: "projects.author_id"
             cascade: "all, delete-orphan"
     """
     author: User!
@@ -121,9 +117,9 @@ class DBUser(Base):
 
 
 def test_generate_sql():
-    formatted_code = render_sql_models([SCHEMA, EXTENTIONS], [])
+    formatted_code = render_code([SCHEMA, EXTENTIONS], [])
 
-    assert formatted_code == EXPECTED
+    assert formatted_code["sql"] == EXPECTED
 
 
 INVALID_NULLABLE = gql(
@@ -194,34 +190,6 @@ type User {
 '''
 )
 
-INVALID_RELATION_CASCADE = gql(
-    '''
-"@metadata(db_table:users)"
-type User {
-    "User ID @metadata(primary_key: true)"
-    id: ID!
-    "@metadata(foreign_key: projects.id)"
-    project_id: String!
-    """
-    User's project
-
-    ---
-    metadata:
-        relation:
-            back_populates: "author"
-            cascade: true
-    """
-    project: Project
-}
-
-"@metadata(db_table:projects)"
-type Project {
-    id: ID!
-    name: String!
-}
-'''
-)
-
 
 @pytest.mark.parametrize(
     "schema, expected",
@@ -246,13 +214,8 @@ type Project {
             "Relation metadata for User.project must be a dictionary",
             id="invalid-relation-type",
         ),
-        pytest.param(
-            [INVALID_RELATION_CASCADE],
-            "Cascade option in relationship User.project must be a string",
-            id="invalid-relation-cascade",
-        ),
     ],
 )
 def test_generate_sql_errors(schema, expected):
     with pytest.raises(SchemaValidationError, match=expected):
-        render_sql_models(schema, [])
+        render_code(schema, [])
