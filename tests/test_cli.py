@@ -99,21 +99,35 @@ def test_resolve_scalars():
 
 
 @pytest.mark.parametrize(
-    "example",
+    "example, gql_dir",
     [
-        pytest.param("scalars", id="scalars"),
-        pytest.param("extension", id="extension"),
+        pytest.param("scalars", "gql", id="scalars"),
+        pytest.param("extension", "gql", id="extension"),
+        pytest.param("codegen", "app", id="codegen"),
     ],
 )
-def test_cli_codegen_in_examples_generates_correct_file(example):
+def test_cli_codegen_in_examples_generates_correct_file(example: str, gql_dir: str):
     cannula_exe = CANNULA.absolute()
     example_dir = pathlib.Path(FIXTURES / "examples" / example)
-    with open(example_dir / "gql" / "types.py") as existing:
+    directory = example_dir / gql_dir
+    has_sql = (directory / "sql.py").exists()
+    existing_sql = ""
+    if has_sql:
+        with open(directory / "sql.py") as existing:
+            existing_sql = existing.read()
+
+    with open(directory / "types.py") as existing:
         existing_generated = existing.read()
 
     subprocess.call([cannula_exe, "codegen"], cwd=example_dir)
 
-    with open(example_dir / "gql" / "types.py") as after:
+    with open(directory / "types.py") as after:
         after_generated = after.read()
 
     assert after_generated == existing_generated
+
+    if existing_sql:
+        with open(directory / "sql.py") as after:
+            after_sql = after.read()
+
+        assert existing_sql == after_sql
