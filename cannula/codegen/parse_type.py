@@ -51,9 +51,6 @@ def parse_graphql_type(
     named_type = get_named_type(type_obj)
     type_name = named_type.extensions.get("py_type", named_type.name)
 
-    if is_object_type(named_type):
-        print("sslkdjflkj!!")
-
     return FieldType(
         value=type_name,
         required=False,
