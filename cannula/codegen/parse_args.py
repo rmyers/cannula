@@ -1,8 +1,7 @@
-from typing import Any, Dict
+from typing import Any
 from graphql import (
     GraphQLArgument,
     GraphQLField,
-    GraphQLNamedType,
     Undefined,
 )
 
@@ -35,9 +34,7 @@ def parse_default_value(arg: GraphQLArgument, field_type: str) -> Any:
     return arg.default_value
 
 
-def parse_field_arguments(
-    field: GraphQLField, schema_types: Dict[str, GraphQLNamedType]
-) -> list[Argument]:
+def parse_field_arguments(field: GraphQLField) -> list[Argument]:
     """
     Parse a GraphQL field's arguments into Python argument definitions.
 
@@ -56,7 +53,7 @@ def parse_field_arguments(
 
     for arg_name, arg in field.args.items():
         # Parse the argument type
-        field_type = parse_graphql_type(arg.type, schema_types)
+        field_type = parse_graphql_type(arg.type)
 
         # Get the default value using GraphQL's parser
         default_value = parse_default_value(arg, field_type.type)
