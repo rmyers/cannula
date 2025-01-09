@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 
 @dataclass(kw_only=True)
-class ScaledType(ABC):
+class Scaled(ABC):
     __typename = "Scaled"
     id: Optional[UUID] = None
     created: Optional[datetime] = None
@@ -23,7 +23,7 @@ class ScaledType(ABC):
 
 class scaledQuery(Protocol):
 
-    async def __call__(self, info: ResolveInfo["Context"]) -> Optional[ScaledType]: ...
+    async def __call__(self, info: ResolveInfo["Context"]) -> Optional[Scaled]: ...
 
 
 class RootType(TypedDict, total=False):

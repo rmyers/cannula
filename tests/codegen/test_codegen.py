@@ -63,7 +63,7 @@ if TYPE_CHECKING:
     from .context import Context
 
 
-class EmailSearchInput(TypedDict):
+class EmailSearch(TypedDict):
     email: str
     limit: int
     other: str
@@ -71,14 +71,14 @@ class EmailSearchInput(TypedDict):
 
 
 @dataclass(kw_only=True)
-class MessageType(ABC):
+class Message(ABC):
     __typename = "Message"
     text: Optional[str] = None
-    sender: Optional[SenderType] = None
+    sender: Optional[Sender] = None
 
 
 @dataclass(kw_only=True)
-class SenderType(ABC):
+class Sender(ABC):
     """
     Some sender action:
 
@@ -95,22 +95,22 @@ class SenderType(ABC):
 class get_sender_by_emailQuery(Protocol):
 
     async def __call__(
-        self, info: ResolveInfo["Context"], *, input: Optional[EmailSearchInput] = None
-    ) -> Optional[SenderType]: ...
+        self, info: ResolveInfo["Context"], *, input: Optional[EmailSearch] = None
+    ) -> Optional[Sender]: ...
 
 
 class messageMutation(Protocol):
 
     async def __call__(
         self, info: ResolveInfo["Context"], sender: str, text: str
-    ) -> Optional[MessageType]: ...
+    ) -> Optional[Message]: ...
 
 
 class messagesQuery(Protocol):
 
     async def __call__(
         self, info: ResolveInfo["Context"], limit: int
-    ) -> Optional[Sequence[MessageType]]: ...
+    ) -> Optional[Sequence[Message]]: ...
 
 
 class RootType(TypedDict, total=False):
@@ -130,20 +130,20 @@ if TYPE_CHECKING:
     from .context import Context
 
 
-class EmailSearchInput(TypedDict):
+class EmailSearch(TypedDict):
     email: str
     limit: int
     other: str
     include: bool
 
 
-class MessageType(BaseModel):
+class Message(BaseModel):
     __typename = "Message"
     text: Optional[str] = None
-    sender: Optional[SenderType] = None
+    sender: Optional[Sender] = None
 
 
-class SenderType(BaseModel):
+class Sender(BaseModel):
     """
     Some sender action:
 
@@ -160,22 +160,22 @@ class SenderType(BaseModel):
 class get_sender_by_emailQuery(Protocol):
 
     async def __call__(
-        self, info: ResolveInfo["Context"], *, input: Optional[EmailSearchInput] = None
-    ) -> Optional[SenderType]: ...
+        self, info: ResolveInfo["Context"], *, input: Optional[EmailSearch] = None
+    ) -> Optional[Sender]: ...
 
 
 class messageMutation(Protocol):
 
     async def __call__(
         self, info: ResolveInfo["Context"], sender: str, text: str
-    ) -> Optional[MessageType]: ...
+    ) -> Optional[Message]: ...
 
 
 class messagesQuery(Protocol):
 
     async def __call__(
         self, info: ResolveInfo["Context"], limit: int
-    ) -> Optional[Sequence[MessageType]]: ...
+    ) -> Optional[Sequence[Message]]: ...
 
 
 class RootType(TypedDict, total=False):
@@ -228,19 +228,19 @@ class Persona(Protocol):
 
 
 @dataclass(kw_only=True)
-class AdminType(ABC):
+class Admin(ABC):
     __typename = "Admin"
     id: str
     created: Optional[Any] = None
 
 
 @dataclass(kw_only=True)
-class UserType(ABC):
+class User(ABC):
     __typename = "User"
     id: str
 
 
-Person = Union[UserType, AdminType]
+Person = Union[User, Admin]
 '''
 
 schema_scalars = """\
@@ -267,12 +267,12 @@ if TYPE_CHECKING:
     pass
 
 
-class ThingMakerInput(TypedDict):
+class ThingMaker(TypedDict):
     created: datetime
 
 
 @dataclass(kw_only=True)
-class ThingType(ABC):
+class Thing(ABC):
     __typename = "Thing"
     created: Optional[datetime] = None
 """

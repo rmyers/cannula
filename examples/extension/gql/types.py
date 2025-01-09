@@ -14,7 +14,7 @@ class Generic(Protocol):
 
 
 @dataclass(kw_only=True)
-class BookType(ABC):
+class Book(ABC):
     """books are cool"""
 
     __typename = "Book"
@@ -24,13 +24,13 @@ class BookType(ABC):
     @abstractmethod
     async def movies(
         self, info: ResolveInfo["Context"], *, limit: Optional[int] = 100
-    ) -> Optional[Sequence[MovieType]]:
+    ) -> Optional[Sequence[Movie]]:
         """Get all the movies for a given book. This is will be added to the BookType."""
         ...
 
 
 @dataclass(kw_only=True)
-class MovieType(ABC):
+class Movie(ABC):
     """
     Movie Type
 
@@ -40,7 +40,7 @@ class MovieType(ABC):
     __typename = "Movie"
     name: Optional[str] = None
     director: Optional[str] = None
-    book: Optional[BookType] = None
+    book: Optional[Book] = None
     views: Optional[int] = None
     created: Optional[Any] = None
 
@@ -49,7 +49,7 @@ class booksQuery(Protocol):
 
     async def __call__(
         self, info: ResolveInfo["Context"]
-    ) -> Optional[Sequence[BookType]]: ...
+    ) -> Optional[Sequence[Book]]: ...
 
 
 class mediaQuery(Protocol):
@@ -63,7 +63,7 @@ class movieQuery(Protocol):
 
     async def __call__(
         self, info: ResolveInfo["Context"], name: str
-    ) -> Optional[MovieType]: ...
+    ) -> Optional[Movie]: ...
 
 
 class RootType(TypedDict, total=False):

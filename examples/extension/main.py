@@ -6,9 +6,9 @@ from typing import Sequence
 import cannula
 import cannula.middleware
 from .gql.types import (
-    BookType,
+    Book as BookType,
     Generic,
-    MovieType,
+    Movie,
     RootType,
 )
 
@@ -19,18 +19,14 @@ logging.basicConfig(level=logging.DEBUG)
 LOG = logging.getLogger("expanded")
 
 
-class Movie(MovieType):
-    pass
-
-
 class Book(BookType):
     async def movies(
         self, info: cannula.ResolveInfo, *, limit: int | None = 100
-    ) -> list[MovieType] | None:
+    ) -> list[Movie] | None:
         return [Movie(name="Lost the Movie", director="Ted")]
 
 
-async def get_books(info: cannula.ResolveInfo) -> Sequence[BookType]:
+async def get_books(info: cannula.ResolveInfo) -> Sequence[Book]:
     return [Book(name="Lost", author="Frank")]
 
 
