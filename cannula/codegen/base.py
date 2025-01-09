@@ -9,14 +9,14 @@ ELLIPSIS = ast.Expr(value=ast.Constant(value=Ellipsis))
 PASS = ast.Pass()
 
 
-def ast_for_import_from(module: str, names: set[str]) -> ast.ImportFrom:
+def ast_for_import_from(module: str, names: set[str], level: int = 0) -> ast.ImportFrom:
     ast_names = []
     _names = list(names)
     _names.sort()
     for name in _names:
         ast_name = ast.alias(name=name, asname=None)
         ast_names.append(ast_name)
-    return ast.ImportFrom(module=module, names=ast_names, level=0)
+    return ast.ImportFrom(module=module, names=ast_names, level=level)
 
 
 def ast_for_name(name: str) -> ast.expr:

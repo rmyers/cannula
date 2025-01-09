@@ -31,6 +31,7 @@ _IMPORTS.update(
             "Sequence",
             "Optional",
             "Protocol",
+            "TYPE_CHECKING",
             "Union",
         },
         "typing_extensions": {"TypedDict", "NotRequired"},

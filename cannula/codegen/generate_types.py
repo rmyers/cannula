@@ -16,8 +16,10 @@ from cannula.codegen.base import (
     ast_for_constant,
     ast_for_docstring,
     ast_for_function_body,
+    ast_for_import_from,
     ast_for_keyword,
     ast_for_name,
+    ast_for_subscript,
     ast_for_union_subscript,
 )
 from cannula.types import Argument, Field, UnionType
@@ -227,7 +229,14 @@ class PythonCodeGenerator(CodeGenerator):
         pos_args, kwonlyargs, defaults = self.render_function_args_ast(field.args)
         args = [
             ast.arg("self"),
-            ast.arg("info", annotation=ast_for_name("ResolveInfo")),
+            ast.arg(
+                "info",
+                annotation=ast.Subscript(
+                    ast_for_name("ResolveInfo"),
+                    slice=ast_for_constant("Context"),
+                    ctx=ast.Load(),
+                ),
+            ),
             *pos_args,
         ]
         args_node = ast.arguments(
@@ -280,9 +289,22 @@ class PythonCodeGenerator(CodeGenerator):
 
         return field_classes
 
+    def render_type_checking(self):
+        return ast.If(
+            test=ast_for_name("TYPE_CHECKING"),
+            body=[
+                ast_for_import_from(
+                    module="context",
+                    names={"Context"},
+                    level=1,
+                )
+            ],
+            orelse=[],
+        )
+
     def generate(self, use_pydantic: bool) -> str:
         """Generate complete Python code from the schema"""
-        body: list[ast.stmt] = []
+        body: list[ast.stmt] = [self.render_type_checking()]
 
         # Generate code for each type
         for interface in self.analyzer.interface_types:
