@@ -9,7 +9,7 @@ from cannula.scalars.date import Date, Datetime, Time
 from cannula.scalars.util import JSON, UUID
 
 from .gql.types import (
-    ScaledType,
+    Scaled,
     RootType,
 )
 
@@ -20,10 +20,6 @@ logging.basicConfig(level=logging.DEBUG)
 LOG = logging.getLogger("scalars")
 
 uid = uuid.UUID("e0c2c649-9c66-4f55-a2d4-966cc4f7d186")
-
-
-class Scaled(ScaledType):
-    pass
 
 
 async def get_scaled(info: cannula.ResolveInfo) -> Scaled:

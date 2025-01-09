@@ -57,42 +57,58 @@ mock_types = {
     "type_obj,expected",
     [
         pytest.param(
-            GraphQLString, FieldType("str", False, of_type="str"), id="string"
+            GraphQLString,
+            FieldType("str", False, of_type="str", is_object_type=False),
+            id="string",
         ),
         pytest.param(
             GraphQLNonNull(GraphQLString),
-            FieldType("str", True, of_type="str"),
+            FieldType("str", True, of_type="str", is_object_type=False),
             id="required-string",
         ),
         pytest.param(
             GraphQLList(GraphQLString),
-            FieldType("Sequence[str]", False, of_type="str", is_list=True),
+            FieldType(
+                "Sequence[str]",
+                False,
+                of_type="str",
+                is_list=True,
+                is_object_type=False,
+            ),
             id="string-list",
         ),
         pytest.param(
             GraphQLNonNull(GraphQLList(GraphQLString)),
-            FieldType("Sequence[str]", True, of_type="str", is_list=True),
+            FieldType(
+                "Sequence[str]", True, of_type="str", is_list=True, is_object_type=False
+            ),
             id="required-string-list",
         ),
         pytest.param(
             mock_types["User"],
-            FieldType("UserType", False, of_type="UserType"),
+            FieldType("UserType", False, of_type="UserType", is_object_type=True),
             id="custom-type",
         ),
         pytest.param(
             GraphQLNonNull(mock_types["User"]),
-            FieldType("UserType", True, of_type="UserType"),
+            FieldType("UserType", True, of_type="UserType", is_object_type=True),
             id="required-custom-type",
         ),
         pytest.param(
             GraphQLList(mock_types["Post"]),
-            FieldType("Sequence[PostType]", False, of_type="PostType", is_list=True),
+            FieldType(
+                "Sequence[PostType]",
+                False,
+                of_type="PostType",
+                is_list=True,
+                is_object_type=True,
+            ),
             id="list-of-custom",
         ),
     ],
 )
 def test_parse_graphql_type(type_obj: Any, expected: FieldType):
-    result = parse_graphql_type(type_obj, mock_schema.type_map)
+    result = parse_graphql_type(type_obj)
     assert result == expected
 
 
@@ -185,7 +201,7 @@ def test_parse_graphql_type(type_obj: Any, expected: FieldType):
     ],
 )
 def test_parse_field_arguments(field: GraphQLField, expected_args: list[Argument]):
-    result = parse_field_arguments(field, mock_schema.type_map)
+    result = parse_field_arguments(field)
     assert result == expected_args
 
 
@@ -283,7 +299,7 @@ def test_parse_default_value(schema: str, expected_default: Any):
     _schema = build_and_extend_schema([schema])
     field = _schema.type_map["Query"].fields["testField"]  # type: ignore
     arg = field.args["arg"]
-    field_type = parse_graphql_type(arg.type, _schema.type_map)
+    field_type = parse_graphql_type(arg.type)
     result = parse_default_value(arg, field_type.value or "Any")
     assert result == expected_default
 

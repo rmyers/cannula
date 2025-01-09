@@ -56,11 +56,14 @@ from __future__ import annotations
 from abc import ABC
 from cannula import ResolveInfo
 from dataclasses import dataclass
-from typing import Optional, Protocol, Sequence
+from typing import Optional, Protocol, Sequence, TYPE_CHECKING
 from typing_extensions import TypedDict
 
+if TYPE_CHECKING:
+    from .context import Context
 
-class EmailSearchInput(TypedDict):
+
+class EmailSearch(TypedDict):
     email: str
     limit: int
     other: str
@@ -68,14 +71,14 @@ class EmailSearchInput(TypedDict):
 
 
 @dataclass(kw_only=True)
-class MessageType(ABC):
+class Message(ABC):
     __typename = "Message"
     text: Optional[str] = None
-    sender: Optional[SenderType] = None
+    sender: Optional[Sender] = None
 
 
 @dataclass(kw_only=True)
-class SenderType(ABC):
+class Sender(ABC):
     """
     Some sender action:
 
@@ -92,22 +95,22 @@ class SenderType(ABC):
 class get_sender_by_emailQuery(Protocol):
 
     async def __call__(
-        self, info: ResolveInfo, *, input: Optional[EmailSearchInput] = None
-    ) -> Optional[SenderType]: ...
+        self, info: ResolveInfo["Context"], *, input: Optional[EmailSearch] = None
+    ) -> Optional[Sender]: ...
 
 
 class messageMutation(Protocol):
 
     async def __call__(
-        self, info: ResolveInfo, sender: str, text: str
-    ) -> Optional[MessageType]: ...
+        self, info: ResolveInfo["Context"], sender: str, text: str
+    ) -> Optional[Message]: ...
 
 
 class messagesQuery(Protocol):
 
     async def __call__(
-        self, info: ResolveInfo, limit: int
-    ) -> Optional[Sequence[MessageType]]: ...
+        self, info: ResolveInfo["Context"], limit: int
+    ) -> Optional[Sequence[Message]]: ...
 
 
 class RootType(TypedDict, total=False):
@@ -120,24 +123,27 @@ expected_pydantic = '''\
 from __future__ import annotations
 from cannula import ResolveInfo
 from pydantic import BaseModel
-from typing import Optional, Protocol, Sequence
+from typing import Optional, Protocol, Sequence, TYPE_CHECKING
 from typing_extensions import TypedDict
 
+if TYPE_CHECKING:
+    from .context import Context
 
-class EmailSearchInput(TypedDict):
+
+class EmailSearch(TypedDict):
     email: str
     limit: int
     other: str
     include: bool
 
 
-class MessageType(BaseModel):
+class Message(BaseModel):
     __typename = "Message"
     text: Optional[str] = None
-    sender: Optional[SenderType] = None
+    sender: Optional[Sender] = None
 
 
-class SenderType(BaseModel):
+class Sender(BaseModel):
     """
     Some sender action:
 
@@ -154,22 +160,22 @@ class SenderType(BaseModel):
 class get_sender_by_emailQuery(Protocol):
 
     async def __call__(
-        self, info: ResolveInfo, *, input: Optional[EmailSearchInput] = None
-    ) -> Optional[SenderType]: ...
+        self, info: ResolveInfo["Context"], *, input: Optional[EmailSearch] = None
+    ) -> Optional[Sender]: ...
 
 
 class messageMutation(Protocol):
 
     async def __call__(
-        self, info: ResolveInfo, sender: str, text: str
-    ) -> Optional[MessageType]: ...
+        self, info: ResolveInfo["Context"], sender: str, text: str
+    ) -> Optional[Message]: ...
 
 
 class messagesQuery(Protocol):
 
     async def __call__(
-        self, info: ResolveInfo, limit: int
-    ) -> Optional[Sequence[MessageType]]: ...
+        self, info: ResolveInfo["Context"], limit: int
+    ) -> Optional[Sequence[Message]]: ...
 
 
 class RootType(TypedDict, total=False):
@@ -205,7 +211,10 @@ expected_interface = '''\
 from __future__ import annotations
 from abc import ABC
 from dataclasses import dataclass
-from typing import Any, Optional, Protocol, Union
+from typing import Any, Optional, Protocol, TYPE_CHECKING, Union
+
+if TYPE_CHECKING:
+    pass
 
 
 class Other(Protocol):
@@ -219,19 +228,19 @@ class Persona(Protocol):
 
 
 @dataclass(kw_only=True)
-class AdminType(ABC):
+class Admin(ABC):
     __typename = "Admin"
     id: str
     created: Optional[Any] = None
 
 
 @dataclass(kw_only=True)
-class UserType(ABC):
+class User(ABC):
     __typename = "User"
     id: str
 
 
-Person = Union[UserType, AdminType]
+Person = Union[User, Admin]
 '''
 
 schema_scalars = """\
@@ -251,16 +260,19 @@ from __future__ import annotations
 from abc import ABC
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from typing_extensions import TypedDict
 
+if TYPE_CHECKING:
+    pass
 
-class ThingMakerInput(TypedDict):
+
+class ThingMaker(TypedDict):
     created: datetime
 
 
 @dataclass(kw_only=True)
-class ThingType(ABC):
+class Thing(ABC):
     __typename = "Thing"
     created: Optional[datetime] = None
 """

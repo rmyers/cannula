@@ -156,7 +156,7 @@ class SchemaAnalyzer:
     def parse_union(self, node: GraphQLUnionType) -> UnionType:
         """Parse a GraphQL Union type into a UnionType object"""
         metadata = self.extensions.get_type_metadata(node.name)
-        types = [parse_graphql_type(t, self.schema.type_map) for t in node.types]
+        types = [parse_graphql_type(t) for t in node.types]
 
         return UnionType(
             name=node.name,
@@ -166,10 +166,10 @@ class SchemaAnalyzer:
         )
 
     def get_field(self, field_name: str, field_def: GraphQLField, parent: str) -> Field:
-        field_type = parse_graphql_type(field_def.type, self.schema.type_map)
+        field_type = parse_graphql_type(field_def.type)
         metadata = self.extensions.get_field_metadata(parent, field_name)
         directives = metadata.get("directives", [])
-        args = parse_field_arguments(field_def, self.schema.type_map)
+        args = parse_field_arguments(field_def)
         return Field.from_field(
             name=field_name,
             field=field_def,

@@ -16,8 +16,10 @@ from cannula.codegen.base import (
     ast_for_constant,
     ast_for_docstring,
     ast_for_function_body,
+    ast_for_import_from,
     ast_for_keyword,
     ast_for_name,
+    ast_for_single_subscript,
     ast_for_union_subscript,
 )
 from cannula.types import Argument, Field, UnionType
@@ -59,7 +61,12 @@ class PythonCodeGenerator(CodeGenerator):
         pos_args, kwonlyargs, defaults = self.render_function_args_ast(field.args)
         args = [
             ast.arg("self"),
-            ast.arg("info", annotation=ast_for_name("ResolveInfo")),
+            ast.arg(
+                "info",
+                annotation=ast_for_single_subscript(
+                    ast_for_name("ResolveInfo"), ast_for_constant("Context")
+                ),
+            ),
             *pos_args,
         ]
 
@@ -79,6 +86,7 @@ class PythonCodeGenerator(CodeGenerator):
             body=ast_for_function_body(field),
             decorator_list=[ast.Name(id="abstractmethod", ctx=ast.Load())],
             returns=ast.Name(id=field.type, ctx=ast.Load()),
+            type_params=[],
         )
 
     def render_interface_type(
@@ -104,6 +112,7 @@ class PythonCodeGenerator(CodeGenerator):
                     keywords=[],
                     body=body,
                     decorator_list=[],
+                    type_params=[],
                 ),
             )
         ]
@@ -163,6 +172,7 @@ class PythonCodeGenerator(CodeGenerator):
                     keywords=[],
                     body=body,
                     decorator_list=decorators,
+                    type_params=[],
                 ),
             )
         ]
@@ -206,6 +216,7 @@ class PythonCodeGenerator(CodeGenerator):
                     keywords=[],
                     body=body,
                     decorator_list=[],
+                    type_params=[],
                 ),
             )
         ]
@@ -218,6 +229,7 @@ class PythonCodeGenerator(CodeGenerator):
             bases=[ast_for_name("Protocol")],
             keywords=[],
             decorator_list=[],
+            type_params=[],
         )
 
     def render_operation_field_ast(self, field: Field) -> ast.AsyncFunctionDef:
@@ -227,7 +239,12 @@ class PythonCodeGenerator(CodeGenerator):
         pos_args, kwonlyargs, defaults = self.render_function_args_ast(field.args)
         args = [
             ast.arg("self"),
-            ast.arg("info", annotation=ast_for_name("ResolveInfo")),
+            ast.arg(
+                "info",
+                annotation=ast_for_single_subscript(
+                    ast_for_name("ResolveInfo"), ast_for_constant("Context")
+                ),
+            ),
             *pos_args,
         ]
         args_node = ast.arguments(
@@ -245,6 +262,7 @@ class PythonCodeGenerator(CodeGenerator):
             body=ast_for_function_body(field),
             decorator_list=[],
             returns=ast.Name(id=field.type, ctx=ast.Load()),
+            type_params=[],
         )
         return func_node
 
@@ -275,14 +293,28 @@ class PythonCodeGenerator(CodeGenerator):
                 bases=[ast_for_name("TypedDict")],
                 keywords=[ast_for_keyword("total", False)],
                 decorator_list=[],
+                type_params=[],
             )
             field_classes.append(cast(ast.stmt, root_type))
 
         return field_classes
 
+    def render_type_checking(self):
+        return ast.If(
+            test=ast_for_name("TYPE_CHECKING"),
+            body=[
+                ast_for_import_from(
+                    module="context",
+                    names={"Context"},
+                    level=1,
+                )
+            ],
+            orelse=[],
+        )
+
     def generate(self, use_pydantic: bool) -> str:
         """Generate complete Python code from the schema"""
-        body: list[ast.stmt] = []
+        body: list[ast.stmt] = [self.render_type_checking()]
 
         # Generate code for each type
         for interface in self.analyzer.interface_types:

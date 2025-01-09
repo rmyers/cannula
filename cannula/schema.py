@@ -149,13 +149,13 @@ def build_and_extend_schema(
         is_private = name.startswith("__")
 
         if is_input_object_type(definition):
-            definition.extensions["py_type"] = f"{name}Input"
+            definition.extensions["py_type"] = name
 
         elif is_union_type(definition):
             definition.extensions["py_type"] = name
 
         elif is_object_type(definition) and not is_private:
-            definition.extensions["py_type"] = f"{name}Type"
+            definition.extensions["py_type"] = name
             definition.extensions["db_type"] = f"DB{name}"
 
         elif is_interface_type(definition):

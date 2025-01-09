@@ -10,6 +10,7 @@ class FieldType:
     required: bool = False
     of_type: str | None = None
     is_list: bool = False
+    is_object_type: bool = False
 
     @property
     def safe_value(self) -> str:
