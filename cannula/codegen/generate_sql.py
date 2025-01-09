@@ -234,6 +234,7 @@ class SQLAlchemyGenerator(CodeGenerator):
             keywords=[],
             body=body,
             decorator_list=[],
+            type_params=[],
         )
 
     def validate_relationships(self) -> None:
@@ -308,6 +309,7 @@ class SQLAlchemyGenerator(CodeGenerator):
                 keywords=[],
                 body=[PASS],
                 decorator_list=[],
+                type_params=[],
             )
         ]
 

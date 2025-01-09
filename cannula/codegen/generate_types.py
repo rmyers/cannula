@@ -86,6 +86,7 @@ class PythonCodeGenerator(CodeGenerator):
             body=ast_for_function_body(field),
             decorator_list=[ast.Name(id="abstractmethod", ctx=ast.Load())],
             returns=ast.Name(id=field.type, ctx=ast.Load()),
+            type_params=[],
         )
 
     def render_interface_type(
@@ -111,6 +112,7 @@ class PythonCodeGenerator(CodeGenerator):
                     keywords=[],
                     body=body,
                     decorator_list=[],
+                    type_params=[],
                 ),
             )
         ]
@@ -170,6 +172,7 @@ class PythonCodeGenerator(CodeGenerator):
                     keywords=[],
                     body=body,
                     decorator_list=decorators,
+                    type_params=[],
                 ),
             )
         ]
@@ -213,6 +216,7 @@ class PythonCodeGenerator(CodeGenerator):
                     keywords=[],
                     body=body,
                     decorator_list=[],
+                    type_params=[],
                 ),
             )
         ]
@@ -225,6 +229,7 @@ class PythonCodeGenerator(CodeGenerator):
             bases=[ast_for_name("Protocol")],
             keywords=[],
             decorator_list=[],
+            type_params=[],
         )
 
     def render_operation_field_ast(self, field: Field) -> ast.AsyncFunctionDef:
@@ -257,6 +262,7 @@ class PythonCodeGenerator(CodeGenerator):
             body=ast_for_function_body(field),
             decorator_list=[],
             returns=ast.Name(id=field.type, ctx=ast.Load()),
+            type_params=[],
         )
         return func_node
 
@@ -287,6 +293,7 @@ class PythonCodeGenerator(CodeGenerator):
                 bases=[ast_for_name("TypedDict")],
                 keywords=[ast_for_keyword("total", False)],
                 decorator_list=[],
+                type_params=[],
             )
             field_classes.append(cast(ast.stmt, root_type))
 
