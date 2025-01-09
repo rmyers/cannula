@@ -19,7 +19,7 @@ from cannula.codegen.base import (
     ast_for_import_from,
     ast_for_keyword,
     ast_for_name,
-    ast_for_subscript,
+    ast_for_single_subscript,
     ast_for_union_subscript,
 )
 from cannula.types import Argument, Field, UnionType
@@ -61,7 +61,12 @@ class PythonCodeGenerator(CodeGenerator):
         pos_args, kwonlyargs, defaults = self.render_function_args_ast(field.args)
         args = [
             ast.arg("self"),
-            ast.arg("info", annotation=ast_for_name("ResolveInfo")),
+            ast.arg(
+                "info",
+                annotation=ast_for_single_subscript(
+                    ast_for_name("ResolveInfo"), ast_for_constant("Context")
+                ),
+            ),
             *pos_args,
         ]
 
@@ -231,10 +236,8 @@ class PythonCodeGenerator(CodeGenerator):
             ast.arg("self"),
             ast.arg(
                 "info",
-                annotation=ast.Subscript(
-                    ast_for_name("ResolveInfo"),
-                    slice=ast_for_constant("Context"),
-                    ctx=ast.Load(),
+                annotation=ast_for_single_subscript(
+                    ast_for_name("ResolveInfo"), ast_for_constant("Context")
                 ),
             ),
             *pos_args,

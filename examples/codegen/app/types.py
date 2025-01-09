@@ -2,9 +2,12 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from cannula import ResolveInfo
 from dataclasses import dataclass
-from typing import Optional, Protocol, Sequence
+from typing import Optional, Protocol, Sequence, TYPE_CHECKING
 from typing_extensions import TypedDict
 from uuid import UUID
+
+if TYPE_CHECKING:
+    from .context import Context
 
 
 @dataclass(kw_only=True)
@@ -27,17 +30,21 @@ class UserType(ABC):
     email: Optional[str] = None
 
     @abstractmethod
-    async def quota(self, info: ResolveInfo) -> Optional[Sequence[QuotaType]]: ...
+    async def quota(
+        self, info: ResolveInfo["Context"]
+    ) -> Optional[Sequence[QuotaType]]: ...
 
     @abstractmethod
     async def overQuota(
-        self, info: ResolveInfo, resource: str
+        self, info: ResolveInfo["Context"], resource: str
     ) -> Optional[QuotaType]: ...
 
 
 class peopleQuery(Protocol):
 
-    async def __call__(self, info: ResolveInfo) -> Optional[Sequence[UserType]]: ...
+    async def __call__(
+        self, info: ResolveInfo["Context"]
+    ) -> Optional[Sequence[UserType]]: ...
 
 
 class RootType(TypedDict, total=False):

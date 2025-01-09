@@ -73,6 +73,12 @@ def ast_for_subscript(
     return ast.Subscript(value=value, slice=_slice, ctx=ast.Load())
 
 
+def ast_for_single_subscript(
+    value: typing.Union[ast.Name, ast.Attribute, ast.expr], item: ast.expr
+) -> ast.Subscript:
+    return ast.Subscript(value=value, slice=item, ctx=ast.Load())
+
+
 def ast_for_union_subscript(*items: str) -> ast.Subscript:
     value = ast_for_name("Union")
     return ast_for_subscript(value, *items)

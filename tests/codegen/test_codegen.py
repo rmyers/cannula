@@ -56,8 +56,11 @@ from __future__ import annotations
 from abc import ABC
 from cannula import ResolveInfo
 from dataclasses import dataclass
-from typing import Optional, Protocol, Sequence
+from typing import Optional, Protocol, Sequence, TYPE_CHECKING
 from typing_extensions import TypedDict
+
+if TYPE_CHECKING:
+    from .context import Context
 
 
 class EmailSearchInput(TypedDict):
@@ -92,21 +95,21 @@ class SenderType(ABC):
 class get_sender_by_emailQuery(Protocol):
 
     async def __call__(
-        self, info: ResolveInfo, *, input: Optional[EmailSearchInput] = None
+        self, info: ResolveInfo["Context"], *, input: Optional[EmailSearchInput] = None
     ) -> Optional[SenderType]: ...
 
 
 class messageMutation(Protocol):
 
     async def __call__(
-        self, info: ResolveInfo, sender: str, text: str
+        self, info: ResolveInfo["Context"], sender: str, text: str
     ) -> Optional[MessageType]: ...
 
 
 class messagesQuery(Protocol):
 
     async def __call__(
-        self, info: ResolveInfo, limit: int
+        self, info: ResolveInfo["Context"], limit: int
     ) -> Optional[Sequence[MessageType]]: ...
 
 
@@ -120,8 +123,11 @@ expected_pydantic = '''\
 from __future__ import annotations
 from cannula import ResolveInfo
 from pydantic import BaseModel
-from typing import Optional, Protocol, Sequence
+from typing import Optional, Protocol, Sequence, TYPE_CHECKING
 from typing_extensions import TypedDict
+
+if TYPE_CHECKING:
+    from .context import Context
 
 
 class EmailSearchInput(TypedDict):
@@ -154,21 +160,21 @@ class SenderType(BaseModel):
 class get_sender_by_emailQuery(Protocol):
 
     async def __call__(
-        self, info: ResolveInfo, *, input: Optional[EmailSearchInput] = None
+        self, info: ResolveInfo["Context"], *, input: Optional[EmailSearchInput] = None
     ) -> Optional[SenderType]: ...
 
 
 class messageMutation(Protocol):
 
     async def __call__(
-        self, info: ResolveInfo, sender: str, text: str
+        self, info: ResolveInfo["Context"], sender: str, text: str
     ) -> Optional[MessageType]: ...
 
 
 class messagesQuery(Protocol):
 
     async def __call__(
-        self, info: ResolveInfo, limit: int
+        self, info: ResolveInfo["Context"], limit: int
     ) -> Optional[Sequence[MessageType]]: ...
 
 
@@ -205,7 +211,10 @@ expected_interface = '''\
 from __future__ import annotations
 from abc import ABC
 from dataclasses import dataclass
-from typing import Any, Optional, Protocol, Union
+from typing import Any, Optional, Protocol, TYPE_CHECKING, Union
+
+if TYPE_CHECKING:
+    pass
 
 
 class Other(Protocol):
@@ -251,8 +260,11 @@ from __future__ import annotations
 from abc import ABC
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from typing_extensions import TypedDict
+
+if TYPE_CHECKING:
+    pass
 
 
 class ThingMakerInput(TypedDict):
