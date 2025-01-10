@@ -10,6 +10,7 @@ import typing
 
 from cannula.codegen.generate_types import PythonCodeGenerator
 from cannula.codegen.generate_sql import SQLAlchemyGenerator
+from cannula.codegen.generate_context import ContextGenerator
 from cannula.codegen.schema_analyzer import SchemaAnalyzer
 from cannula.scalars import ScalarInterface
 from cannula.schema import Imports, build_and_extend_schema
@@ -23,6 +24,8 @@ _IMPORTS.update(
         "__future__": {"annotations"},
         "abc": {"ABC", "abstractmethod"},
         "cannula": {"ResolveInfo"},
+        "cannula.context": {"Context as BaseContext"},
+        "cannula.datasource.orm": {"DatabaseRepository"},
         "dataclasses": {"dataclass"},
         "pydantic": {"BaseModel"},
         "typing": {
@@ -36,7 +39,7 @@ _IMPORTS.update(
         },
         "typing_extensions": {"TypedDict", "NotRequired"},
         "sqlalchemy": {"ForeignKey", "select", "func"},
-        "sqlalchemy.ext.asyncio": {"AsyncAttrs"},
+        "sqlalchemy.ext.asyncio": {"AsyncAttrs", "async_sessionmaker"},
         "sqlalchemy.orm": {
             "DeclarativeBase",
             "mapped_column",
@@ -50,6 +53,7 @@ _IMPORTS.update(
 class Generated(typing.TypedDict):
     types: str
     sql: str
+    context: str
 
 
 def render_code(
@@ -63,6 +67,7 @@ def render_code(
     return {
         "types": PythonCodeGenerator(analyzer).generate(use_pydantic),
         "sql": SQLAlchemyGenerator(analyzer).generate(),
+        "context": ContextGenerator(analyzer).generate(),
     }
 
 
@@ -89,3 +94,6 @@ def render_file(
     if formatted_code["sql"]:
         with open(dest / "sql.py", "w") as sql_file:
             sql_file.write(formatted_code["sql"])
+    if formatted_code["context"]:
+        with open(dest / "context.py", "w") as context_file:
+            context_file.write(formatted_code["context"])
