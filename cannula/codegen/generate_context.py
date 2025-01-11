@@ -7,13 +7,12 @@ database-backed type in the schema.
 """
 
 import ast
-from typing import List, Tuple
+from typing import List
 
-from cannula.types import Argument, Field
+from cannula.types import Field
 from graphql import GraphQLObjectType
 from cannula.codegen.base import (
     ast_for_annotation_assignment,
-    ast_for_argument,
     ast_for_constant,
     ast_for_import_from,
     ast_for_name,
@@ -25,27 +24,6 @@ from cannula.format import format_code
 class ContextGenerator(CodeGenerator):
     """Generates context.py with datasources for database-backed types"""
 
-    def render_function_args_ast(
-        self,
-        args: list[Argument],
-    ) -> Tuple[list[ast.arg], list[ast.arg], list[ast.expr | None], list[ast.keyword]]:
-        """
-        Render function arguments as AST nodes.
-        """
-        pos_args_ast: list[ast.arg] = [
-            ast_for_argument(arg) for arg in args if arg.required
-        ]
-        kwonly_args_ast: list[ast.arg] = [
-            ast_for_argument(arg) for arg in args if not arg.required
-        ]
-        defaults: list[ast.expr | None] = [
-            ast_for_constant(arg.default) for arg in args if not arg.required
-        ]
-        keywords: list[ast.keyword] = [
-            ast.keyword(arg.name, ast_for_name(arg.name)) for arg in args
-        ]
-        return pos_args_ast, kwonly_args_ast, defaults, keywords
-
     def create_relation_method(
         self,
         field: Field,
@@ -56,18 +34,17 @@ class ContextGenerator(CodeGenerator):
         # Generate the method name with the related field info
         method_name = f"{related_field.parent.lower()}_{related_field.name}"
 
-        pos_args, kwonlyargs, defaults, keywords = self.render_function_args_ast(
-            related_field.args
-        )
         # For relations, we need the foreign key field as the first argument
         args = [
             ast.arg(arg="self"),
             ast.arg(arg=fk_field.name, annotation=ast_for_name(fk_field.type)),
-            *pos_args,
+            *related_field.positional_args,
         ]
 
         # Use the correct class method for fetching single or list of items
-        cls_method = "get_models" if related_field.field_type.is_list else "get_model"
+        cls_method = (
+            "get_models" if related_field.field_type.is_list else "get_model_by_query"
+        )
 
         method_body: list[ast.stmt] = [
             ast.Return(
@@ -80,20 +57,16 @@ class ContextGenerator(CodeGenerator):
                         ),
                         args=[
                             ast.Compare(
-                                left=ast.Attribute(
-                                    value=ast.Attribute(
-                                        value=ast.Name(id="self", ctx=ast.Load()),
-                                        attr="_db_model",
-                                        ctx=ast.Load(),
-                                    ),
-                                    attr=fk_field.name,
-                                    ctx=ast.Load(),
+                                left=ast.Call(
+                                    func=ast_for_name("column"),
+                                    args=[ast_for_constant(fk_field.name)],
+                                    keywords=[],
                                 ),
                                 ops=[ast.Eq()],
                                 comparators=[ast_for_name(fk_field.name)],
                             ),
                         ],
-                        keywords=keywords,
+                        keywords=related_field.keywords,
                     )
                 )
             )
@@ -104,8 +77,8 @@ class ContextGenerator(CodeGenerator):
             args=ast.arguments(
                 posonlyargs=[],
                 args=args,
-                kwonlyargs=[*kwonlyargs],
-                kw_defaults=defaults,
+                kwonlyargs=[*related_field.kwonlyargs],
+                kw_defaults=related_field.kwdefaults,
                 defaults=[],
                 vararg=None,
                 kwarg=None,

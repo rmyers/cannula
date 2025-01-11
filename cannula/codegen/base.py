@@ -1,7 +1,7 @@
 import ast
 import typing
 
-from cannula.types import Argument, Field
+from cannula.types import Field
 
 # AST contants for common values
 NONE = ast.Constant(value=None)
@@ -49,15 +49,6 @@ def ast_for_assign(target: str, value: ast.expr) -> ast.Assign:
         value=value,
         lineno=None,  # type: ignore
     )
-
-
-def ast_for_argument(arg: Argument) -> ast.arg:
-    """
-    Create an AST node for a function argument.
-    """
-    is_required = arg.required or arg.default is not None
-    arg_type = arg.type if is_required else f"Optional[{arg.type}]"
-    return ast.arg(arg=arg.name, annotation=ast.Name(id=arg_type, ctx=ast.Load()))
 
 
 def ast_for_keyword(arg: str, value: typing.Any) -> ast.keyword:

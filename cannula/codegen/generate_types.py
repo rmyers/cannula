@@ -1,6 +1,6 @@
 import ast
 import logging
-from typing import Tuple, List, TypeVar, cast
+from typing import List, TypeVar, cast
 from graphql import (
     GraphQLObjectType,
     GraphQLInputObjectType,
@@ -10,7 +10,6 @@ from graphql import (
 from cannula.format import format_code
 from cannula.codegen.base import (
     ast_for_annotation_assignment,
-    ast_for_argument,
     ast_for_assign,
     ast_for_class_field,
     ast_for_constant,
@@ -22,7 +21,7 @@ from cannula.codegen.base import (
     ast_for_single_subscript,
     ast_for_union_subscript,
 )
-from cannula.types import Argument, Field, UnionType
+from cannula.types import Field, UnionType
 from cannula.codegen.schema_analyzer import CodeGenerator, TypeInfo
 
 LOG = logging.getLogger(__name__)
@@ -36,29 +35,8 @@ class PythonCodeGenerator(CodeGenerator):
 
     use_pydantic: bool
 
-    def render_function_args_ast(
-        self,
-        args: list[Argument],
-    ) -> Tuple[list[ast.arg], list[ast.arg], list[ast.expr | None]]:
-        """
-        Render function arguments as AST nodes.
-        """
-        pos_args_ast: list[ast.arg] = [
-            ast_for_argument(arg) for arg in args if arg.required
-        ]
-        kwonly_args_ast: list[ast.arg] = [
-            ast_for_argument(arg) for arg in args if not arg.required
-        ]
-        defaults: list[ast.expr | None] = [
-            ast_for_constant(arg.default) for arg in args if not arg.required
-        ]
-        return pos_args_ast, kwonly_args_ast, defaults
-
-    def render_computed_field(
-        self, field: Field, parent_type: str
-    ) -> ast.AsyncFunctionDef:
+    def render_computed_field(self, field: Field) -> ast.AsyncFunctionDef:
         """Create an AST node for a computed field method"""
-        pos_args, kwonlyargs, defaults = self.render_function_args_ast(field.args)
         args = [
             ast.arg("self"),
             ast.arg(
@@ -67,15 +45,15 @@ class PythonCodeGenerator(CodeGenerator):
                     ast_for_name("ResolveInfo"), ast_for_constant("Context")
                 ),
             ),
-            *pos_args,
+            *field.positional_args,
         ]
 
         args_node = ast.arguments(
             args=args,
             vararg=None,
             posonlyargs=[],
-            kwonlyargs=kwonlyargs,
-            kw_defaults=defaults,
+            kwonlyargs=field.kwonlyargs,
+            kw_defaults=field.kwdefaults,
             kwarg=None,
             defaults=[],
         )
@@ -99,9 +77,8 @@ class PythonCodeGenerator(CodeGenerator):
             body.append(ast_for_docstring(type_info.description))
 
         # Add fields as stmts
-        body.extend(
-            cast(list[ast.stmt], [ast_for_class_field(f) for f in type_info.fields])
-        )
+        for field in type_info.fields:
+            body.append(ast_for_class_field(field))
 
         return [
             cast(
@@ -123,34 +100,26 @@ class PythonCodeGenerator(CodeGenerator):
         use_pydantic: bool,
     ) -> list[ast.stmt]:
         """Create AST nodes for an object type"""
-        computed_fields = [f for f in type_info.fields if f.is_computed]
-        normal_fields = [f for f in type_info.fields if not f.is_computed]
-
         # Create class body
         body: list[ast.stmt] = []
         if type_info.description:
             body.append(ast_for_docstring(type_info.description))
 
         # Add type definition as stmt
-        body.append(
-            cast(
-                ast.stmt, ast_for_assign("__typename", ast_for_constant(type_info.name))
-            )
-        )
+        type_def = ast_for_assign("__typename", ast_for_constant(type_info.name))
+        body.append(type_def)
 
-        # Add fields as stmts
-        body.extend(
-            cast(list[ast.stmt], [ast_for_class_field(f) for f in normal_fields])
-        )
-        body.extend(
-            cast(
-                list[ast.stmt],
-                [
-                    self.render_computed_field(f, type_info.name)
-                    for f in computed_fields
-                ],
-            )
-        )
+        # Render non-computed as class vars and add them to body first
+        normal_fields: list[ast.stmt] = [
+            ast_for_class_field(f) for f in type_info.fields if not f.is_computed
+        ]
+        body.extend(normal_fields)
+
+        # Render computed fields as functions and add them at end of body
+        computed_fields: list[ast.stmt] = [
+            self.render_computed_field(f) for f in type_info.fields if f.is_computed
+        ]
+        body.extend(computed_fields)
 
         base_class = "BaseModel" if use_pydantic else "ABC"
         decorators: list[ast.expr] = []
@@ -236,7 +205,6 @@ class PythonCodeGenerator(CodeGenerator):
         """
         Render a computed field as an AST node for a function definition.
         """
-        pos_args, kwonlyargs, defaults = self.render_function_args_ast(field.args)
         args = [
             ast.arg("self"),
             ast.arg(
@@ -245,14 +213,14 @@ class PythonCodeGenerator(CodeGenerator):
                     ast_for_name("ResolveInfo"), ast_for_constant("Context")
                 ),
             ),
-            *pos_args,
+            *field.positional_args,
         ]
         args_node = ast.arguments(
             args=args,
             vararg=None,
             posonlyargs=[],
-            kwonlyargs=kwonlyargs,
-            kw_defaults=defaults,
+            kwonlyargs=field.kwonlyargs,
+            kw_defaults=field.kwdefaults,
             kwarg=None,
             defaults=[],
         )

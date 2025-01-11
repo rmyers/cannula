@@ -1,7 +1,8 @@
 import dataclasses
 import pytest
 from sqlalchemy.ext.asyncio import AsyncAttrs, create_async_engine, async_sessionmaker
-from sqlalchemy.orm import DeclarativeBase, mapped_column, Mapped
+from sqlalchemy.orm import DeclarativeBase, mapped_column, Mapped, relationship
+from sqlalchemy import ForeignKey, column
 
 from cannula.datasource.orm import DatabaseRepository
 
@@ -22,12 +23,31 @@ class DBUser(Base):
     password: Mapped[str]
 
 
+class DBProject(Base):
+    __tablename__ = "projects"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str]
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    user: Mapped[DBUser] = relationship()
+
+
 @dataclasses.dataclass
 class User:
     id: int
     email: str | None
     name: str | None
     password: str | None
+
+
+@dataclasses.dataclass
+class Project:
+    __typename = "Project"
+    id: str
+    name: str | None
+    user_id: str | None = None
+
+    async def user(self, user_datasource: "UserRepository"):
+        return await user_datasource.get_model(self.user_id)
 
 
 async def create_tables() -> None:
@@ -48,6 +68,14 @@ class UserRepository(
     pass
 
 
+class ProjectRepository(
+    DatabaseRepository[DBProject, Project],
+    db_model=DBProject,
+    graph_model=Project,
+):
+    pass
+
+
 @pytest.fixture(autouse=True)
 async def db_session():
     await create_tables()
@@ -58,8 +86,13 @@ async def db_session():
 async def test_orm_defaults(mocker):
     mock_logger = mocker.patch("cannula.datasource.orm.LOG")
     users = UserRepository(session)
+    projects = ProjectRepository(session)
     new_user = await users.add(id=1, name="test", email="u@c.com", password="secret")
     assert new_user.id == 1
+    new_project = await projects.add(id=2, name="test", user_id=1)
+    assert new_project.id == 2
+    my_user = await new_project.user(users)
+    assert my_user == new_user
 
     all_users = await users.get_models()
     assert len(all_users) == 1
@@ -96,6 +129,12 @@ async def test_orm_defaults(mocker):
     assert len(filter_users_again) == 1
     mock_logger.debug.assert_called_with("Found cached results for UserRepository")
     mock_logger.reset()
+
+    # Test a special filter
+    filter_with_column = await users.get_models(
+        (column("name") == "test") & ~(column("name") == "best")
+    )
+    assert len(filter_with_column) == 1, filter_with_column
 
 
 async def test_invalid_graph_model():

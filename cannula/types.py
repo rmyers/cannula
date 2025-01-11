@@ -1,3 +1,4 @@
+import ast
 import dataclasses
 import typing
 
@@ -28,6 +29,16 @@ class Argument:
     value: typing.Any = None
     default: typing.Any = None
     required: bool = False
+
+    @property
+    def as_ast(self) -> ast.arg:
+        is_required = self.required or self.default is not None
+        arg_type = self.type if is_required else f"Optional[{self.type}]"
+        return ast.arg(arg=self.name, annotation=ast.Name(id=arg_type, ctx=ast.Load()))
+
+    @property
+    def as_keyword(self) -> ast.keyword:
+        return ast.keyword(self.name, ast.Name(id=self.name, ctx=ast.Load()))
 
 
 @dataclasses.dataclass
@@ -98,6 +109,40 @@ class Field:
     @property
     def relation(self) -> dict:
         return self.metadata.get("relation", {})
+
+    @property
+    def required_args(self) -> list[Argument]:
+        return [arg for arg in self.args if arg.required]
+
+    @property
+    def optional_args(self) -> list[Argument]:
+        return [arg for arg in self.args if not arg.required]
+
+    @property
+    def positional_args(self) -> list[ast.arg]:
+        """Postional args for this field that are required"""
+        return [arg.as_ast for arg in self.required_args]
+
+    @property
+    def kwonlyargs(self) -> list[ast.arg]:
+        """Keyword only args are for this field that are not required"""
+        return [arg.as_ast for arg in self.optional_args]
+
+    @property
+    def kwdefaults(self) -> list[ast.expr | None]:
+        """Defaults constants for the args either provided value or 'None'"""
+        return [ast.Constant(value=arg.default) for arg in self.optional_args]
+
+    @property
+    def keywords(self) -> list[ast.keyword]:
+        """These are used in a function body to call an another function.
+
+        example::
+
+            def myfunction(field_arg, field_kwarg=None):
+                return external(field_arg=field_arg, field_kwarg=field_kwarg)
+        """
+        return [arg.as_keyword for arg in self.args]
 
 
 @dataclasses.dataclass
