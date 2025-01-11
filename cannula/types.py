@@ -95,6 +95,10 @@ class Field:
         has_args = bool(self.args)
         return has_args or self.computed
 
+    @property
+    def relation(self) -> dict:
+        return self.metadata.get("relation", {})
+
 
 @dataclasses.dataclass
 class ObjectType:

@@ -97,6 +97,20 @@ class TypeInfo(Generic[T]):
     def db_type(self) -> str:
         return self.type_def.extensions.get("db_type", f"DB{self.name}")
 
+    @property
+    def context_attr(self) -> str:
+        """Pluralized name used for the attribute on the context object"""
+        _attr = self.name.lower()
+        if _attr.endswith(("s", "x", "z", "ch", "sh", "to", "ro")):
+            return f"{_attr}es"
+        if _attr.endswith("ey"):
+            return f"{_attr}s"
+        if _attr.endswith("fe"):
+            return f"{_attr[:-2]}ves"
+        if _attr.endswith("y"):
+            return f"{_attr[:-1]}ies"
+        return f"{_attr}s"
+
 
 class SchemaAnalyzer:
     """
@@ -210,6 +224,14 @@ class CodeGenerator(ABC):
         self.analyzer = analyzer
         self.schema = analyzer.schema
         self.imports = analyzer.extensions.imports
+
+    def get_db_types(self) -> List[TypeInfo[GraphQLObjectType]]:
+        """Get all types that have db_table metadata"""
+        return [
+            type_info
+            for type_info in self.analyzer.object_types
+            if type_info.is_db_type
+        ]
 
     def create_import_statements(self) -> List[ast.ImportFrom]:
         """Create AST nodes for import statements."""

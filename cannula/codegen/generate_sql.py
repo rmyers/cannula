@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Set
+from typing import Any, Dict, List
 import ast
 
 from graphql import GraphQLObjectType
@@ -37,14 +37,6 @@ class SQLAlchemyGenerator(CodeGenerator):
             raise SchemaValidationError(
                 f"Relation metadata for {type_info.name}.{field.name} must be a dictionary"
             )
-
-    def get_db_table_types(self) -> Set[str]:
-        """Get all types that have db_table metadata."""
-        return {
-            type_info.db_type
-            for type_info in self.analyzer.object_types
-            if "db_table" in type_info.metadata
-        }
 
     def validate_field_metadata(
         self, field_name: str, is_required: bool, metadata: Dict[str, Any]
@@ -239,7 +231,7 @@ class SQLAlchemyGenerator(CodeGenerator):
 
     def validate_relationships(self) -> None:
         """Validate that relationships reference valid database tables and have proper foreign keys."""
-        db_tables = self.get_db_table_types()
+        db_tables = [t.db_type for t in self.get_db_types()]
 
         for type_info in self.analyzer.object_types:
             if "db_table" not in type_info.metadata:
@@ -297,7 +289,7 @@ class SQLAlchemyGenerator(CodeGenerator):
 
     def generate(self) -> str:
         """Generate SQLAlchemy models from the schema."""
-        db_tables = self.get_db_table_types()
+        db_tables = self.get_db_types()
         if not db_tables:
             return ""
 
