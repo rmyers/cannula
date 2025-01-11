@@ -99,16 +99,67 @@ class TypeInfo(Generic[T]):
 
     @property
     def context_attr(self) -> str:
-        """Pluralized name used for the attribute on the context object"""
+        """Pluralized name used for the attribute on the context object.
+
+        Follows English pluralization rules.
+        """
         _attr = self.name.lower()
-        if _attr.endswith(("s", "x", "z", "ch", "sh", "to", "ro")):
+
+        # Special cases and irregular plurals could be added here
+        irregular_plurals = {
+            "person": "people",
+            "child": "children",
+            "goose": "geese",
+            "mouse": "mice",
+            "criterion": "criteria",
+        }
+        if _attr in irregular_plurals:
+            return irregular_plurals[_attr]
+
+        # Words ending in -is change to -es
+        if _attr.endswith("is"):
+            return f"{_attr[:-2]}es"
+
+        # Words ending in -us change to -i
+        if _attr.endswith("us"):
+            return f"{_attr[:-2]}i"
+
+        # Words ending in -on change to -a
+        if _attr.endswith("on"):
+            return f"{_attr[:-2]}a"
+
+        # Words ending in sibilant sounds (s, sh, ch, x) add -es
+        if _attr.endswith(("s", "sh", "ch", "x", "zz")):
             return f"{_attr}es"
-        if _attr.endswith("ey"):
-            return f"{_attr}s"
+
+        # Words ending in -z double the z and add -es
+        if _attr.endswith("z"):
+            return f"{_attr}zes"
+
+        # Words ending in consonant + y change y to ies
+        if _attr.endswith("y") and len(_attr) > 1 and _attr[-2] not in "aeiou":
+            return f"{_attr[:-1]}ies"
+
+        # Words ending in -f or -fe change to -ves
         if _attr.endswith("fe"):
             return f"{_attr[:-2]}ves"
-        if _attr.endswith("y"):
-            return f"{_attr[:-1]}ies"
+        if _attr.endswith("f"):
+            return f"{_attr[:-1]}ves"
+
+        # Words ending in -o: some add -es, most just add -s
+        o_es_endings = {
+            "hero",
+            "potato",
+            "tomato",
+            "echo",
+            "veto",
+            "volcano",
+            "tornado",
+        }
+        if _attr in o_es_endings:
+            return f"{_attr}es"
+
+        # Default case: just add s
         return f"{_attr}s"
 
 
