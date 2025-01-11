@@ -55,8 +55,8 @@ def ast_for_argument(arg: Argument) -> ast.arg:
     """
     Create an AST node for a function argument.
     """
-    # LOG.debug(f"AST for arg: {arg.__dict__}")
-    arg_type = arg.type if arg.required else f"Optional[{arg.type}]"
+    is_required = arg.required or arg.default is not None
+    arg_type = arg.type if is_required else f"Optional[{arg.type}]"
     return ast.arg(arg=arg.name, annotation=ast.Name(id=arg_type, ctx=ast.Load()))
 
 

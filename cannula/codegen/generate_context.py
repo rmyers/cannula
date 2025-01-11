@@ -7,12 +7,14 @@ database-backed type in the schema.
 """
 
 import ast
-from typing import List
+from typing import List, Tuple
 
-from cannula.types import Field
+from cannula.types import Argument, Field
 from graphql import GraphQLObjectType
 from cannula.codegen.base import (
     ast_for_annotation_assignment,
+    ast_for_argument,
+    ast_for_constant,
     ast_for_import_from,
     ast_for_name,
 )
@@ -22,6 +24,27 @@ from cannula.format import format_code
 
 class ContextGenerator(CodeGenerator):
     """Generates context.py with datasources for database-backed types"""
+
+    def render_function_args_ast(
+        self,
+        args: list[Argument],
+    ) -> Tuple[list[ast.arg], list[ast.arg], list[ast.expr | None], list[ast.keyword]]:
+        """
+        Render function arguments as AST nodes.
+        """
+        pos_args_ast: list[ast.arg] = [
+            ast_for_argument(arg) for arg in args if arg.required
+        ]
+        kwonly_args_ast: list[ast.arg] = [
+            ast_for_argument(arg) for arg in args if not arg.required
+        ]
+        defaults: list[ast.expr | None] = [
+            ast_for_constant(arg.default) for arg in args if not arg.required
+        ]
+        keywords: list[ast.keyword] = [
+            ast.keyword(arg.name, ast_for_name(arg.name)) for arg in args
+        ]
+        return pos_args_ast, kwonly_args_ast, defaults, keywords
 
     def create_relation_method(
         self,
@@ -33,10 +56,14 @@ class ContextGenerator(CodeGenerator):
         # Generate the method name with the related field info
         method_name = f"{related_field.parent.lower()}_{related_field.name}"
 
-        # For relations, we only need the foreign key field as argument
+        pos_args, kwonlyargs, defaults, keywords = self.render_function_args_ast(
+            related_field.args
+        )
+        # For relations, we need the foreign key field as the first argument
         args = [
             ast.arg(arg="self"),
             ast.arg(arg=fk_field.name, annotation=ast_for_name(fk_field.type)),
+            *pos_args,
         ]
 
         # Use the correct class method for fetching single or list of items
@@ -64,9 +91,9 @@ class ContextGenerator(CodeGenerator):
                                 ),
                                 ops=[ast.Eq()],
                                 comparators=[ast_for_name(fk_field.name)],
-                            )
+                            ),
                         ],
-                        keywords=[],
+                        keywords=keywords,
                     )
                 )
             )
@@ -77,8 +104,8 @@ class ContextGenerator(CodeGenerator):
             args=ast.arguments(
                 posonlyargs=[],
                 args=args,
-                kwonlyargs=[],
-                kw_defaults=[],
+                kwonlyargs=[*kwonlyargs],
+                kw_defaults=defaults,
                 defaults=[],
                 vararg=None,
                 kwarg=None,

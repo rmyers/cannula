@@ -23,7 +23,7 @@ class Book(ABC):
 
     @abstractmethod
     async def movies(
-        self, info: ResolveInfo["Context"], *, limit: Optional[int] = 100
+        self, info: ResolveInfo["Context"], *, limit: int = 100
     ) -> Optional[Sequence[Movie]]:
         """Get all the movies for a given book. This is will be added to the BookType."""
         ...
@@ -55,7 +55,7 @@ class booksQuery(Protocol):
 class mediaQuery(Protocol):
 
     async def __call__(
-        self, info: ResolveInfo["Context"], *, limit: Optional[int] = 100
+        self, info: ResolveInfo["Context"], *, limit: int = 100
     ) -> Optional[Sequence[Generic]]: ...
 
 
