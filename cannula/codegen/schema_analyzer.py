@@ -7,13 +7,23 @@ Key changes:
 4. Type-safe schema extensions
 """
 
-from abc import ABC, abstractmethod
 import ast
+import collections
 import logging
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Dict, Generic, List, Optional, Protocol, TypeVar, cast
+from typing import (
+    Any,
+    DefaultDict,
+    Dict,
+    Generic,
+    List,
+    Optional,
+    Protocol,
+    TypeVar,
+    cast,
+)
 
-from cannula.codegen.base import ast_for_import_from
 from graphql import (
     GraphQLField,
     GraphQLSchema,
@@ -30,7 +40,8 @@ from graphql import (
 
 from cannula.codegen.parse_args import parse_field_arguments
 from cannula.codegen.parse_type import parse_graphql_type
-from cannula.types import Field, UnionType
+from cannula.types import Field, InputType, InterfaceType, UnionType
+from cannula.utils import ast_for_import_from
 
 LOG = logging.getLogger(__name__)
 
@@ -177,8 +188,8 @@ class SchemaAnalyzer:
     def _analyze(self) -> None:
         """Analyze schema and categorize types"""
         self.object_types: List[TypeInfo[GraphQLObjectType]] = []
-        self.interface_types: List[TypeInfo[GraphQLInterfaceType]] = []
-        self.input_types: List[TypeInfo[GraphQLInputObjectType]] = []
+        self.interface_types: List[InterfaceType] = []
+        self.input_types: List[InputType] = []
         self.union_types: List[UnionType] = []
         self.operation_types: List[TypeInfo[GraphQLObjectType]] = []
         self.operation_fields: List[Field] = []
@@ -201,10 +212,10 @@ class SchemaAnalyzer:
                 self.object_types.append(self.get_type_info(type_def))
             elif is_interface_type(type_def):
                 type_def = cast(GraphQLInterfaceType, type_def)
-                self.interface_types.append(self.get_type_info(type_def))
+                self.interface_types.append(self.parse_interface(type_def))
             elif is_input_object_type(type_def):
                 type_def = cast(GraphQLInputObjectType, type_def)
-                self.input_types.append(self.get_type_info(type_def))
+                self.input_types.append(self.parse_input(type_def))
             elif is_union_type(type_def):
                 type_def = cast(GraphQLUnionType, type_def)
                 self.union_types.append(self.parse_union(type_def))
@@ -217,6 +228,7 @@ class SchemaAnalyzer:
         self.operation_types.sort(key=lambda o: o.name)
         self.union_types.sort(key=lambda o: o.name)
         self.object_types_by_name = {t.py_type: t for t in self.object_types}
+        self.forward_references = self.get_forward_references()
 
     def parse_union(self, node: GraphQLUnionType) -> UnionType:
         """Parse a GraphQL Union type into a UnionType object"""
@@ -228,6 +240,46 @@ class SchemaAnalyzer:
             py_type=metadata.get("py_type", node.name),
             description=metadata.get("description"),
             types=types,
+        )
+
+    def parse_interface(self, node: GraphQLInterfaceType) -> InterfaceType:
+        """Parse a GraphQL Interface type into InterfaceType object."""
+        metadata = self.extensions.get_type_metadata(node.name)
+        fields = [
+            self.get_field(
+                field_name=field_name,
+                field_def=field_def,
+                parent=node.name,
+            )
+            for field_name, field_def in node.fields.items()
+        ]
+        return InterfaceType(
+            node=node,
+            name=node.name,
+            py_type=node.name,
+            fields=fields,
+            metadata=metadata,
+            description=metadata.get("description"),
+        )
+
+    def parse_input(self, node: GraphQLInputObjectType) -> InputType:
+        """Parse a GraphQL Input type into InputType object."""
+        metadata = self.extensions.get_type_metadata(node.name)
+        fields = [
+            self.get_field(
+                field_name=field_name,
+                field_def=field_def,
+                parent=node.name,
+            )
+            for field_name, field_def in node.fields.items()
+        ]
+        return InputType(
+            node=node,
+            name=node.name,
+            py_type=node.name,
+            fields=fields,
+            metadata=metadata,
+            description=metadata.get("description"),
         )
 
     def get_field(self, field_name: str, field_def: GraphQLField, parent: str) -> Field:
@@ -244,6 +296,16 @@ class SchemaAnalyzer:
             args=args,
             directives=directives,
         )
+
+    def get_forward_references(self) -> DefaultDict[str, list[Field]]:
+        # First parse the db_types and add forward reference to relations
+        forward_relations: DefaultDict[str, list[Field]] = collections.defaultdict(list)
+        for type_info in self.object_types:
+            for field in type_info.fields:
+                if field.relation and field.field_type.is_object_type:
+                    forward_relations[field.field_type.of_type].append(field)
+
+        return forward_relations
 
     def get_type_info(self, gql_type: T) -> TypeInfo[T]:
         """Get type information for a specific type"""

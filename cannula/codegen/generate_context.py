@@ -7,11 +7,13 @@ database-backed type in the schema.
 """
 
 import ast
-from typing import List
+import collections
+from pprint import pprint
+from typing import DefaultDict, List
 
 from cannula.types import Field
 from graphql import GraphQLObjectType
-from cannula.codegen.base import (
+from cannula.utils import (
     ast_for_annotation_assignment,
     ast_for_constant,
     ast_for_import_from,
@@ -31,9 +33,6 @@ class ContextGenerator(CodeGenerator):
         fk_field: Field,
     ) -> ast.AsyncFunctionDef:
         """Create a method for fetching related objects"""
-        # Generate the method name with the related field info
-        method_name = f"{related_field.parent.lower()}_{related_field.name}"
-
         # For relations, we need the foreign key field as the first argument
         args = [
             ast.arg(arg="self"),
@@ -42,9 +41,7 @@ class ContextGenerator(CodeGenerator):
         ]
 
         # Use the correct class method for fetching single or list of items
-        cls_method = (
-            "get_models" if related_field.field_type.is_list else "get_model_by_query"
-        )
+        cls_method = "get_models" if related_field.field_type.is_list else "get_model"
 
         method_body: list[ast.stmt] = [
             ast.Return(
@@ -73,7 +70,7 @@ class ContextGenerator(CodeGenerator):
         ]
 
         return ast.AsyncFunctionDef(
-            name=method_name,
+            name=related_field.relation_method,
             args=ast.arguments(
                 posonlyargs=[],
                 args=args,
@@ -259,6 +256,16 @@ class ContextGenerator(CodeGenerator):
                 ast_for_import_from(".types", model_types),
             ]
         )
+
+        # First parse the db_types and add forward reference to relations
+        forward_relations: DefaultDict[str, list[Field]] = collections.defaultdict(list)
+        for type_info in self.analyzer.object_types:
+            for field in type_info.fields:
+                if field.relation and field.field_type.is_object_type:
+                    forward_relations[field.field_type.of_type].append(field)
+
+        pprint(forward_relations)
+        pprint(self.analyzer.object_types_by_name)
         # Create datasource classes
         for type_info in db_types:
             datasource = self.create_datasource_class(type_info)

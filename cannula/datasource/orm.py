@@ -24,7 +24,7 @@ from typing import (
     Union,
 )
 
-from sqlalchemy import BinaryExpression, ColumnExpressionArgument, select
+from sqlalchemy import BinaryExpression, ColumnExpressionArgument, Select, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 
@@ -136,18 +136,32 @@ class DatabaseRepository(Generic[DBModel, GraphModel]):
         self._memoized_get[cache_key] = process_get()
         return await self._memoized_get[cache_key]
 
+    def _get_cache_key(self, query: Select, **kwargs) -> str:
+        """Return a cache key for the query using with bind params.
+
+        Get the params for the query and add in any from bindparams specified
+        In the relation like::
+
+            query: 'project.type == :type'
+        """
+        compiled = query.compile()
+        params = compiled.params
+        params.update(kwargs)
+        cache_key = f"{compiled}:{params}"
+        return cache_key
+
     async def get_by_query(
-        self, *expressions: BinaryExpression | ColumnExpressionArgument
+        self, *expressions: BinaryExpression | ColumnExpressionArgument, **kwargs
     ) -> DBModel | None:
         query = select(self._db_model).where(*expressions)
 
         # Get the query as a string with bound values
-        cache_key = str(query.compile(compile_kwargs={"literal_binds": True}))
+        cache_key = self._get_cache_key(query, **kwargs)
 
         @cacheable
         async def process_get() -> DBModel | None:
             async with self.readonly_session_maker() as session:
-                results = await session.scalars(query)
+                results = await session.scalars(query, params=kwargs)
                 return results.one_or_none()
 
         if results := self._memoized_get.get(cache_key):
@@ -157,15 +171,15 @@ class DatabaseRepository(Generic[DBModel, GraphModel]):
         self._memoized_get[cache_key] = process_get()
         return await self._memoized_get[cache_key]
 
-    async def get_model(self, pk: _PKIdentityArgument) -> GraphModel | None:
+    async def get_model_by_pk(self, pk: _PKIdentityArgument) -> GraphModel | None:
         if db_obj := await self.get_by_pk(pk):
             return self.from_db(db_obj)
         return None
 
-    async def get_model_by_query(
-        self, *expressions: BinaryExpression | ColumnExpressionArgument
+    async def get_model(
+        self, *expressions: BinaryExpression | ColumnExpressionArgument, **kwargs
     ) -> GraphModel | None:
-        if db_obj := await self.get_by_query(*expressions):
+        if db_obj := await self.get_by_query(*expressions, **kwargs):
             return self.from_db(db_obj)
         return None
 
@@ -174,20 +188,21 @@ class DatabaseRepository(Generic[DBModel, GraphModel]):
         *expressions: BinaryExpression | ColumnExpressionArgument,
         limit: int = 100,
         offset: int = 0,
+        **kwargs,
     ) -> list[DBModel]:
         query = select(self._db_model).limit(limit).offset(offset)
         if expressions:
             query = query.where(*expressions)
 
         # Get the query as a string with bound values
-        cache_key = str(query.compile(compile_kwargs={"literal_binds": True}))
+        cache_key = self._get_cache_key(query, **kwargs)
 
         @cacheable
         async def process_filter() -> list[DBModel]:
             async with self.readonly_session_maker() as session:
                 # If we don't convert this to a list only the first
                 # coroutine that awaits this will be able to read the data.
-                return list(await session.scalars(query))
+                return list(await session.scalars(query, params=kwargs))
 
         if results := self._memoized_list.get(cache_key):
             LOG.debug(f"Found cached results for {self.__class__.__name__}")
@@ -201,10 +216,11 @@ class DatabaseRepository(Generic[DBModel, GraphModel]):
         *expressions: BinaryExpression | ColumnExpressionArgument,
         limit: int = 100,
         offset: int = 0,
+        **kwargs,
     ) -> list[GraphModel]:
         return list(
             map(
                 self.from_db,
-                await self.filter(*expressions, limit=limit, offset=offset),
+                await self.filter(*expressions, limit=limit, offset=offset, **kwargs),
             )
         )

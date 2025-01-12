@@ -2,7 +2,7 @@ from typing import Any, Dict, List
 import ast
 
 from graphql import GraphQLObjectType
-from cannula.codegen.base import (
+from cannula.utils import (
     PASS,
     ast_for_annotation_assignment,
     ast_for_assign,
