@@ -48,61 +48,6 @@ def test_db_type(name: str, type_extensions: Dict[str, Any], expected_db_type: s
     assert type_info.db_type == expected_db_type
 
 
-@pytest.mark.parametrize(
-    "name,expected_context_attr",
-    [
-        # Regular plurals
-        ("User", "users"),
-        ("Book", "books"),
-        # Sibilant endings (s, sh, ch, x, z)
-        ("Class", "classes"),
-        ("Bush", "bushes"),
-        ("Match", "matches"),
-        ("Box", "boxes"),
-        ("Quiz", "quizzes"),
-        ("Buzz", "buzzes"),
-        # Words ending in y
-        ("City", "cities"),  # consonant + y
-        ("Day", "days"),  # vowel + y
-        ("Boy", "boys"),  # vowel + y
-        # Words ending in f/fe
-        ("Wolf", "wolves"),
-        ("Knife", "knives"),
-        ("Life", "lives"),
-        # Words ending in o
-        ("Hero", "heroes"),
-        ("Potato", "potatoes"),
-        ("Studio", "studios"),
-        ("Radio", "radios"),
-        ("Video", "videos"),
-        # Latin/Greek endings
-        ("Analysis", "analyses"),
-        ("Basis", "bases"),
-        ("Focus", "foci"),
-        ("Stimulus", "stimuli"),
-        ("Criterion", "criteria"),
-        ("Phenomenon", "phenomena"),
-        # Irregular plurals
-        ("Person", "people"),
-        ("Child", "children"),
-        ("Mouse", "mice"),
-        ("Goose", "geese"),
-        # Edge cases
-        (
-            "Data",
-            "datas",
-        ),  # Technically "data" is already plural, but in GraphQL we might want to treat it as singular
-        ("Schema", "schemas"),  # Both "schemas" and "schemata" are valid
-    ],
-)
-def test_context_attr_pluralization(name: str, expected_context_attr: str):
-    type_def = create_graphql_type(name=name)
-    type_info = TypeInfo(
-        type_def=type_def, name=name, py_type=name, metadata={}, fields=[]
-    )
-    assert type_info.context_attr == expected_context_attr
-
-
 def test_typeinfo_full_initialization():
     """Test full initialization of TypeInfo with all fields"""
     type_def = create_graphql_type(name="User")

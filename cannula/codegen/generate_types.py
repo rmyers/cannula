@@ -1,7 +1,6 @@
 import ast
 import logging
 from typing import List, TypeVar, cast
-from graphql import GraphQLObjectType
 
 from cannula.format import format_code
 from cannula.utils import (
@@ -72,7 +71,7 @@ class PythonCodeGenerator(CodeGenerator):
 
     def render_object_type(
         self,
-        type_info: TypeInfo[GraphQLObjectType],
+        type_info: TypeInfo,
         use_pydantic: bool,
     ) -> list[ast.stmt]:
         """Create AST nodes for an object type"""

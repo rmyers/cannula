@@ -16,18 +16,14 @@ from typing import (
     Any,
     DefaultDict,
     Dict,
-    Generic,
     List,
     Optional,
-    Protocol,
-    TypeVar,
     cast,
 )
 
 from graphql import (
     GraphQLField,
     GraphQLSchema,
-    GraphQLNamedType,
     GraphQLObjectType,
     GraphQLInterfaceType,
     GraphQLInputObjectType,
@@ -41,22 +37,9 @@ from graphql import (
 from cannula.codegen.parse_args import parse_field_arguments
 from cannula.codegen.parse_type import parse_graphql_type
 from cannula.types import Field, InputType, InterfaceType, UnionType
-from cannula.utils import ast_for_import_from
+from cannula.utils import ast_for_import_from, pluralize
 
 LOG = logging.getLogger(__name__)
-
-# Type Definitions
-T = TypeVar("T", bound=GraphQLNamedType)
-
-
-class MetadataProvider(Protocol):
-    """Protocol for accessing type and field metadata"""
-
-    @property
-    def type_metadata(self) -> Dict[str, Dict[str, Any]]: ...
-
-    @property
-    def field_metadata(self) -> Dict[str, Dict[str, Dict[str, Any]]]: ...
 
 
 class SchemaExtension:
@@ -90,10 +73,10 @@ class SchemaExtension:
 
 
 @dataclass
-class TypeInfo(Generic[T]):
+class TypeInfo:
     """Container for type information and metadata"""
 
-    type_def: T
+    type_def: GraphQLObjectType
     name: str
     py_type: str
     metadata: Dict[str, Any]
@@ -110,68 +93,8 @@ class TypeInfo(Generic[T]):
 
     @property
     def context_attr(self) -> str:
-        """Pluralized name used for the attribute on the context object.
-
-        Follows English pluralization rules.
-        """
-        _attr = self.name.lower()
-
-        # Special cases and irregular plurals could be added here
-        irregular_plurals = {
-            "person": "people",
-            "child": "children",
-            "goose": "geese",
-            "mouse": "mice",
-            "criterion": "criteria",
-        }
-        if _attr in irregular_plurals:
-            return irregular_plurals[_attr]
-
-        # Words ending in -is change to -es
-        if _attr.endswith("is"):
-            return f"{_attr[:-2]}es"
-
-        # Words ending in -us change to -i
-        if _attr.endswith("us"):
-            return f"{_attr[:-2]}i"
-
-        # Words ending in -on change to -a
-        if _attr.endswith("on"):
-            return f"{_attr[:-2]}a"
-
-        # Words ending in sibilant sounds (s, sh, ch, x) add -es
-        if _attr.endswith(("s", "sh", "ch", "x", "zz")):
-            return f"{_attr}es"
-
-        # Words ending in -z double the z and add -es
-        if _attr.endswith("z"):
-            return f"{_attr}zes"
-
-        # Words ending in consonant + y change y to ies
-        if _attr.endswith("y") and len(_attr) > 1 and _attr[-2] not in "aeiou":
-            return f"{_attr[:-1]}ies"
-
-        # Words ending in -f or -fe change to -ves
-        if _attr.endswith("fe"):
-            return f"{_attr[:-2]}ves"
-        if _attr.endswith("f"):
-            return f"{_attr[:-1]}ves"
-
-        # Words ending in -o: some add -es, most just add -s
-        o_es_endings = {
-            "hero",
-            "potato",
-            "tomato",
-            "echo",
-            "veto",
-            "volcano",
-            "tornado",
-        }
-        if _attr in o_es_endings:
-            return f"{_attr}es"
-
-        # Default case: just add s
-        return f"{_attr}s"
+        """Pluralized name used for the attribute on the context object."""
+        return pluralize(self.name)
 
 
 class SchemaAnalyzer:
@@ -187,14 +110,14 @@ class SchemaAnalyzer:
 
     def _analyze(self) -> None:
         """Analyze schema and categorize types"""
-        self.object_types: List[TypeInfo[GraphQLObjectType]] = []
+        self.object_types: List[TypeInfo] = []
         self.interface_types: List[InterfaceType] = []
         self.input_types: List[InputType] = []
         self.union_types: List[UnionType] = []
-        self.operation_types: List[TypeInfo[GraphQLObjectType]] = []
+        self.operation_types: List[TypeInfo] = []
         self.operation_fields: List[Field] = []
         # Add helper to access object types by name
-        self.object_types_by_name: Dict[str, TypeInfo[GraphQLObjectType]] = {}
+        self.object_types_by_name: Dict[str, TypeInfo] = {}
 
         for name, type_def in self.schema.type_map.items():
             is_operation = name in ("Query", "Mutation", "Subscription")
@@ -245,19 +168,11 @@ class SchemaAnalyzer:
     def parse_interface(self, node: GraphQLInterfaceType) -> InterfaceType:
         """Parse a GraphQL Interface type into InterfaceType object."""
         metadata = self.extensions.get_type_metadata(node.name)
-        fields = [
-            self.get_field(
-                field_name=field_name,
-                field_def=field_def,
-                parent=node.name,
-            )
-            for field_name, field_def in node.fields.items()
-        ]
         return InterfaceType(
             node=node,
             name=node.name,
             py_type=node.name,
-            fields=fields,
+            fields=self.get_fields(node),
             metadata=metadata,
             description=metadata.get("description"),
         )
@@ -265,7 +180,19 @@ class SchemaAnalyzer:
     def parse_input(self, node: GraphQLInputObjectType) -> InputType:
         """Parse a GraphQL Input type into InputType object."""
         metadata = self.extensions.get_type_metadata(node.name)
-        fields = [
+        return InputType(
+            node=node,
+            name=node.name,
+            py_type=node.name,
+            fields=self.get_fields(node),
+            metadata=metadata,
+            description=metadata.get("description"),
+        )
+
+    def get_fields(
+        self, node: GraphQLObjectType | GraphQLInputObjectType | GraphQLInterfaceType
+    ) -> list[Field]:
+        return [
             self.get_field(
                 field_name=field_name,
                 field_def=field_def,
@@ -273,14 +200,6 @@ class SchemaAnalyzer:
             )
             for field_name, field_def in node.fields.items()
         ]
-        return InputType(
-            node=node,
-            name=node.name,
-            py_type=node.name,
-            fields=fields,
-            metadata=metadata,
-            description=metadata.get("description"),
-        )
 
     def get_field(self, field_name: str, field_def: GraphQLField, parent: str) -> Field:
         field_type = parse_graphql_type(field_def.type)
@@ -307,18 +226,9 @@ class SchemaAnalyzer:
 
         return forward_relations
 
-    def get_type_info(self, gql_type: T) -> TypeInfo[T]:
+    def get_type_info(self, gql_type: GraphQLObjectType) -> TypeInfo:
         """Get type information for a specific type"""
         metadata = self.extensions.get_type_metadata(gql_type.name)
-        _fields = getattr(gql_type, "fields", {})
-        fields = [
-            self.get_field(
-                field_name=field_name,
-                field_def=field_def,
-                parent=gql_type.name,
-            )
-            for field_name, field_def in _fields.items()
-        ]
 
         return TypeInfo(
             type_def=gql_type,
@@ -326,7 +236,7 @@ class SchemaAnalyzer:
             py_type=gql_type.extensions.get("py_type", gql_type.name),
             description=metadata.get("description"),
             metadata=metadata.get("metadata", {}),
-            fields=fields,
+            fields=self.get_fields(gql_type),
         )
 
 
@@ -338,7 +248,7 @@ class CodeGenerator(ABC):
         self.schema = analyzer.schema
         self.imports = analyzer.extensions.imports
 
-    def get_db_types(self) -> List[TypeInfo[GraphQLObjectType]]:
+    def get_db_types(self) -> List[TypeInfo]:
         """Get all types that have db_table metadata"""
         return [
             type_info
