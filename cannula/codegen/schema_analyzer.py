@@ -11,13 +11,11 @@ import ast
 import collections
 import logging
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from typing import (
     Any,
     DefaultDict,
     Dict,
     List,
-    Optional,
     cast,
 )
 
@@ -36,8 +34,8 @@ from graphql import (
 
 from cannula.codegen.parse_args import parse_field_arguments
 from cannula.codegen.parse_type import parse_graphql_type
-from cannula.types import Field, InputType, InterfaceType, UnionType
-from cannula.utils import ast_for_import_from, pluralize
+from cannula.types import Field, InputType, InterfaceType, ObjectType, UnionType
+from cannula.utils import ast_for_import_from
 
 LOG = logging.getLogger(__name__)
 
@@ -72,31 +70,6 @@ class SchemaExtension:
         return self.field_metadata.get(type_name, {}).get(str(field_name), {})
 
 
-@dataclass
-class ObjectType:
-    """Container for type information and metadata"""
-
-    type_def: GraphQLObjectType
-    name: str
-    py_type: str
-    metadata: Dict[str, Any]
-    fields: List[Field]
-    description: Optional[str] = None
-
-    @property
-    def is_db_type(self) -> bool:
-        return bool(self.metadata.get("db_table", False))
-
-    @property
-    def db_type(self) -> str:
-        return self.type_def.extensions.get("db_type", f"DB{self.name}")
-
-    @property
-    def context_attr(self) -> str:
-        """Pluralized name used for the attribute on the context object."""
-        return pluralize(self.name)
-
-
 class SchemaAnalyzer:
     """
     Analyzes a GraphQL schema and provides high-level access to type information
@@ -127,12 +100,12 @@ class SchemaAnalyzer:
                 continue
             elif is_operation:
                 type_def = cast(GraphQLObjectType, type_def)
-                type_info = self.get_type_info(type_def)
+                type_info = self.parse_object(type_def)
                 self.operation_types.append(type_info)
                 self.operation_fields.extend(type_info.fields)
             elif is_object_type(type_def):
                 type_def = cast(GraphQLObjectType, type_def)
-                self.object_types.append(self.get_type_info(type_def))
+                self.object_types.append(self.parse_object(type_def))
             elif is_interface_type(type_def):
                 type_def = cast(GraphQLInterfaceType, type_def)
                 self.interface_types.append(self.parse_interface(type_def))
@@ -189,6 +162,19 @@ class SchemaAnalyzer:
             description=metadata.get("description"),
         )
 
+    def parse_object(self, node: GraphQLObjectType) -> ObjectType:
+        """Parse a GraphQL Object type into ObjectType object."""
+        metadata = self.extensions.get_type_metadata(node.name)
+
+        return ObjectType(
+            type_def=node,
+            name=node.name,
+            py_type=node.extensions.get("py_type", node.name),
+            description=metadata.get("description"),
+            metadata=metadata.get("metadata", {}),
+            fields=self.get_fields(node),
+        )
+
     def get_fields(
         self, node: GraphQLObjectType | GraphQLInputObjectType | GraphQLInterfaceType
     ) -> list[Field]:
@@ -225,19 +211,6 @@ class SchemaAnalyzer:
                     forward_relations[field.field_type.of_type].append(field)
 
         return forward_relations
-
-    def get_type_info(self, gql_type: GraphQLObjectType) -> ObjectType:
-        """Get type information for a specific type"""
-        metadata = self.extensions.get_type_metadata(gql_type.name)
-
-        return ObjectType(
-            type_def=gql_type,
-            name=gql_type.name,
-            py_type=gql_type.extensions.get("py_type", gql_type.name),
-            description=metadata.get("description"),
-            metadata=metadata.get("metadata", {}),
-            fields=self.get_fields(gql_type),
-        )
 
 
 class CodeGenerator(ABC):

@@ -2,7 +2,12 @@ import ast
 import dataclasses
 import typing
 
-from graphql import GraphQLField, GraphQLInputObjectType, GraphQLInterfaceType
+from graphql import (
+    GraphQLField,
+    GraphQLInputObjectType,
+    GraphQLInterfaceType,
+    GraphQLObjectType,
+)
 
 from cannula.utils import (
     ast_for_annotation_assignment,
@@ -11,6 +16,7 @@ from cannula.utils import (
     ast_for_docstring,
     ast_for_name,
     ast_for_union_subscript,
+    pluralize,
 )
 
 
@@ -186,12 +192,27 @@ class Field:
 
 @dataclasses.dataclass
 class ObjectType:
+    """Container for type information and metadata"""
+
+    type_def: GraphQLObjectType
     name: str
     py_type: str
-    fields: typing.List[Field]
-    directives: typing.List[Directive]
+    metadata: typing.Dict[str, typing.Any]
+    fields: list[Field]
     description: typing.Optional[str] = None
-    defined_scalar_type: bool = False
+
+    @property
+    def is_db_type(self) -> bool:
+        return bool(self.metadata.get("db_table", False))
+
+    @property
+    def db_type(self) -> str:
+        return self.type_def.extensions.get("db_type", f"DB{self.name}")
+
+    @property
+    def context_attr(self) -> str:
+        """Pluralized name used for the attribute on the context object."""
+        return pluralize(self.name)
 
 
 @dataclasses.dataclass
