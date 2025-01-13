@@ -38,7 +38,7 @@ class UserRepository(
 ):
 
     async def get_user(self, pk: int) -> User | None:
-        return await self.get_model(pk)
+        return await self.get_model_by_pk(pk)
 
 
 class WidgetRepository(

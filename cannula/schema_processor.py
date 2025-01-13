@@ -98,7 +98,7 @@ class SchemaProcessor:
         description = parse_metadata_to_yaml(description)
 
         # Look for YAML metadata section with separator
-        parts = description.split("\n---\n", 1)
+        parts = description.split("---\n", 1)
         if len(parts) == 2:
             desc, yaml_str = parts
             try:

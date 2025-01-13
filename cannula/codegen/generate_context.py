@@ -7,32 +7,85 @@ database-backed type in the schema.
 """
 
 import ast
-from typing import List
+import collections
+from pprint import pprint
+from typing import DefaultDict, List
 
-from graphql import GraphQLObjectType
-from cannula.codegen.base import (
+from cannula.codegen.schema_analyzer import CodeGenerator, ObjectType
+from cannula.format import format_code
+from cannula.types import Field
+from cannula.utils import (
     ast_for_annotation_assignment,
+    ast_for_constant,
     ast_for_import_from,
     ast_for_name,
 )
-from cannula.codegen.schema_analyzer import CodeGenerator, TypeInfo
-from cannula.format import format_code
 
 
 class ContextGenerator(CodeGenerator):
     """Generates context.py with datasources for database-backed types"""
 
-    def get_db_types(self) -> List[TypeInfo[GraphQLObjectType]]:
-        """Get all types that have db_table metadata"""
-        return [
-            type_info
-            for type_info in self.analyzer.object_types
-            if type_info.is_db_type
+    def create_relation_method(
+        self,
+        field: Field,
+        related_field: Field,
+        fk_field: Field,
+    ) -> ast.AsyncFunctionDef:
+        """Create a method for fetching related objects"""
+        # For relations, we need the foreign key field as the first argument
+        args = [
+            ast.arg(arg="self"),
+            ast.arg(arg=fk_field.name, annotation=ast_for_name(fk_field.type)),
+            *related_field.positional_args,
         ]
 
-    def create_datasource_class(
-        self, type_info: TypeInfo[GraphQLObjectType]
-    ) -> ast.ClassDef:
+        # Use the correct class method for fetching single or list of items
+        cls_method = "get_models" if related_field.field_type.is_list else "get_model"
+
+        method_body: list[ast.stmt] = [
+            ast.Return(
+                value=ast.Await(
+                    value=ast.Call(
+                        func=ast.Attribute(
+                            value=ast.Name(id="self", ctx=ast.Load()),
+                            attr=cls_method,
+                            ctx=ast.Load(),
+                        ),
+                        args=[
+                            ast.Compare(
+                                left=ast.Call(
+                                    func=ast_for_name("column"),
+                                    args=[ast_for_constant(fk_field.name)],
+                                    keywords=[],
+                                ),
+                                ops=[ast.Eq()],
+                                comparators=[ast_for_name(fk_field.name)],
+                            ),
+                        ],
+                        keywords=related_field.keywords,
+                    )
+                )
+            )
+        ]
+
+        return ast.AsyncFunctionDef(
+            name=related_field.relation_method,
+            args=ast.arguments(
+                posonlyargs=[],
+                args=args,
+                kwonlyargs=[*related_field.kwonlyargs],
+                kw_defaults=related_field.kwdefaults,
+                defaults=[],
+                vararg=None,
+                kwarg=None,
+            ),
+            body=method_body,
+            decorator_list=[],
+            returns=ast_for_name(related_field.type),
+            type_params=[],
+        )
+
+    def create_datasource_class(self, type_info: ObjectType) -> ast.ClassDef:
         """Create a datasource class for a specific type"""
         # Get the type names
         graph_type = type_info.py_type
@@ -57,6 +110,51 @@ class ContextGenerator(CodeGenerator):
         # Create the datasource class
         body: List[ast.stmt] = []
 
+        fk_fields: dict[str, Field] = {}
+        # Map all the foreign_key fields for relations
+        for field in type_info.fields:
+            if fk := field.metadata.get("foreign_key"):
+                table_name = fk.split(".")[0]
+                fk_fields[table_name] = field
+
+        for field in type_info.fields:
+            if back_populates := field.relation.get("back_populates"):
+
+                # Get the related type info
+                related_type_name = (
+                    field.field_type.of_type or field.field_type.safe_value
+                )
+                related_type = next(
+                    (
+                        t
+                        for t in self.analyzer.object_types
+                        if t.py_type == related_type_name
+                    ),
+                    None,
+                )
+                if related_type is None:
+                    continue
+
+                related_field = next(
+                    (f for f in related_type.fields if f.name == back_populates),
+                    None,
+                )
+                if related_field is None:
+                    continue
+
+                table_name = related_type.metadata.get("db_table", "")
+                fk_field = fk_fields.get(table_name)
+                if fk_field is None:
+                    continue
+
+                body.append(
+                    self.create_relation_method(
+                        field=field,
+                        related_field=related_field,
+                        fk_field=fk_field,
+                    )
+                )
+
         # If no custom methods were added, add pass
         if not body:
             body.append(ast.Pass())
@@ -70,9 +168,7 @@ class ContextGenerator(CodeGenerator):
             type_params=[],
         )
 
-    def create_context_class(
-        self, db_types: List[TypeInfo[GraphQLObjectType]]
-    ) -> ast.ClassDef:
+    def create_context_class(self, db_types: List[ObjectType]) -> ast.ClassDef:
         """Create the main Context class"""
         # Create __init__ method
         init_body: List[ast.stmt] = []
@@ -83,7 +179,7 @@ class ContextGenerator(CodeGenerator):
         for type_info in db_types:
             graph_type = type_info.py_type
             datasource_name = f"{graph_type}Datasource"
-            attr_name = f"{graph_type.lower()}s"
+            attr_name = type_info.context_attr
 
             annotations.append(
                 ast_for_annotation_assignment(
@@ -155,6 +251,16 @@ class ContextGenerator(CodeGenerator):
                 ast_for_import_from(".types", model_types),
             ]
         )
+
+        # First parse the db_types and add forward reference to relations
+        forward_relations: DefaultDict[str, list[Field]] = collections.defaultdict(list)
+        for type_info in self.analyzer.object_types:
+            for field in type_info.fields:
+                if field.relation and field.field_type.is_object_type:
+                    forward_relations[field.field_type.of_type].append(field)
+
+        pprint(forward_relations)
+        pprint(self.analyzer.object_types_by_name)
         # Create datasource classes
         for type_info in db_types:
             datasource = self.create_datasource_class(type_info)
@@ -166,4 +272,6 @@ class ContextGenerator(CodeGenerator):
 
         # Create and format the complete module
         module = self.create_module(body)
+
+        print(ast.unparse(module))
         return format_code(module)

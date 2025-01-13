@@ -1,34 +1,32 @@
 import ast
 import logging
-from typing import Tuple, List, TypeVar, cast
-from graphql import (
-    GraphQLObjectType,
-    GraphQLInputObjectType,
-    GraphQLInterfaceType,
-)
+from typing import List, cast
 
 from cannula.format import format_code
-from cannula.codegen.base import (
+from cannula.utils import (
+    ELLIPSIS,
     ast_for_annotation_assignment,
-    ast_for_argument,
     ast_for_assign,
-    ast_for_class_field,
     ast_for_constant,
     ast_for_docstring,
-    ast_for_function_body,
     ast_for_import_from,
     ast_for_keyword,
     ast_for_name,
     ast_for_single_subscript,
-    ast_for_union_subscript,
 )
-from cannula.types import Argument, Field, UnionType
-from cannula.codegen.schema_analyzer import CodeGenerator, TypeInfo
+from cannula.types import Field
+from cannula.codegen.schema_analyzer import CodeGenerator, ObjectType
 
 LOG = logging.getLogger(__name__)
 
 
-T = TypeVar("T")
+def ast_for_function_body(field: Field) -> list[ast.stmt]:
+    body: list[ast.stmt] = []
+    if field.description:
+        body.append(ast_for_docstring(field.description))
+
+    body.append(ELLIPSIS)
+    return body
 
 
 class PythonCodeGenerator(CodeGenerator):
@@ -36,29 +34,8 @@ class PythonCodeGenerator(CodeGenerator):
 
     use_pydantic: bool
 
-    def render_function_args_ast(
-        self,
-        args: list[Argument],
-    ) -> Tuple[list[ast.arg], list[ast.arg], list[ast.expr | None]]:
-        """
-        Render function arguments as AST nodes.
-        """
-        pos_args_ast: list[ast.arg] = [
-            ast_for_argument(arg) for arg in args if arg.required
-        ]
-        kwonly_args_ast: list[ast.arg] = [
-            ast_for_argument(arg) for arg in args if not arg.required
-        ]
-        defaults: list[ast.expr | None] = [
-            ast_for_constant(arg.default) for arg in args if not arg.required
-        ]
-        return pos_args_ast, kwonly_args_ast, defaults
-
-    def render_computed_field(
-        self, field: Field, parent_type: str
-    ) -> ast.AsyncFunctionDef:
+    def render_computed_field(self, field: Field) -> ast.AsyncFunctionDef:
         """Create an AST node for a computed field method"""
-        pos_args, kwonlyargs, defaults = self.render_function_args_ast(field.args)
         args = [
             ast.arg("self"),
             ast.arg(
@@ -67,15 +44,15 @@ class PythonCodeGenerator(CodeGenerator):
                     ast_for_name("ResolveInfo"), ast_for_constant("Context")
                 ),
             ),
-            *pos_args,
+            *field.positional_args,
         ]
 
         args_node = ast.arguments(
             args=args,
             vararg=None,
             posonlyargs=[],
-            kwonlyargs=kwonlyargs,
-            kw_defaults=defaults,
+            kwonlyargs=field.kwonlyargs,
+            kw_defaults=field.kwdefaults,
             kwarg=None,
             defaults=[],
         )
@@ -89,68 +66,32 @@ class PythonCodeGenerator(CodeGenerator):
             type_params=[],
         )
 
-    def render_interface_type(
-        self, type_info: TypeInfo[GraphQLInterfaceType]
-    ) -> list[ast.stmt]:
-        """Create AST nodes for an interface type"""
-        # Create class body
-        body: list[ast.stmt] = []
-        if type_info.description:
-            body.append(ast_for_docstring(type_info.description))
-
-        # Add fields as stmts
-        body.extend(
-            cast(list[ast.stmt], [ast_for_class_field(f) for f in type_info.fields])
-        )
-
-        return [
-            cast(
-                ast.stmt,
-                ast.ClassDef(
-                    name=type_info.py_type,
-                    bases=[ast_for_name("Protocol")],
-                    keywords=[],
-                    body=body,
-                    decorator_list=[],
-                    type_params=[],
-                ),
-            )
-        ]
-
     def render_object_type(
         self,
-        type_info: TypeInfo[GraphQLObjectType],
+        type_info: ObjectType,
         use_pydantic: bool,
     ) -> list[ast.stmt]:
         """Create AST nodes for an object type"""
-        computed_fields = [f for f in type_info.fields if f.is_computed]
-        normal_fields = [f for f in type_info.fields if not f.is_computed]
-
         # Create class body
         body: list[ast.stmt] = []
         if type_info.description:
             body.append(ast_for_docstring(type_info.description))
 
         # Add type definition as stmt
-        body.append(
-            cast(
-                ast.stmt, ast_for_assign("__typename", ast_for_constant(type_info.name))
-            )
-        )
+        type_def = ast_for_assign("__typename", ast_for_constant(type_info.name))
+        body.append(type_def)
 
-        # Add fields as stmts
-        body.extend(
-            cast(list[ast.stmt], [ast_for_class_field(f) for f in normal_fields])
-        )
-        body.extend(
-            cast(
-                list[ast.stmt],
-                [
-                    self.render_computed_field(f, type_info.name)
-                    for f in computed_fields
-                ],
-            )
-        )
+        # Render non-computed as class vars and add them to body first
+        normal_fields: list[ast.stmt] = [
+            f.as_class_var for f in type_info.fields if not f.is_computed
+        ]
+        body.extend(normal_fields)
+
+        # Render computed fields as functions and add them at end of body
+        computed_fields: list[ast.stmt] = [
+            self.render_computed_field(f) for f in type_info.fields if f.is_computed
+        ]
+        body.extend(computed_fields)
 
         base_class = "BaseModel" if use_pydantic else "ABC"
         decorators: list[ast.expr] = []
@@ -177,54 +118,10 @@ class PythonCodeGenerator(CodeGenerator):
             )
         ]
 
-    def render_union_type(self, type_info: UnionType) -> list[ast.stmt]:
-        """Create AST nodes for a union type"""
-        member_types = [t.safe_value for t in type_info.types]
-        return [
-            cast(
-                ast.stmt,
-                ast_for_assign(
-                    type_info.name,
-                    ast_for_union_subscript(*member_types),
-                ),
-            )
-        ]
-
-    def render_input_type(
-        self, type_info: TypeInfo[GraphQLInputObjectType]
-    ) -> list[ast.stmt]:
-        """Create AST nodes for an input type"""
-        body: list[ast.stmt] = [
-            cast(
-                ast.stmt,
-                ast_for_annotation_assignment(
-                    f.name,
-                    # For input types we need to include all fields as required
-                    # since the resolver will fill in the default values if not provided
-                    annotation=ast_for_name(f.field_type.safe_value),
-                ),
-            )
-            for f in type_info.fields
-        ]
-
-        return [
-            cast(
-                ast.stmt,
-                ast.ClassDef(
-                    name=type_info.py_type,
-                    bases=[ast_for_name("TypedDict")],
-                    keywords=[],
-                    body=body,
-                    decorator_list=[],
-                    type_params=[],
-                ),
-            )
-        ]
-
     def ast_for_operation(self, field: Field) -> ast.ClassDef:
         func = self.render_operation_field_ast(field)
         return ast.ClassDef(
-            name=field.func_name,
+            name=field.operation_name,
             body=[func],
             bases=[ast_for_name("Protocol")],
             keywords=[],
@@ -236,7 +133,6 @@ class PythonCodeGenerator(CodeGenerator):
         """
         Render a computed field as an AST node for a function definition.
         """
-        pos_args, kwonlyargs, defaults = self.render_function_args_ast(field.args)
         args = [
             ast.arg("self"),
             ast.arg(
@@ -245,14 +141,14 @@ class PythonCodeGenerator(CodeGenerator):
                     ast_for_name("ResolveInfo"), ast_for_constant("Context")
                 ),
             ),
-            *pos_args,
+            *field.positional_args,
         ]
         args_node = ast.arguments(
             args=args,
             vararg=None,
             posonlyargs=[],
-            kwonlyargs=kwonlyargs,
-            kw_defaults=defaults,
+            kwonlyargs=field.kwonlyargs,
+            kw_defaults=field.kwdefaults,
             kwarg=None,
             defaults=[],
         )
@@ -318,17 +214,17 @@ class PythonCodeGenerator(CodeGenerator):
 
         # Generate code for each type
         for interface in self.analyzer.interface_types:
-            body.extend(cast(list[ast.stmt], self.render_interface_type(interface)))
+            body.append(interface.as_ast)
 
         for input_type in self.analyzer.input_types:
-            body.extend(cast(list[ast.stmt], self.render_input_type(input_type)))
+            body.append(input_type.as_ast)
 
         for obj_type in self.analyzer.object_types:
             obj = self.render_object_type(obj_type, use_pydantic)
             body.extend(cast(list[ast.stmt], obj))
 
         for union_type in self.analyzer.union_types:
-            body.extend(cast(list[ast.stmt], self.render_union_type(union_type)))
+            body.append(union_type.as_ast)
 
         # Generate operation types
         body.extend(cast(list[ast.stmt], self.render_operation_types()))

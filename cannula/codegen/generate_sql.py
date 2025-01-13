@@ -1,8 +1,7 @@
-from typing import Any, Dict, List, Set
+from typing import Any, Dict, List
 import ast
 
-from graphql import GraphQLObjectType
-from cannula.codegen.base import (
+from cannula.utils import (
     PASS,
     ast_for_annotation_assignment,
     ast_for_assign,
@@ -11,7 +10,7 @@ from cannula.codegen.base import (
     ast_for_name,
     ast_for_subscript,
 )
-from cannula.codegen.schema_analyzer import TypeInfo, CodeGenerator
+from cannula.codegen.schema_analyzer import ObjectType, CodeGenerator
 from cannula.format import format_code
 from cannula.types import Field
 
@@ -26,7 +25,7 @@ class SQLAlchemyGenerator(CodeGenerator):
     """Generates SQLAlchemy models from GraphQL schema."""
 
     def validate_relationship_metadata(
-        self, field: Field, type_info: TypeInfo[GraphQLObjectType]
+        self, field: Field, type_info: ObjectType
     ) -> None:
         """Validate basic structure of relationship metadata."""
         if not field.metadata.get("relation"):
@@ -37,14 +36,6 @@ class SQLAlchemyGenerator(CodeGenerator):
             raise SchemaValidationError(
                 f"Relation metadata for {type_info.name}.{field.name} must be a dictionary"
             )
-
-    def get_db_table_types(self) -> Set[str]:
-        """Get all types that have db_table metadata."""
-        return {
-            type_info.db_type
-            for type_info in self.analyzer.object_types
-            if "db_table" in type_info.metadata
-        }
 
     def validate_field_metadata(
         self, field_name: str, is_required: bool, metadata: Dict[str, Any]
@@ -59,9 +50,7 @@ class SQLAlchemyGenerator(CodeGenerator):
                 "or update the GraphQL schema."
             )
 
-    def get_primary_key_fields(
-        self, type_info: TypeInfo[GraphQLObjectType]
-    ) -> List[str]:
+    def get_primary_key_fields(self, type_info: ObjectType) -> List[str]:
         """Get list of field names that are marked as primary keys."""
         primary_keys = []
         for field in type_info.fields:
@@ -154,7 +143,7 @@ class SQLAlchemyGenerator(CodeGenerator):
         return args, keywords
 
     def create_field_definition(
-        self, field: Field, type_info: TypeInfo[GraphQLObjectType]
+        self, field: Field, type_info: ObjectType
     ) -> ast.AnnAssign:
         """Create field definition AST node based on field type and metadata."""
         # Validate relationship metadata if present
@@ -189,9 +178,7 @@ class SQLAlchemyGenerator(CodeGenerator):
             ),
         )
 
-    def create_model_class(
-        self, type_info: TypeInfo[GraphQLObjectType]
-    ) -> ast.ClassDef:
+    def create_model_class(self, type_info: ObjectType) -> ast.ClassDef:
         """Create an AST ClassDef node for a SQLAlchemy model."""
         # Check for multiple primary keys
         primary_keys = self.get_primary_key_fields(type_info)
@@ -239,7 +226,7 @@ class SQLAlchemyGenerator(CodeGenerator):
 
     def validate_relationships(self) -> None:
         """Validate that relationships reference valid database tables and have proper foreign keys."""
-        db_tables = self.get_db_table_types()
+        db_tables = [t.db_type for t in self.get_db_types()]
 
         for type_info in self.analyzer.object_types:
             if "db_table" not in type_info.metadata:
@@ -297,7 +284,7 @@ class SQLAlchemyGenerator(CodeGenerator):
 
     def generate(self) -> str:
         """Generate SQLAlchemy models from the schema."""
-        db_tables = self.get_db_table_types()
+        db_tables = self.get_db_types()
         if not db_tables:
             return ""
 
