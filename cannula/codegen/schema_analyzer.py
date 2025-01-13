@@ -83,6 +83,9 @@ class SchemaAnalyzer:
 
     def _analyze(self) -> None:
         """Analyze schema and categorize types"""
+        self.forward_relations: DefaultDict[str, list[Field]] = collections.defaultdict(
+            list
+        )
         self.object_types: List[ObjectType] = []
         self.interface_types: List[InterfaceType] = []
         self.input_types: List[InputType] = []
@@ -93,19 +96,15 @@ class SchemaAnalyzer:
         self.object_types_by_name: Dict[str, ObjectType] = {}
 
         for name, type_def in self.schema.type_map.items():
-            is_operation = name in ("Query", "Mutation", "Subscription")
             is_private = name.startswith("__")
 
             if is_private:
                 continue
-            elif is_operation:
-                type_def = cast(GraphQLObjectType, type_def)
-                type_info = self.parse_object(type_def)
-                self.operation_types.append(type_info)
-                self.operation_fields.extend(type_info.fields)
             elif is_object_type(type_def):
                 type_def = cast(GraphQLObjectType, type_def)
-                self.object_types.append(self.parse_object(type_def))
+                object_type = self.parse_object(type_def)
+                self.get_forward_references(object_type)
+                self.object_types_by_name[name] = object_type
             elif is_interface_type(type_def):
                 type_def = cast(GraphQLInterfaceType, type_def)
                 self.interface_types.append(self.parse_interface(type_def))
@@ -116,6 +115,15 @@ class SchemaAnalyzer:
                 type_def = cast(GraphQLUnionType, type_def)
                 self.union_types.append(self.parse_union(type_def))
 
+        # Parse relations
+        for name, obj in self.object_types_by_name.items():
+            # TODO parse again with forward relations
+            if name in ("Query", "Mutation", "Subscription"):
+                self.operation_types.append(obj)
+                self.operation_fields.extend(obj.fields)
+            else:
+                self.object_types.append(obj)
+
         # Sort types and fields
         self.input_types.sort(key=lambda o: o.name)
         self.interface_types.sort(key=lambda o: o.name)
@@ -124,7 +132,6 @@ class SchemaAnalyzer:
         self.operation_types.sort(key=lambda o: o.name)
         self.union_types.sort(key=lambda o: o.name)
         self.object_types_by_name = {t.py_type: t for t in self.object_types}
-        self.forward_references = self.get_forward_references()
 
     def parse_union(self, node: GraphQLUnionType) -> UnionType:
         """Parse a GraphQL Union type into a UnionType object"""
@@ -202,15 +209,10 @@ class SchemaAnalyzer:
             directives=directives,
         )
 
-    def get_forward_references(self) -> DefaultDict[str, list[Field]]:
-        # First parse the db_types and add forward reference to relations
-        forward_relations: DefaultDict[str, list[Field]] = collections.defaultdict(list)
-        for type_info in self.object_types:
-            for field in type_info.fields:
-                if field.relation and field.field_type.is_object_type:
-                    forward_relations[field.field_type.of_type].append(field)
-
-        return forward_relations
+    def get_forward_references(self, object_type: ObjectType) -> None:
+        for field in object_type.fields:
+            if field.relation and field.field_type.is_object_type:
+                self.forward_relations[field.field_type.of_type].append(field)
 
 
 class CodeGenerator(ABC):
