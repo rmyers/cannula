@@ -7,9 +7,8 @@ database-backed type in the schema.
 """
 
 import ast
-import collections
 from pprint import pprint
-from typing import DefaultDict, List
+from typing import List
 
 from cannula.codegen.schema_analyzer import CodeGenerator, ObjectType
 from cannula.format import format_code
@@ -82,7 +81,7 @@ class ContextGenerator(CodeGenerator):
             body=method_body,
             decorator_list=[],
             returns=ast_for_name(related_field.type),
-            type_params=[],
+            type_params=[],  # type: ignore
         )
 
     def create_datasource_class(self, type_info: ObjectType) -> ast.ClassDef:
@@ -165,7 +164,7 @@ class ContextGenerator(CodeGenerator):
             keywords=keywords,
             body=body,
             decorator_list=[],
-            type_params=[],
+            type_params=[],  # type: ignore
         )
 
     def create_context_class(self, db_types: List[ObjectType]) -> ast.ClassDef:
@@ -222,7 +221,7 @@ class ContextGenerator(CodeGenerator):
             body=init_body,
             decorator_list=[],
             returns=None,
-            type_params=[],
+            type_params=[],  # type: ignore
         )
 
         return ast.ClassDef(
@@ -231,7 +230,7 @@ class ContextGenerator(CodeGenerator):
             keywords=[],
             body=[*annotations, init_method],
             decorator_list=[],
-            type_params=[],
+            type_params=[],  # type: ignore
         )
 
     def generate(self) -> str:
@@ -252,14 +251,6 @@ class ContextGenerator(CodeGenerator):
             ]
         )
 
-        # First parse the db_types and add forward reference to relations
-        forward_relations: DefaultDict[str, list[Field]] = collections.defaultdict(list)
-        for type_info in self.analyzer.object_types:
-            for field in type_info.fields:
-                if field.relation and field.field_type.is_object_type:
-                    forward_relations[field.field_type.of_type].append(field)
-
-        pprint(forward_relations)
         pprint(self.analyzer.object_types_by_name)
         # Create datasource classes
         for type_info in db_types:

@@ -28,11 +28,7 @@ class User(ABC):
     id: UUID
     name: Optional[str] = None
     email: Optional[str] = None
-
-    @abstractmethod
-    async def quota(
-        self, info: ResolveInfo["Context"]
-    ) -> Optional[Sequence[Quota]]: ...
+    quota: Optional[Sequence[Quota]] = None
 
     @abstractmethod
     async def overQuota(

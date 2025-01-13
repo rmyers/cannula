@@ -32,7 +32,7 @@ from graphql import (
     is_union_type,
 )
 
-from cannula.codegen.parse_args import parse_field_arguments
+from cannula.codegen.parse_args import parse_field_arguments, parse_related_args
 from cannula.codegen.parse_type import parse_graphql_type
 from cannula.types import Field, InputType, InterfaceType, ObjectType, UnionType
 from cannula.utils import ast_for_import_from
@@ -117,6 +117,7 @@ class SchemaAnalyzer:
 
         # Parse relations
         for name, obj in self.object_types_by_name.items():
+            obj.related_fields = self.forward_relations.get(name, [])
             # TODO parse again with forward relations
             if name in ("Query", "Mutation", "Subscription"):
                 self.operation_types.append(obj)
@@ -189,23 +190,31 @@ class SchemaAnalyzer:
             self.get_field(
                 field_name=field_name,
                 field_def=field_def,
-                parent=node.name,
+                parent=node,
             )
             for field_name, field_def in node.fields.items()
         ]
 
-    def get_field(self, field_name: str, field_def: GraphQLField, parent: str) -> Field:
+    def get_field(
+        self,
+        field_name: str,
+        field_def: GraphQLField,
+        parent: GraphQLObjectType | GraphQLInputObjectType | GraphQLInterfaceType,
+    ) -> Field:
         field_type = parse_graphql_type(field_def.type)
-        metadata = self.extensions.get_field_metadata(parent, field_name)
+        metadata = self.extensions.get_field_metadata(parent.name, field_name)
         directives = metadata.get("directives", [])
+        meta = metadata.get("metadata", {})
         args = parse_field_arguments(field_def)
+        related_args = parse_related_args(field_name, meta, parent)
         return Field.from_field(
             name=field_name,
             field=field_def,
             metadata=metadata,
-            parent=parent,
+            parent=parent.name,
             field_type=field_type,
             args=args,
+            related_args=related_args,
             directives=directives,
         )
 

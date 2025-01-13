@@ -71,6 +71,7 @@ class Field:
     field_type: FieldType
     description: typing.Optional[str]
     args: typing.List[Argument]
+    related_args: typing.List[Argument] = dataclasses.field(default_factory=list)
     directives: typing.List[Directive] = dataclasses.field(default_factory=list)
     default: typing.Any = None
     computed: bool = False
@@ -84,9 +85,11 @@ class Field:
         field_type: FieldType,
         metadata: typing.Dict[str, typing.Any],
         args: typing.Optional[typing.List[Argument]] = None,
+        related_args: typing.Optional[typing.List[Argument]] = None,
         directives: typing.Optional[typing.List[Directive]] = None,
     ) -> "Field":
         args = args or []
+        related_args = related_args or []
         meta = metadata.get("metadata", {})
         return cls(
             field=field,
@@ -97,6 +100,7 @@ class Field:
             description=metadata.get("description"),
             computed=meta.get("computed", False),
             args=args,
+            related_args=related_args,
             directives=directives or [],
         )
 
@@ -199,6 +203,7 @@ class ObjectType:
     py_type: str
     metadata: typing.Dict[str, typing.Any]
     fields: list[Field]
+    related_fields: list[Field] = dataclasses.field(default_factory=list)
     description: typing.Optional[str] = None
 
     @property
@@ -240,7 +245,7 @@ class InterfaceType:
             keywords=[],
             body=body,
             decorator_list=[],
-            type_params=[],
+            type_params=[],  # type: ignore
         )
 
 
@@ -285,7 +290,7 @@ class InputType:
             keywords=[],
             body=body,
             decorator_list=[],
-            type_params=[],
+            type_params=[],  # type: ignore
         )
 
 

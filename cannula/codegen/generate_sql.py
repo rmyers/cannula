@@ -11,14 +11,9 @@ from cannula.utils import (
     ast_for_subscript,
 )
 from cannula.codegen.schema_analyzer import ObjectType, CodeGenerator
+from cannula.errors import SchemaValidationError
 from cannula.format import format_code
 from cannula.types import Field
-
-
-class SchemaValidationError(Exception):
-    """Raised when the GraphQL schema metadata is invalid for SQLAlchemy model generation."""
-
-    pass
 
 
 class SQLAlchemyGenerator(CodeGenerator):
@@ -221,7 +216,7 @@ class SQLAlchemyGenerator(CodeGenerator):
             keywords=[],
             body=body,
             decorator_list=[],
-            type_params=[],
+            type_params=[],  # type: ignore
         )
 
     def validate_relationships(self) -> None:
@@ -296,7 +291,7 @@ class SQLAlchemyGenerator(CodeGenerator):
                 keywords=[],
                 body=[PASS],
                 decorator_list=[],
-                type_params=[],
+                type_params=[],  # type: ignore
             )
         ]
 

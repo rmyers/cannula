@@ -1,7 +1,7 @@
 from __future__ import annotations
 from sqlalchemy import ForeignKey
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
-from typing import Optional
+from typing import Optional, Sequence
 from uuid import UUID
 
 
@@ -14,7 +14,7 @@ class DBQuota(Base):
     user_id: Mapped[UUID] = mapped_column(
         foreign_key=ForeignKey("users.id"), nullable=False
     )
-    user: Mapped[DBUser] = relationship("DBUser", cascade="all")
+    user: Mapped[DBUser] = relationship("DBUser", back_populates="quota")
     resource: Mapped[Optional[str]] = mapped_column(nullable=True)
     limit: Mapped[Optional[int]] = mapped_column(nullable=True)
     count: Mapped[Optional[int]] = mapped_column(nullable=True)
@@ -27,3 +27,4 @@ class DBUser(Base):
     id: Mapped[UUID] = mapped_column(primary_key=True)
     name: Mapped[Optional[str]] = mapped_column(nullable=True)
     email: Mapped[Optional[str]] = mapped_column(nullable=True)
+    quota: Mapped[Optional[Sequence[Quota]]] = mapped_column(nullable=True)

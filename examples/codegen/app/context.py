@@ -1,7 +1,10 @@
 from __future__ import annotations
 from cannula.context import Context as BaseContext
 from cannula.datasource.orm import DatabaseRepository
+from sqlalchemy import column
 from sqlalchemy.ext.asyncio import async_sessionmaker
+from typing import Optional, Sequence
+from uuid import UUID
 from .sql import DBQuota, DBUser
 from .types import Quota, User
 
@@ -9,7 +12,9 @@ from .types import Quota, User
 class QuotaDatasource(
     DatabaseRepository[DBQuota, Quota], graph_model=Quota, db_model=DBQuota
 ):
-    pass
+
+    async def user_quota(self, user_id: UUID) -> Optional[Sequence[Quota]]:
+        return await self.get_models(column("user_id") == user_id)
 
 
 class UserDatasource(

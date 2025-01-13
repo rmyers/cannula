@@ -12,7 +12,7 @@ type User {
   id: UUID!
   name: String
   email: String
-  "@metadata(computed: true)"
+  "@metadata(args: id)"
   quota: [Quota!]
   overQuota(resource: String!): Quota
 }
@@ -26,7 +26,7 @@ type Quota {
   ---
   metadata:
     relation:
-       cascade: "all"
+       back_populates: quota
   """
   user: User
   resource: String

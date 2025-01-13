@@ -1,12 +1,16 @@
-from typing import Any
+from typing import Any, Dict, List, cast
 from graphql import (
     GraphQLArgument,
     GraphQLField,
+    GraphQLInputObjectType,
+    GraphQLInterfaceType,
+    GraphQLObjectType,
     Undefined,
 )
 
-from .parse_type import parse_graphql_type
-from ..types import Argument
+from cannula.codegen.parse_type import parse_graphql_type
+from cannula.errors import SchemaValidationError
+from cannula.types import Argument
 
 
 def parse_default_value(arg: GraphQLArgument, field_type: str) -> Any:
@@ -69,3 +73,24 @@ def parse_field_arguments(field: GraphQLField) -> list[Argument]:
         )
 
     return sorted(arguments, key=lambda x: x.name)
+
+
+def parse_related_args(
+    field: str,
+    field_metadata: Dict[str, Any],
+    parent: GraphQLObjectType | GraphQLInputObjectType | GraphQLInterfaceType,
+) -> List[Argument]:
+    related_args: list[Argument] = []
+    metadata_args = field_metadata.get("args", [])
+    if isinstance(metadata_args, str):
+        metadata_args = metadata_args.split(",")
+
+    for arg in metadata_args:
+        arg_field = cast(GraphQLField, parent.fields.get(arg))
+        if arg_field is None:
+            raise SchemaValidationError(
+                f"Field {field} Metadata Arg: {arg} not found on {parent.name}"
+            )
+        arg_type = parse_graphql_type(arg_field.type)
+        related_args.append(Argument(arg, type=arg_type, required=True))
+    return related_args
