@@ -1,6 +1,6 @@
 import ast
 import logging
-from typing import List, TypeVar, cast
+from typing import List, cast
 
 from cannula.format import format_code
 from cannula.utils import (
@@ -15,12 +15,9 @@ from cannula.utils import (
     ast_for_single_subscript,
 )
 from cannula.types import Field
-from cannula.codegen.schema_analyzer import CodeGenerator, TypeInfo
+from cannula.codegen.schema_analyzer import CodeGenerator, ObjectType
 
 LOG = logging.getLogger(__name__)
-
-
-T = TypeVar("T")
 
 
 def ast_for_function_body(field: Field) -> list[ast.stmt]:
@@ -71,7 +68,7 @@ class PythonCodeGenerator(CodeGenerator):
 
     def render_object_type(
         self,
-        type_info: TypeInfo,
+        type_info: ObjectType,
         use_pydantic: bool,
     ) -> list[ast.stmt]:
         """Create AST nodes for an object type"""

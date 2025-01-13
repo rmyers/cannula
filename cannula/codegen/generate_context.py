@@ -11,7 +11,7 @@ import collections
 from pprint import pprint
 from typing import DefaultDict, List
 
-from cannula.codegen.schema_analyzer import CodeGenerator, TypeInfo
+from cannula.codegen.schema_analyzer import CodeGenerator, ObjectType
 from cannula.format import format_code
 from cannula.types import Field
 from cannula.utils import (
@@ -85,7 +85,7 @@ class ContextGenerator(CodeGenerator):
             type_params=[],
         )
 
-    def create_datasource_class(self, type_info: TypeInfo) -> ast.ClassDef:
+    def create_datasource_class(self, type_info: ObjectType) -> ast.ClassDef:
         """Create a datasource class for a specific type"""
         # Get the type names
         graph_type = type_info.py_type
@@ -168,7 +168,7 @@ class ContextGenerator(CodeGenerator):
             type_params=[],
         )
 
-    def create_context_class(self, db_types: List[TypeInfo]) -> ast.ClassDef:
+    def create_context_class(self, db_types: List[ObjectType]) -> ast.ClassDef:
         """Create the main Context class"""
         # Create __init__ method
         init_body: List[ast.stmt] = []

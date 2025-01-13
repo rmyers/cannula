@@ -73,7 +73,7 @@ class SchemaExtension:
 
 
 @dataclass
-class TypeInfo:
+class ObjectType:
     """Container for type information and metadata"""
 
     type_def: GraphQLObjectType
@@ -110,14 +110,14 @@ class SchemaAnalyzer:
 
     def _analyze(self) -> None:
         """Analyze schema and categorize types"""
-        self.object_types: List[TypeInfo] = []
+        self.object_types: List[ObjectType] = []
         self.interface_types: List[InterfaceType] = []
         self.input_types: List[InputType] = []
         self.union_types: List[UnionType] = []
-        self.operation_types: List[TypeInfo] = []
+        self.operation_types: List[ObjectType] = []
         self.operation_fields: List[Field] = []
         # Add helper to access object types by name
-        self.object_types_by_name: Dict[str, TypeInfo] = {}
+        self.object_types_by_name: Dict[str, ObjectType] = {}
 
         for name, type_def in self.schema.type_map.items():
             is_operation = name in ("Query", "Mutation", "Subscription")
@@ -226,11 +226,11 @@ class SchemaAnalyzer:
 
         return forward_relations
 
-    def get_type_info(self, gql_type: GraphQLObjectType) -> TypeInfo:
+    def get_type_info(self, gql_type: GraphQLObjectType) -> ObjectType:
         """Get type information for a specific type"""
         metadata = self.extensions.get_type_metadata(gql_type.name)
 
-        return TypeInfo(
+        return ObjectType(
             type_def=gql_type,
             name=gql_type.name,
             py_type=gql_type.extensions.get("py_type", gql_type.name),
@@ -248,7 +248,7 @@ class CodeGenerator(ABC):
         self.schema = analyzer.schema
         self.imports = analyzer.extensions.imports
 
-    def get_db_types(self) -> List[TypeInfo]:
+    def get_db_types(self) -> List[ObjectType]:
         """Get all types that have db_table metadata"""
         return [
             type_info

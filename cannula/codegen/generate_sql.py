@@ -10,7 +10,7 @@ from cannula.utils import (
     ast_for_name,
     ast_for_subscript,
 )
-from cannula.codegen.schema_analyzer import TypeInfo, CodeGenerator
+from cannula.codegen.schema_analyzer import ObjectType, CodeGenerator
 from cannula.format import format_code
 from cannula.types import Field
 
@@ -24,7 +24,9 @@ class SchemaValidationError(Exception):
 class SQLAlchemyGenerator(CodeGenerator):
     """Generates SQLAlchemy models from GraphQL schema."""
 
-    def validate_relationship_metadata(self, field: Field, type_info: TypeInfo) -> None:
+    def validate_relationship_metadata(
+        self, field: Field, type_info: ObjectType
+    ) -> None:
         """Validate basic structure of relationship metadata."""
         if not field.metadata.get("relation"):
             return
@@ -48,7 +50,7 @@ class SQLAlchemyGenerator(CodeGenerator):
                 "or update the GraphQL schema."
             )
 
-    def get_primary_key_fields(self, type_info: TypeInfo) -> List[str]:
+    def get_primary_key_fields(self, type_info: ObjectType) -> List[str]:
         """Get list of field names that are marked as primary keys."""
         primary_keys = []
         for field in type_info.fields:
@@ -141,7 +143,7 @@ class SQLAlchemyGenerator(CodeGenerator):
         return args, keywords
 
     def create_field_definition(
-        self, field: Field, type_info: TypeInfo
+        self, field: Field, type_info: ObjectType
     ) -> ast.AnnAssign:
         """Create field definition AST node based on field type and metadata."""
         # Validate relationship metadata if present
@@ -176,7 +178,7 @@ class SQLAlchemyGenerator(CodeGenerator):
             ),
         )
 
-    def create_model_class(self, type_info: TypeInfo) -> ast.ClassDef:
+    def create_model_class(self, type_info: ObjectType) -> ast.ClassDef:
         """Create an AST ClassDef node for a SQLAlchemy model."""
         # Check for multiple primary keys
         primary_keys = self.get_primary_key_fields(type_info)

@@ -2,7 +2,7 @@ import pytest
 from typing import Dict, Any, Optional
 from graphql import GraphQLObjectType
 
-from cannula.codegen.schema_analyzer import TypeInfo
+from cannula.codegen.schema_analyzer import ObjectType
 
 
 # Helper function to create GraphQLObjectType for testing
@@ -25,7 +25,7 @@ def test_is_db_type(
     name: str, py_type: str, metadata: Dict[str, Any], expected_is_db_type: bool
 ):
     type_def = create_graphql_type(name=name)
-    type_info = TypeInfo(
+    type_info = ObjectType(
         type_def=type_def, name=name, py_type=py_type, metadata=metadata, fields=[]
     )
     assert type_info.is_db_type == expected_is_db_type
@@ -42,7 +42,7 @@ def test_is_db_type(
 )
 def test_db_type(name: str, type_extensions: Dict[str, Any], expected_db_type: str):
     type_def = create_graphql_type(name=name, extensions=type_extensions)
-    type_info = TypeInfo(
+    type_info = ObjectType(
         type_def=type_def, name=name, py_type=name, metadata={}, fields=[]
     )
     assert type_info.db_type == expected_db_type
@@ -52,7 +52,7 @@ def test_typeinfo_full_initialization():
     """Test full initialization of TypeInfo with all fields"""
     type_def = create_graphql_type(name="User")
 
-    type_info = TypeInfo(
+    type_info = ObjectType(
         type_def=type_def,
         name="User",
         py_type="UserType",
