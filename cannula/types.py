@@ -55,6 +55,18 @@ class Argument:
     def as_keyword(self) -> ast.keyword:
         return ast.keyword(self.name, ast_for_name(self.name))
 
+    @property
+    def as_self_keyword(self) -> ast.keyword:
+        """Return a keyword arg that references an attribute lookup."""
+        return ast.keyword(
+            self.name,
+            ast.Attribute(
+                value=ast.Name(id="self", ctx=ast.Load()),
+                attr=self.name,
+                ctx=ast.Load(),
+            ),
+        )
+
 
 @dataclasses.dataclass
 class Directive:
@@ -75,6 +87,7 @@ class Field:
     directives: typing.List[Directive] = dataclasses.field(default_factory=list)
     default: typing.Any = None
     computed: bool = False
+    fk_field: typing.Optional["Field"] = None
 
     @classmethod
     def from_field(
@@ -84,24 +97,25 @@ class Field:
         field: GraphQLField,
         field_type: FieldType,
         metadata: typing.Dict[str, typing.Any],
+        description: typing.Optional[str] = None,
         args: typing.Optional[typing.List[Argument]] = None,
         related_args: typing.Optional[typing.List[Argument]] = None,
         directives: typing.Optional[typing.List[Directive]] = None,
+        fk_field: typing.Optional["Field"] = None,
     ) -> "Field":
         args = args or []
         related_args = related_args or []
-        meta = metadata.get("metadata", {})
         return cls(
             field=field,
-            metadata=meta,
+            metadata=metadata,
             parent=parent,
             name=name,
             field_type=field_type,
-            description=metadata.get("description"),
-            computed=meta.get("computed", False),
+            description=description,
             args=args,
             related_args=related_args,
             directives=directives or [],
+            fk_field=fk_field,
         )
 
     @property
@@ -125,7 +139,7 @@ class Field:
     @property
     def is_computed(self) -> bool:
         has_args = bool(self.args)
-        return has_args or self.computed
+        return has_args or self.field_type.is_object_type
 
     @property
     def relation(self) -> dict:
@@ -134,6 +148,12 @@ class Field:
     @property
     def relation_method(self) -> str:
         return f"{self.parent.lower()}_{self.name}"
+
+    @property
+    def relation_context_attr(self) -> str:
+        """Gets the context var for the related datasource"""
+        target = pluralize(self.field_type.of_type)
+        return f"info.context.{target}"
 
     @property
     def required_args(self) -> list[Argument]:
@@ -164,10 +184,25 @@ class Field:
 
         example::
 
-            def myfunction(field_arg, field_kwarg=None):
-                return external(field_arg=field_arg, field_kwarg=field_kwarg)
+            def myfunction(self, field_arg, field_kwarg=None):
+                return external(id=self.id, field_arg=field_arg, field_kwarg=field_kwarg)
         """
-        return [arg.as_keyword for arg in self.args]
+        related = [arg.as_self_keyword for arg in self.related_args]
+        defined_args = [arg.as_keyword for arg in self.args]
+        return related + defined_args
+
+    @property
+    def related_keywords(self) -> list[ast.keyword]:
+        """These are used in a function body to include related args in the query.
+
+        example::
+
+            def myfunction(self, id: str, field_arg: str):
+                return self.db_query(text('user_id = :id AND field :field_arg'), id=id, field_arg=field_arg)
+        """
+        related = [arg.as_keyword for arg in self.related_args]
+        defined_args = [arg.as_keyword for arg in self.args]
+        return related + defined_args
 
     @property
     def as_class_var(self) -> ast.AnnAssign:

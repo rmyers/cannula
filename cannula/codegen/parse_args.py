@@ -92,5 +92,5 @@ def parse_related_args(
                 f"Field {field} Metadata Arg: {arg} not found on {parent.name}"
             )
         arg_type = parse_graphql_type(arg_field.type)
-        related_args.append(Argument(arg, type=arg_type, required=True))
+        related_args.append(Argument(arg, type=arg_type.safe_value, required=True))
     return related_args

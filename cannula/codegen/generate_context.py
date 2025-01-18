@@ -7,8 +7,7 @@ database-backed type in the schema.
 """
 
 import ast
-from pprint import pprint
-from typing import List
+from typing import List, Optional
 
 from cannula.codegen.schema_analyzer import CodeGenerator, ObjectType
 from cannula.format import format_code
@@ -26,7 +25,61 @@ class ContextGenerator(CodeGenerator):
 
     def create_relation_method(
         self,
-        field: Field,
+        related_field: Field,
+        where_clause: str,
+    ) -> ast.AsyncFunctionDef:
+        """Create a method for fetching related objects"""
+        # For relations, we need the foreign key field as the first argument
+        args = [
+            ast.arg(arg="self"),
+            *[arg.as_ast for arg in related_field.related_args],
+            *related_field.positional_args,
+        ]
+
+        # Use the correct class method for fetching single or list of items
+        cls_method = "get_models" if related_field.field_type.is_list else "get_model"
+
+        method_body: list[ast.stmt] = [
+            ast.Return(
+                value=ast.Await(
+                    value=ast.Call(
+                        func=ast.Attribute(
+                            value=ast.Name(id="self", ctx=ast.Load()),
+                            attr=cls_method,
+                            ctx=ast.Load(),
+                        ),
+                        args=[
+                            ast.Call(
+                                func=ast_for_name("text"),
+                                args=[ast.Constant(where_clause)],
+                                keywords=[],
+                            ),
+                        ],
+                        keywords=related_field.related_keywords,
+                    )
+                )
+            )
+        ]
+
+        return ast.AsyncFunctionDef(
+            name=related_field.relation_method,
+            args=ast.arguments(
+                posonlyargs=[],
+                args=args,
+                kwonlyargs=[*related_field.kwonlyargs],
+                kw_defaults=related_field.kwdefaults,
+                defaults=[],
+                vararg=None,
+                kwarg=None,
+            ),
+            body=method_body,
+            decorator_list=[],
+            returns=ast_for_name(related_field.type),
+            type_params=[],  # type: ignore
+        )
+
+    def create_fk_relation_method(
+        self,
         related_field: Field,
         fk_field: Field,
     ) -> ast.AsyncFunctionDef:
@@ -61,7 +114,7 @@ class ContextGenerator(CodeGenerator):
                                 comparators=[ast_for_name(fk_field.name)],
                             ),
                         ],
-                        keywords=related_field.keywords,
+                        keywords=[],
                     )
                 )
             )
@@ -116,43 +169,27 @@ class ContextGenerator(CodeGenerator):
                 table_name = fk.split(".")[0]
                 fk_fields[table_name] = field
 
-        for field in type_info.fields:
-            if back_populates := field.relation.get("back_populates"):
+        for related_field in type_info.related_fields:
 
-                # Get the related type info
-                related_type_name = (
-                    field.field_type.of_type or field.field_type.safe_value
-                )
-                related_type = next(
-                    (
-                        t
-                        for t in self.analyzer.object_types
-                        if t.py_type == related_type_name
-                    ),
-                    None,
-                )
-                if related_type is None:
-                    continue
+            if parent := self.analyzer.object_types_by_name.get(related_field.parent):
+                db_table = parent.metadata.get("db_table", "___missing___")
 
-                related_field = next(
-                    (f for f in related_type.fields if f.name == back_populates),
-                    None,
-                )
-                if related_field is None:
-                    continue
-
-                table_name = related_type.metadata.get("db_table", "")
-                fk_field = fk_fields.get(table_name)
-                if fk_field is None:
-                    continue
-
-                body.append(
-                    self.create_relation_method(
-                        field=field,
-                        related_field=related_field,
-                        fk_field=fk_field,
+                if where_clause := related_field.metadata.get("where"):
+                    body.append(
+                        self.create_relation_method(
+                            related_field=related_field, where_clause=where_clause
+                        )
                     )
-                )
+
+                elif fk_field := fk_fields.get(db_table):
+                    print(related_field.fk_field)
+                    print(fk_field)
+                    body.append(
+                        self.create_fk_relation_method(
+                            related_field=related_field,
+                            fk_field=fk_field,
+                        )
+                    )
 
         # If no custom methods were added, add pass
         if not body:
@@ -251,7 +288,7 @@ class ContextGenerator(CodeGenerator):
             ]
         )
 
-        pprint(self.analyzer.object_types_by_name)
+        # pprint(self.analyzer.object_types_by_name)
         # Create datasource classes
         for type_info in db_types:
             datasource = self.create_datasource_class(type_info)

@@ -25,7 +25,6 @@ def ast_for_function_body(field: Field) -> list[ast.stmt]:
     if field.description:
         body.append(ast_for_docstring(field.description))
 
-    body.append(ELLIPSIS)
     return body
 
 
@@ -56,12 +55,29 @@ class PythonCodeGenerator(CodeGenerator):
             kwarg=None,
             defaults=[],
         )
+        body = ast_for_function_body(field)
+        body.append(
+            ast.Return(
+                value=ast.Await(
+                    value=ast.Call(
+                        func=ast.Attribute(
+                            value=ast_for_name(field.relation_context_attr),
+                            attr=field.relation_method,
+                            ctx=ast.Load(),
+                        ),
+                        args=[],
+                        keywords=field.keywords,
+                    )
+                )
+            )
+        )
 
         return ast.AsyncFunctionDef(
             name=field.name,
             args=args_node,
-            body=ast_for_function_body(field),
-            decorator_list=[ast.Name(id="abstractmethod", ctx=ast.Load())],
+            body=body,
+            decorator_list=[],
+            # decorator_list=[ast.Name(id="abstractmethod", ctx=ast.Load())],
             returns=ast.Name(id=field.type, ctx=ast.Load()),
             type_params=[],  # type: ignore
         )
@@ -152,10 +168,12 @@ class PythonCodeGenerator(CodeGenerator):
             kwarg=None,
             defaults=[],
         )
+        body = ast_for_function_body(field)
+        body.append(ELLIPSIS)
         func_node = ast.AsyncFunctionDef(
             name="__call__",
             args=args_node,
-            body=ast_for_function_body(field),
+            body=body,
             decorator_list=[],
             returns=ast.Name(id=field.type, ctx=ast.Load()),
             type_params=[],  # type: ignore
@@ -230,4 +248,5 @@ class PythonCodeGenerator(CodeGenerator):
         body.extend(cast(list[ast.stmt], self.render_operation_types()))
 
         module = self.create_module(body)
+        print(ast.unparse(module))
         return format_code(module)

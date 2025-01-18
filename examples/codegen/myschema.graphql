@@ -14,6 +14,13 @@ type User {
   email: String
   "@metadata(args: id)"
   quota: [Quota!]
+  """
+  ---
+  metadata:
+    where: "user_id = :id AND resource = :resource"
+    args:
+      - id
+  """
   overQuota(resource: String!): Quota
 }
 
@@ -27,6 +34,7 @@ type Quota {
   metadata:
     relation:
        back_populates: quota
+       where: user.id == :id
   """
   user: User
   resource: String

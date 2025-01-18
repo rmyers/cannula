@@ -1,5 +1,5 @@
 from __future__ import annotations
-from abc import ABC, abstractmethod
+from abc import ABC
 from cannula import ResolveInfo
 from dataclasses import dataclass
 from typing import Any, Optional, Protocol, Sequence, TYPE_CHECKING
@@ -21,12 +21,11 @@ class Book(ABC):
     name: Optional[str] = None
     author: Optional[str] = None
 
-    @abstractmethod
     async def movies(
         self, info: ResolveInfo["Context"], *, limit: int = 100
     ) -> Optional[Sequence[Movie]]:
         """Get all the movies for a given book. This is will be added to the BookType."""
-        ...
+        return await info.context.movies.book_movies(limit=limit)
 
 
 @dataclass(kw_only=True)
@@ -40,9 +39,11 @@ class Movie(ABC):
     __typename = "Movie"
     name: Optional[str] = None
     director: Optional[str] = None
-    book: Optional[Book] = None
     views: Optional[int] = None
     created: Optional[Any] = None
+
+    async def book(self, info: ResolveInfo["Context"]) -> Optional[Book]:
+        return await info.context.books.movie_book()
 
 
 class booksQuery(Protocol):
