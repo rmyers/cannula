@@ -24,6 +24,13 @@ type User {
     email: String!
     "@metadata(nullable: true, cache: false)"
     age: Int
+    """
+    User Projects
+    ---
+    metadata:
+        where: "author_id = :id"
+        args: id
+    """
     projects(limit: Int = 10): [Project]
     is_active: Boolean
 }
@@ -39,15 +46,6 @@ type Project {
     name: String!
     "@metadata(foreign_key: users.id)"
     author_id: ID!
-    """
-    Author of the project
-
-    ---
-    metadata:
-        relation:
-            back_populates: "projects"
-            cascade: "all, delete-orphan"
-    """
     author: User!
     description: String
     "@metadata(wieght: 1.5, fancy: $100)"
@@ -67,18 +65,24 @@ type RemoteResourceWithoutDB {
 )
 
 EXTENTIONS = gql(
-    """
+    '''
 extend type Query {
+    """
+    User by id
+    ---
+    metadata:
+        where: "id = :id"
+    """
     user(id: ID!): User
     projects(userId: ID!): [Project]
 }
-"""
+'''
 )
 
 EXPECTED = '''\
 from __future__ import annotations
 from sqlalchemy import ForeignKey
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from typing import Optional
 
 
@@ -94,9 +98,6 @@ class DBProject(Base):
     name: Mapped[str] = mapped_column(nullable=False)
     author_id: Mapped[str] = mapped_column(
         foreign_key=ForeignKey("users.id"), nullable=False
-    )
-    author: Mapped[DBUser] = relationship(
-        "DBUser", back_populates="projects", cascade="all, delete-orphan"
     )
     description: Mapped[Optional[str]] = mapped_column(nullable=True)
     is_active: Mapped[Optional[bool]] = mapped_column(nullable=True)
