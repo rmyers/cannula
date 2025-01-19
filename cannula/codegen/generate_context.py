@@ -91,6 +91,7 @@ class ContextGenerator(CodeGenerator):
             *related_field.positional_args,
         ]
 
+        print(related_field)
         # Use the correct class method for fetching single or list of items
         cls_method = "get_models" if related_field.field_type.is_list else "get_model"
 
@@ -170,6 +171,9 @@ class ContextGenerator(CodeGenerator):
                 fk_fields[table_name] = field
 
         for related_field in type_info.related_fields:
+            print(related_field)
+            print(related_field.fk_field)
+            print(fk_fields)
 
             if parent := self.analyzer.object_types_by_name.get(related_field.parent):
                 db_table = parent.metadata.get("db_table", "___missing___")
@@ -182,8 +186,6 @@ class ContextGenerator(CodeGenerator):
                     )
 
                 elif fk_field := fk_fields.get(db_table):
-                    print(related_field.fk_field)
-                    print(fk_field)
                     body.append(
                         self.create_fk_relation_method(
                             related_field=related_field,

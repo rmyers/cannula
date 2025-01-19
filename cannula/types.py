@@ -18,6 +18,7 @@ from cannula.utils import (
     ast_for_union_subscript,
     pluralize,
 )
+from cannula.errors import SchemaValidationError
 
 
 @dataclasses.dataclass
@@ -27,6 +28,10 @@ class FieldType:
     of_type: str = ""
     is_list: bool = False
     is_object_type: bool = False
+
+    def __repr__(self) -> str:
+        _type = self.of_type or self.safe_value
+        return f"[{_type}]" if self.is_list else _type
 
     @property
     def safe_value(self) -> str:
@@ -118,6 +123,9 @@ class Field:
             fk_field=fk_field,
         )
 
+    def __repr__(self) -> str:
+        return f"Field<{self.parent}.{self.name}>"
+
     @property
     def type(self) -> str:
         return self.field_type.type
@@ -147,6 +155,13 @@ class Field:
 
     @property
     def relation_method(self) -> str:
+        if self.fk_field is not None:
+            if self.field_type.is_list:
+                raise SchemaValidationError(
+                    f"{self} is related via {self.fk_field} but {self.field_type} is a list. "
+                    f"Either change the reponse type to be singular or provide 'where' and 'args' to retrieve data."
+                )
+            return "get_model_by_pk"
         return f"{self.parent.lower()}_{self.name}"
 
     @property

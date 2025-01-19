@@ -63,16 +63,16 @@ clean: ## Clean your local workspace
 
 test: flake8 unit ## Run the tests (flake8, unit)
 
-flake8: ## Run flake8 checks
+flake8: setup ## Run flake8 checks
 	$(VIRTUAL_ENV)/bin/flake8 cannula tests
 
-unit: ## Run unit tests
+unit: setup ## Run unit tests
 	$(VIRTUAL_ENV)/bin/pytest $(args)
 
-test-failed:  ## Run failing tests
+test-failed: setup ## Run failing tests
 	$(VIRTUAL_ENV)/bin/pytest --lf
 
-mypy: ## Run mypy on code
+mypy: setup ## Run mypy on code
 	$(VIRTUAL_ENV)/bin/mypy cannula
 
 .coverage: $(PYTHON_MODULES)

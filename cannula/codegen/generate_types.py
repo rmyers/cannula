@@ -56,6 +56,12 @@ class PythonCodeGenerator(CodeGenerator):
             defaults=[],
         )
         body = ast_for_function_body(field)
+
+        print(f"{field.parent}{field.name}")
+        print(field.fk_field)
+        call_args = []
+        if field.fk_field is not None and not field.keywords:
+            call_args.append(ast.arg(f"self.{field.fk_field.name}"))
         body.append(
             ast.Return(
                 value=ast.Await(
@@ -65,7 +71,7 @@ class PythonCodeGenerator(CodeGenerator):
                             attr=field.relation_method,
                             ctx=ast.Load(),
                         ),
-                        args=[],
+                        args=call_args,
                         keywords=field.keywords,
                     )
                 )
