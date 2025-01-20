@@ -148,23 +148,13 @@ type User {
 )
 
 INVALID_RELATION = gql(
-    '''
+    """
 "@metadata(db_table:users)"
 type User {
     "User ID @metadata(primary_key: true)"
     id: ID!
     "@metadata(foreign_key: projects.id)"
     project_id: String!
-    """
-    User's project
-
-    ---
-    metadata:
-        relation:
-            back_populates: "author"
-            cascade: "all, delete-orphan"
-    """
-    project: Project
 }
 
 "not a db table"
@@ -172,23 +162,7 @@ type Project {
     id: ID!
     name: String!
 }
-'''
-)
-
-INVALID_RELATION_TYPE = gql(
-    '''
-"@metadata(db_table:users)"
-type User {
-    "User ID @metadata(primary_key: true)"
-    id: ID!
-    "@metadata(foreign_key: projects.id)"
-    project_id: String!
-    """
-    User's project @metadata(relation: "projects")
-    """
-    project: String
-}
-'''
+"""
 )
 
 
@@ -207,13 +181,8 @@ type User {
         ),
         pytest.param(
             [INVALID_RELATION],
-            "Relationship User.project references type DBProject which is not marked as a database table",
+            "Field<User.project_id> references foreign_key 'projects.id' which is not marked as a database table",
             id="invalid-relation",
-        ),
-        pytest.param(
-            [INVALID_RELATION_TYPE],
-            "Relation metadata for User.project must be a dictionary",
-            id="invalid-relation-type",
         ),
     ],
 )

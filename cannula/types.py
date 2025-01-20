@@ -257,8 +257,12 @@ class ObjectType:
     description: typing.Optional[str] = None
 
     @property
+    def db_table(self) -> typing.Optional[str]:
+        return self.metadata.get("db_table")
+
+    @property
     def is_db_type(self) -> bool:
-        return bool(self.metadata.get("db_table", False))
+        return bool(self.db_table)
 
     @property
     def db_type(self) -> str:
