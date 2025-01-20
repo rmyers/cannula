@@ -150,10 +150,6 @@ class Field:
         return has_args or self.field_type.is_object_type
 
     @property
-    def relation(self) -> dict:
-        return self.metadata.get("relation", {})
-
-    @property
     def relation_method(self) -> str:
         if self.fk_field is not None:
             if self.field_type.is_list:
