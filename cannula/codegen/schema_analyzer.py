@@ -243,6 +243,8 @@ class SchemaAnalyzer:
                     field_type=field_type,
                 )
 
+        return None
+
     def get_field(
         self,
         field_name: str,

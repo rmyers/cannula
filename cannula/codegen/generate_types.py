@@ -57,9 +57,9 @@ class PythonCodeGenerator(CodeGenerator):
         )
         body = ast_for_function_body(field)
 
-        call_args = []
+        call_args: list[ast.expr] = []
         if field.fk_field is not None and not field.keywords:
-            call_args.append(ast.arg(f"self.{field.fk_field.name}"))
+            call_args.append(cast(ast.expr, ast.arg(f"self.{field.fk_field.name}")))
 
         body.append(
             ast.Return(
