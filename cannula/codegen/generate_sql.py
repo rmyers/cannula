@@ -11,31 +11,13 @@ from cannula.utils import (
     ast_for_subscript,
 )
 from cannula.codegen.schema_analyzer import ObjectType, CodeGenerator
+from cannula.errors import SchemaValidationError
 from cannula.format import format_code
 from cannula.types import Field
 
 
-class SchemaValidationError(Exception):
-    """Raised when the GraphQL schema metadata is invalid for SQLAlchemy model generation."""
-
-    pass
-
-
 class SQLAlchemyGenerator(CodeGenerator):
     """Generates SQLAlchemy models from GraphQL schema."""
-
-    def validate_relationship_metadata(
-        self, field: Field, type_info: ObjectType
-    ) -> None:
-        """Validate basic structure of relationship metadata."""
-        if not field.metadata.get("relation"):
-            return
-
-        relation_metadata = field.metadata["relation"]
-        if not isinstance(relation_metadata, dict):
-            raise SchemaValidationError(
-                f"Relation metadata for {type_info.name}.{field.name} must be a dictionary"
-            )
 
     def validate_field_metadata(
         self, field_name: str, is_required: bool, metadata: Dict[str, Any]
@@ -110,63 +92,17 @@ class SQLAlchemyGenerator(CodeGenerator):
 
         return args, keywords
 
-    def get_db_type(self, type_name: str) -> str:
-        """Get the SQLAlchemy type for a given GraphQL type."""
-        return next(
-            (
-                type_info.db_type
-                for type_info in self.analyzer.object_types
-                if type_name == type_info.py_type
-            ),
-            type_name,
-        )
-
-    def create_relationship_args(
-        self, field: Field, metadata: Dict[str, Any]
-    ) -> tuple[list[ast.expr], list[ast.keyword]]:
-        """Create SQLAlchemy relationship arguments."""
-        args: list[ast.expr] = []
-        keywords: list[ast.keyword] = []
-
-        relation_metadata = metadata.get("relation", {})
-
-        # Add the related class name as first argument
-        relation_value = self.get_db_type(
-            field.field_type.of_type or field.field_type.safe_value
-        )
-        args.append(ast.Constant(value=relation_value))
-
-        # Add keyword arguments specified in metadata (e.g. back_populates)
-        for key, value in relation_metadata.items():
-            keywords.append(ast_for_keyword(key, value))
-
-        return args, keywords
-
     def create_field_definition(
         self, field: Field, type_info: ObjectType
     ) -> ast.AnnAssign:
         """Create field definition AST node based on field type and metadata."""
-        # Validate relationship metadata if present
-        self.validate_relationship_metadata(field, type_info)
 
-        # Handle relationship fields
-        if field.metadata.get("relation"):
-            func_name = "relationship"
-            args, keywords = self.create_relationship_args(field, field.metadata)
-            # Create the Mapped[DBType] annotation
-            relation_value = self.get_db_type(
-                field.field_type.of_type or field.field_type.safe_value
-            )
-            mapped_type = ast_for_subscript(ast_for_name("Mapped"), relation_value)
-        else:
-            func_name = "mapped_column"
-            args, keywords = self.create_column_args(
-                field.name, field.field_type.required, field.metadata
-            )
-            # Create the Mapped[Type] annotation
-            mapped_type = ast_for_subscript(
-                ast_for_name("Mapped"), field.field_type.type
-            )
+        func_name = "mapped_column"
+        args, keywords = self.create_column_args(
+            field.name, field.field_type.required, field.metadata
+        )
+        # Create the Mapped[Type] annotation
+        mapped_type = ast_for_subscript(ast_for_name("Mapped"), field.field_type.type)
 
         return ast_for_annotation_assignment(
             target=field.name,
@@ -221,65 +157,25 @@ class SQLAlchemyGenerator(CodeGenerator):
             keywords=[],
             body=body,
             decorator_list=[],
-            type_params=[],
+            type_params=[],  # type: ignore
         )
 
     def validate_relationships(self) -> None:
         """Validate that relationships reference valid database tables and have proper foreign keys."""
-        db_tables = [t.db_type for t in self.get_db_types()]
+        db_tables = [t.db_table for t in self.get_db_types()]
 
         for type_info in self.analyzer.object_types:
             if "db_table" not in type_info.metadata:
                 continue
 
             for field in type_info.fields:
-                if not field.metadata.get("relation"):
-                    continue
-
-                # Get the related type (handle both direct and sequence relationships)
-                related_type = self.get_db_type(
-                    field.field_type.of_type or field.field_type.safe_value
-                )
-                schema_type = field.field_type.of_type or field.field_type.safe_value
-
-                # Ensure the related type is also a database table
-                if related_type not in db_tables:
-                    raise SchemaValidationError(
-                        f"Relationship {type_info.name}.{field.name} references type {related_type} "
-                        "which is not marked as a database table"
-                    )
-
-                relation_metadata = field.metadata.get("relation", {})
-                if "back_populates" in relation_metadata:
-                    # If back_populates is specified, ensure the referenced model exists
-                    referenced_field = relation_metadata["back_populates"]
-                    referenced_type = self.analyzer.object_types_by_name.get(
-                        schema_type
-                    )
-
-                    if not referenced_type:
+                if fk := field.metadata.get("foreign_key"):
+                    _table, _column = fk.split(".")
+                    # Ensure the related type is also a database table
+                    if _table not in db_tables:
                         raise SchemaValidationError(
-                            f"Relationship {type_info.name}.{field.name} references non-existent type {schema_type}"
-                        )
-
-                    # Find field by name in referenced type
-                    referenced_fields = {f.name: f for f in referenced_type.fields}
-                    if referenced_field not in referenced_fields:
-                        raise SchemaValidationError(
-                            f"Relationship {type_info.name}.{field.name} references non-existent field "
-                            f"{referenced_field} in type {schema_type}"
-                        )
-
-                # For many-to-one or one-to-one relationships, ensure there's a foreign key
-                if not field.field_type.is_list:
-                    fk_field = next(
-                        (f for f in type_info.fields if f.metadata.get("foreign_key")),
-                        None,
-                    )
-                    if not fk_field:
-                        raise SchemaValidationError(
-                            f"Relationship {type_info.name}.{field.name} to {related_type} "
-                            "requires a foreign key field"
+                            f"{field} references foreign_key '{fk}' "
+                            "which is not marked as a database table"
                         )
 
     def generate(self) -> str:
@@ -296,7 +192,7 @@ class SQLAlchemyGenerator(CodeGenerator):
                 keywords=[],
                 body=[PASS],
                 decorator_list=[],
-                type_params=[],
+                type_params=[],  # type: ignore
             )
         ]
 

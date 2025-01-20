@@ -38,7 +38,7 @@ _IMPORTS.update(
             "Union",
         },
         "typing_extensions": {"TypedDict", "NotRequired"},
-        "sqlalchemy": {"ForeignKey", "select", "func", "column"},
+        "sqlalchemy": {"ForeignKey", "select", "func", "column", "text", "true"},
         "sqlalchemy.ext.asyncio": {"AsyncAttrs", "async_sessionmaker"},
         "sqlalchemy.orm": {
             "DeclarativeBase",

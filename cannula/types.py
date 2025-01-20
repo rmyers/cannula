@@ -18,6 +18,7 @@ from cannula.utils import (
     ast_for_union_subscript,
     pluralize,
 )
+from cannula.errors import SchemaValidationError
 
 
 @dataclasses.dataclass
@@ -27,6 +28,10 @@ class FieldType:
     of_type: str = ""
     is_list: bool = False
     is_object_type: bool = False
+
+    def __repr__(self) -> str:
+        _type = self.of_type or self.safe_value
+        return f"[{_type}]" if self.is_list else _type
 
     @property
     def safe_value(self) -> str:
@@ -55,6 +60,18 @@ class Argument:
     def as_keyword(self) -> ast.keyword:
         return ast.keyword(self.name, ast_for_name(self.name))
 
+    @property
+    def as_self_keyword(self) -> ast.keyword:
+        """Return a keyword arg that references an attribute lookup."""
+        return ast.keyword(
+            self.name,
+            ast.Attribute(
+                value=ast.Name(id="self", ctx=ast.Load()),
+                attr=self.name,
+                ctx=ast.Load(),
+            ),
+        )
+
 
 @dataclasses.dataclass
 class Directive:
@@ -71,9 +88,11 @@ class Field:
     field_type: FieldType
     description: typing.Optional[str]
     args: typing.List[Argument]
+    related_args: typing.List[Argument] = dataclasses.field(default_factory=list)
     directives: typing.List[Directive] = dataclasses.field(default_factory=list)
     default: typing.Any = None
     computed: bool = False
+    fk_field: typing.Optional["Field"] = None
 
     @classmethod
     def from_field(
@@ -83,22 +102,29 @@ class Field:
         field: GraphQLField,
         field_type: FieldType,
         metadata: typing.Dict[str, typing.Any],
+        description: typing.Optional[str] = None,
         args: typing.Optional[typing.List[Argument]] = None,
+        related_args: typing.Optional[typing.List[Argument]] = None,
         directives: typing.Optional[typing.List[Directive]] = None,
+        fk_field: typing.Optional["Field"] = None,
     ) -> "Field":
         args = args or []
-        meta = metadata.get("metadata", {})
+        related_args = related_args or []
         return cls(
             field=field,
-            metadata=meta,
+            metadata=metadata,
             parent=parent,
             name=name,
             field_type=field_type,
-            description=metadata.get("description"),
-            computed=meta.get("computed", False),
+            description=description,
             args=args,
+            related_args=related_args,
             directives=directives or [],
+            fk_field=fk_field,
         )
+
+    def __repr__(self) -> str:
+        return f"Field<{self.parent}.{self.name}>"
 
     @property
     def type(self) -> str:
@@ -121,15 +147,24 @@ class Field:
     @property
     def is_computed(self) -> bool:
         has_args = bool(self.args)
-        return has_args or self.computed
-
-    @property
-    def relation(self) -> dict:
-        return self.metadata.get("relation", {})
+        return has_args or self.field_type.is_object_type
 
     @property
     def relation_method(self) -> str:
+        if self.fk_field is not None:
+            if self.field_type.is_list:
+                raise SchemaValidationError(
+                    f"{self} is related via {self.fk_field} but {self.field_type} is a list. "
+                    f"Either change the reponse type to be singular or provide 'where' and 'args' to retrieve data."
+                )
+            return "get_model_by_pk"
         return f"{self.parent.lower()}_{self.name}"
+
+    @property
+    def relation_context_attr(self) -> str:
+        """Gets the context var for the related datasource"""
+        target = pluralize(self.field_type.of_type)
+        return f"info.context.{target}"
 
     @property
     def required_args(self) -> list[Argument]:
@@ -160,10 +195,25 @@ class Field:
 
         example::
 
-            def myfunction(field_arg, field_kwarg=None):
-                return external(field_arg=field_arg, field_kwarg=field_kwarg)
+            def myfunction(self, field_arg, field_kwarg=None):
+                return external(id=self.id, field_arg=field_arg, field_kwarg=field_kwarg)
         """
-        return [arg.as_keyword for arg in self.args]
+        related = [arg.as_self_keyword for arg in self.related_args]
+        defined_args = [arg.as_keyword for arg in self.args]
+        return related + defined_args
+
+    @property
+    def related_keywords(self) -> list[ast.keyword]:
+        """These are used in a function body to include related args in the query.
+
+        example::
+
+            def myfunction(self, id: str, field_arg: str):
+                return self.db_query(text('user_id = :id AND field :field_arg'), id=id, field_arg=field_arg)
+        """
+        related = [arg.as_keyword for arg in self.related_args]
+        defined_args = [arg.as_keyword for arg in self.args]
+        return related + defined_args
 
     @property
     def as_class_var(self) -> ast.AnnAssign:
@@ -199,11 +249,16 @@ class ObjectType:
     py_type: str
     metadata: typing.Dict[str, typing.Any]
     fields: list[Field]
+    related_fields: list[Field] = dataclasses.field(default_factory=list)
     description: typing.Optional[str] = None
 
     @property
+    def db_table(self) -> typing.Optional[str]:
+        return self.metadata.get("db_table")
+
+    @property
     def is_db_type(self) -> bool:
-        return bool(self.metadata.get("db_table", False))
+        return bool(self.db_table)
 
     @property
     def db_type(self) -> str:
@@ -240,7 +295,7 @@ class InterfaceType:
             keywords=[],
             body=body,
             decorator_list=[],
-            type_params=[],
+            type_params=[],  # type: ignore
         )
 
 
@@ -285,7 +340,7 @@ class InputType:
             keywords=[],
             body=body,
             decorator_list=[],
-            type_params=[],
+            type_params=[],  # type: ignore
         )
 
 

@@ -7,16 +7,14 @@ database-backed type in the schema.
 """
 
 import ast
-import collections
-from pprint import pprint
-from typing import DefaultDict, List
+from typing import List, Optional
 
 from cannula.codegen.schema_analyzer import CodeGenerator, ObjectType
+from cannula.errors import SchemaValidationError
 from cannula.format import format_code
 from cannula.types import Field
 from cannula.utils import (
     ast_for_annotation_assignment,
-    ast_for_constant,
     ast_for_import_from,
     ast_for_name,
 )
@@ -27,20 +25,31 @@ class ContextGenerator(CodeGenerator):
 
     def create_relation_method(
         self,
-        field: Field,
         related_field: Field,
-        fk_field: Field,
+        where_clause: Optional[str] = None,
     ) -> ast.AsyncFunctionDef:
         """Create a method for fetching related objects"""
-        # For relations, we need the foreign key field as the first argument
         args = [
             ast.arg(arg="self"),
-            ast.arg(arg=fk_field.name, annotation=ast_for_name(fk_field.type)),
+            *[arg.as_ast for arg in related_field.related_args],
             *related_field.positional_args,
         ]
 
         # Use the correct class method for fetching single or list of items
         cls_method = "get_models" if related_field.field_type.is_list else "get_model"
+
+        # Build the call args with the where clause or include all results
+        call_args: list[ast.expr] = [
+            ast.Call(func=ast_for_name("true"), args=[], keywords=[])
+        ]
+        if where_clause:
+            call_args = [
+                ast.Call(
+                    func=ast_for_name("text"),
+                    args=[ast.Constant(where_clause)],
+                    keywords=[],
+                )
+            ]
 
         method_body: list[ast.stmt] = [
             ast.Return(
@@ -51,18 +60,8 @@ class ContextGenerator(CodeGenerator):
                             attr=cls_method,
                             ctx=ast.Load(),
                         ),
-                        args=[
-                            ast.Compare(
-                                left=ast.Call(
-                                    func=ast_for_name("column"),
-                                    args=[ast_for_constant(fk_field.name)],
-                                    keywords=[],
-                                ),
-                                ops=[ast.Eq()],
-                                comparators=[ast_for_name(fk_field.name)],
-                            ),
-                        ],
-                        keywords=related_field.keywords,
+                        args=call_args,
+                        keywords=related_field.related_keywords,
                     )
                 )
             )
@@ -82,7 +81,7 @@ class ContextGenerator(CodeGenerator):
             body=method_body,
             decorator_list=[],
             returns=ast_for_name(related_field.type),
-            type_params=[],
+            type_params=[],  # type: ignore
         )
 
     def create_datasource_class(self, type_info: ObjectType) -> ast.ClassDef:
@@ -110,50 +109,25 @@ class ContextGenerator(CodeGenerator):
         # Create the datasource class
         body: List[ast.stmt] = []
 
-        fk_fields: dict[str, Field] = {}
-        # Map all the foreign_key fields for relations
-        for field in type_info.fields:
-            if fk := field.metadata.get("foreign_key"):
-                table_name = fk.split(".")[0]
-                fk_fields[table_name] = field
+        for related_field in type_info.related_fields:
+            # If the related field has a fk_field the generated type object
+            # will use that to construct `get_model_by_pk` and we don't need
+            # a special resolver function in that case.
+            if related_field.fk_field is not None:
+                continue
 
-        for field in type_info.fields:
-            if back_populates := field.relation.get("back_populates"):
-
-                # Get the related type info
-                related_type_name = (
-                    field.field_type.of_type or field.field_type.safe_value
+            where_clause = related_field.metadata.get("where")
+            if not where_clause and not related_field.field_type.is_list:
+                raise SchemaValidationError(
+                    f"{related_field} includes a relation to {type_info.name} that requires "
+                    "a 'where' metadata attribute like 'user_id = :id' to preform the query."
                 )
-                related_type = next(
-                    (
-                        t
-                        for t in self.analyzer.object_types
-                        if t.py_type == related_type_name
-                    ),
-                    None,
-                )
-                if related_type is None:
-                    continue
 
-                related_field = next(
-                    (f for f in related_type.fields if f.name == back_populates),
-                    None,
+            body.append(
+                self.create_relation_method(
+                    related_field=related_field, where_clause=where_clause
                 )
-                if related_field is None:
-                    continue
-
-                table_name = related_type.metadata.get("db_table", "")
-                fk_field = fk_fields.get(table_name)
-                if fk_field is None:
-                    continue
-
-                body.append(
-                    self.create_relation_method(
-                        field=field,
-                        related_field=related_field,
-                        fk_field=fk_field,
-                    )
-                )
+            )
 
         # If no custom methods were added, add pass
         if not body:
@@ -165,7 +139,7 @@ class ContextGenerator(CodeGenerator):
             keywords=keywords,
             body=body,
             decorator_list=[],
-            type_params=[],
+            type_params=[],  # type: ignore
         )
 
     def create_context_class(self, db_types: List[ObjectType]) -> ast.ClassDef:
@@ -222,7 +196,7 @@ class ContextGenerator(CodeGenerator):
             body=init_body,
             decorator_list=[],
             returns=None,
-            type_params=[],
+            type_params=[],  # type: ignore
         )
 
         return ast.ClassDef(
@@ -231,7 +205,7 @@ class ContextGenerator(CodeGenerator):
             keywords=[],
             body=[*annotations, init_method],
             decorator_list=[],
-            type_params=[],
+            type_params=[],  # type: ignore
         )
 
     def generate(self) -> str:
@@ -252,15 +226,6 @@ class ContextGenerator(CodeGenerator):
             ]
         )
 
-        # First parse the db_types and add forward reference to relations
-        forward_relations: DefaultDict[str, list[Field]] = collections.defaultdict(list)
-        for type_info in self.analyzer.object_types:
-            for field in type_info.fields:
-                if field.relation and field.field_type.is_object_type:
-                    forward_relations[field.field_type.of_type].append(field)
-
-        pprint(forward_relations)
-        pprint(self.analyzer.object_types_by_name)
         # Create datasource classes
         for type_info in db_types:
             datasource = self.create_datasource_class(type_info)
@@ -273,5 +238,4 @@ class ContextGenerator(CodeGenerator):
         # Create and format the complete module
         module = self.create_module(body)
 
-        print(ast.unparse(module))
         return format_code(module)

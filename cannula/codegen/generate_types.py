@@ -25,7 +25,6 @@ def ast_for_function_body(field: Field) -> list[ast.stmt]:
     if field.description:
         body.append(ast_for_docstring(field.description))
 
-    body.append(ELLIPSIS)
     return body
 
 
@@ -56,14 +55,36 @@ class PythonCodeGenerator(CodeGenerator):
             kwarg=None,
             defaults=[],
         )
+        body = ast_for_function_body(field)
+
+        call_args: list[ast.expr] = []
+        if field.fk_field is not None and not field.keywords:
+            call_args.append(cast(ast.expr, ast.arg(f"self.{field.fk_field.name}")))
+
+        body.append(
+            ast.Return(
+                value=ast.Await(
+                    value=ast.Call(
+                        func=ast.Attribute(
+                            value=ast_for_name(field.relation_context_attr),
+                            attr=field.relation_method,
+                            ctx=ast.Load(),
+                        ),
+                        args=call_args,
+                        keywords=field.keywords,
+                    )
+                )
+            )
+        )
 
         return ast.AsyncFunctionDef(
             name=field.name,
             args=args_node,
-            body=ast_for_function_body(field),
-            decorator_list=[ast.Name(id="abstractmethod", ctx=ast.Load())],
+            body=body,
+            decorator_list=[],
+            # decorator_list=[ast.Name(id="abstractmethod", ctx=ast.Load())],
             returns=ast.Name(id=field.type, ctx=ast.Load()),
-            type_params=[],
+            type_params=[],  # type: ignore
         )
 
     def render_object_type(
@@ -113,7 +134,7 @@ class PythonCodeGenerator(CodeGenerator):
                     keywords=[],
                     body=body,
                     decorator_list=decorators,
-                    type_params=[],
+                    type_params=[],  # type: ignore
                 ),
             )
         ]
@@ -126,7 +147,7 @@ class PythonCodeGenerator(CodeGenerator):
             bases=[ast_for_name("Protocol")],
             keywords=[],
             decorator_list=[],
-            type_params=[],
+            type_params=[],  # type: ignore
         )
 
     def render_operation_field_ast(self, field: Field) -> ast.AsyncFunctionDef:
@@ -152,13 +173,15 @@ class PythonCodeGenerator(CodeGenerator):
             kwarg=None,
             defaults=[],
         )
+        body = ast_for_function_body(field)
+        body.append(ELLIPSIS)
         func_node = ast.AsyncFunctionDef(
             name="__call__",
             args=args_node,
-            body=ast_for_function_body(field),
+            body=body,
             decorator_list=[],
             returns=ast.Name(id=field.type, ctx=ast.Load()),
-            type_params=[],
+            type_params=[],  # type: ignore
         )
         return func_node
 
@@ -189,7 +212,7 @@ class PythonCodeGenerator(CodeGenerator):
                 bases=[ast_for_name("TypedDict")],
                 keywords=[ast_for_keyword("total", False)],
                 decorator_list=[],
-                type_params=[],
+                type_params=[],  # type: ignore
             )
             field_classes.append(cast(ast.stmt, root_type))
 

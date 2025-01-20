@@ -42,3 +42,9 @@ def log_error(
         logger.log(level, f"{error} \nContext={tb.tb_frame.f_locals!r}")
     else:
         logger.log(level, f"{error}")
+
+
+class SchemaValidationError(Exception):
+    """Raised when the GraphQL schema metadata is invalid for model generation."""
+
+    pass

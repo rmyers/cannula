@@ -27,3 +27,4 @@ different parts of cannula to assist in creating a well structued GraphQL API.
    contrib
    middleware
    testing
+   design

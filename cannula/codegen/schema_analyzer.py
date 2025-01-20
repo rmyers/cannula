@@ -32,9 +32,16 @@ from graphql import (
     is_union_type,
 )
 
-from cannula.codegen.parse_args import parse_field_arguments
+from cannula.codegen.parse_args import parse_field_arguments, parse_related_args
 from cannula.codegen.parse_type import parse_graphql_type
-from cannula.types import Field, InputType, InterfaceType, ObjectType, UnionType
+from cannula.types import (
+    Field,
+    FieldType,
+    InputType,
+    InterfaceType,
+    ObjectType,
+    UnionType,
+)
 from cannula.utils import ast_for_import_from
 
 LOG = logging.getLogger(__name__)
@@ -117,7 +124,8 @@ class SchemaAnalyzer:
 
         # Parse relations
         for name, obj in self.object_types_by_name.items():
-            # TODO parse again with forward relations
+            obj.related_fields = self.forward_relations.get(name, [])
+
             if name in ("Query", "Mutation", "Subscription"):
                 self.operation_types.append(obj)
                 self.operation_fields.extend(obj.fields)
@@ -152,7 +160,7 @@ class SchemaAnalyzer:
             node=node,
             name=node.name,
             py_type=node.name,
-            fields=self.get_fields(node),
+            fields=self.get_fields(node, metadata),
             metadata=metadata,
             description=metadata.get("description"),
         )
@@ -164,7 +172,7 @@ class SchemaAnalyzer:
             node=node,
             name=node.name,
             py_type=node.name,
-            fields=self.get_fields(node),
+            fields=self.get_fields(node, metadata),
             metadata=metadata,
             description=metadata.get("description"),
         )
@@ -173,45 +181,104 @@ class SchemaAnalyzer:
         """Parse a GraphQL Object type into ObjectType object."""
         metadata = self.extensions.get_type_metadata(node.name)
 
+        fk_fields: dict[str, GraphQLField] = {}
+
+        for field_name, field_def in node.fields.items():
+            field_extension = self.extensions.get_field_metadata(node.name, field_name)
+            field_meta = field_extension.get("metadata", {})
+            if fk := field_meta.get("foreign_key"):
+                fk = cast(str, fk)
+                table_name = fk.split(".")[0]
+                fk_fields[table_name] = cast(GraphQLField, field_def)
+
         return ObjectType(
             type_def=node,
             name=node.name,
             py_type=node.extensions.get("py_type", node.name),
             description=metadata.get("description"),
             metadata=metadata.get("metadata", {}),
-            fields=self.get_fields(node),
+            fields=self.get_fields(node, fk_fields),
         )
 
     def get_fields(
-        self, node: GraphQLObjectType | GraphQLInputObjectType | GraphQLInterfaceType
+        self,
+        node: GraphQLObjectType | GraphQLInputObjectType | GraphQLInterfaceType,
+        fk_fields: Dict[str, GraphQLField],
     ) -> list[Field]:
         return [
             self.get_field(
                 field_name=field_name,
                 field_def=field_def,
-                parent=node.name,
+                parent=node,
+                fk_fields=fk_fields,
             )
             for field_name, field_def in node.fields.items()
         ]
 
-    def get_field(self, field_name: str, field_def: GraphQLField, parent: str) -> Field:
+    def get_fk_field(
+        self,
+        field_type: FieldType,
+        parent: GraphQLObjectType | GraphQLInputObjectType | GraphQLInterfaceType,
+        fk_fields: Dict[str, GraphQLField],
+    ) -> Field | None:
+        if not field_type.is_object_type:
+            return None
+
+        related_meta = self.extensions.get_type_metadata(field_type.of_type)
+        meta = related_meta.get("metadata", {})
+        if table_name := meta.get("db_table"):
+            if fk_field := fk_fields.get(table_name):
+                field_type = parse_graphql_type(fk_field.type)
+                assert fk_field.ast_node
+                field_name = fk_field.ast_node.name.value
+                metadata = self.extensions.get_field_metadata(parent.name, field_name)
+                meta = metadata.get("metadata", {})
+                return Field.from_field(
+                    name=field_name,
+                    field=fk_field,
+                    metadata=meta,
+                    description=metadata.get("description"),
+                    parent=parent.name,
+                    field_type=field_type,
+                )
+
+        return None
+
+    def get_field(
+        self,
+        field_name: str,
+        field_def: GraphQLField,
+        parent: GraphQLObjectType | GraphQLInputObjectType | GraphQLInterfaceType,
+        fk_fields: Dict[str, GraphQLField],
+    ) -> Field:
         field_type = parse_graphql_type(field_def.type)
-        metadata = self.extensions.get_field_metadata(parent, field_name)
-        directives = metadata.get("directives", [])
+        extensions = self.extensions.get_field_metadata(parent.name, field_name)
+        directives = extensions.get("directives", [])
+        metadata = extensions.get("metadata", {})
+        description = extensions.get("description")
+        fk_field = self.get_fk_field(
+            field_type=field_type,
+            parent=parent,
+            fk_fields=fk_fields,
+        )
         args = parse_field_arguments(field_def)
+        related_args = parse_related_args(field_name, metadata, parent)
         return Field.from_field(
             name=field_name,
             field=field_def,
             metadata=metadata,
-            parent=parent,
+            description=description,
+            parent=parent.name,
             field_type=field_type,
             args=args,
+            related_args=related_args,
             directives=directives,
+            fk_field=fk_field,
         )
 
     def get_forward_references(self, object_type: ObjectType) -> None:
         for field in object_type.fields:
-            if field.relation and field.field_type.is_object_type:
+            if field.field_type.is_object_type:
                 self.forward_relations[field.field_type.of_type].append(field)
 
 

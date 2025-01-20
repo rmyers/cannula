@@ -74,7 +74,9 @@ class EmailSearch(TypedDict):
 class Message(ABC):
     __typename = "Message"
     text: Optional[str] = None
-    sender: Optional[Sender] = None
+
+    async def sender(self, info: ResolveInfo["Context"]) -> Optional[Sender]:
+        return await info.context.senders.message_sender()
 
 
 @dataclass(kw_only=True)
@@ -140,7 +142,9 @@ class EmailSearch(TypedDict):
 class Message(BaseModel):
     __typename = "Message"
     text: Optional[str] = None
-    sender: Optional[Sender] = None
+
+    async def sender(self, info: ResolveInfo["Context"]) -> Optional[Sender]:
+        return await info.context.senders.message_sender()
 
 
 class Sender(BaseModel):

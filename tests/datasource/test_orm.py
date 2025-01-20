@@ -4,12 +4,12 @@ import logging
 import pytest
 from sqlalchemy.ext.asyncio import AsyncAttrs, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase, mapped_column, Mapped, relationship
-from sqlalchemy import ForeignKey, column, text
+from sqlalchemy import ForeignKey, column, text, true
 
 from cannula.datasource.orm import DatabaseRepository
 
 database_uri = "sqlite+aiosqlite:///:memory:"
-engine = create_async_engine(database_uri, echo=True)
+engine = create_async_engine(database_uri)
 session = async_sessionmaker(engine, expire_on_commit=False)
 
 aio_log = logging.getLogger("aiosqlite")
@@ -139,6 +139,7 @@ async def test_orm_defaults(mocker):
 async def test_filters_with_columns():
     users = UserRepository(session)
     await users.add(id=90, name="test", email="u@c.com", password="secret")
+    await users.add(id=91, name="fast", email="slow@fast.com", password="so-secret")
 
     # Test a special filter
     filter_with_column = await users.get_models(
@@ -161,6 +162,10 @@ async def test_filters_with_columns():
     )
     assert isinstance(user_model, User)
     assert user_model.id == 90
+
+    # Test get all
+    all_users = await users.get_models(true())
+    assert len(all_users) == 2
 
 
 async def test_get_model_null():

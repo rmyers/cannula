@@ -13,12 +13,14 @@ from graphql import (
 )
 from typing import Any
 
+from cannula.errors import SchemaValidationError
 from cannula.schema import build_and_extend_schema
 from cannula.types import Argument, FieldType
 from cannula.codegen.parse_type import parse_graphql_type
 from cannula.codegen.parse_args import (
     parse_field_arguments,
     parse_default_value,
+    parse_related_args,
 )
 
 SCHEMA = """\
@@ -324,3 +326,61 @@ def test_parse_default_invalid_ast():
     arg = field.args["arg"]
     result = parse_default_value(arg, "int")
     assert result is None
+
+
+@pytest.mark.parametrize(
+    "field_metadata,expected_args",
+    [
+        pytest.param(
+            {"args": "id"},
+            [Argument(name="id", type="str", required=True)],
+            id="single-arg",
+        ),
+        pytest.param(
+            {"args": "id,email"},
+            [
+                Argument(name="id", type="str", required=True),
+                Argument(name="email", type="str", required=True),
+            ],
+            id="multiple-args",
+        ),
+        pytest.param(
+            {"args": ["id", "email"]},  # Test list format
+            [
+                Argument(name="id", type="str", required=True),
+                Argument(name="email", type="str", required=True),
+            ],
+            id="list-format",
+        ),
+    ],
+)
+def test_parse_related_args(field_metadata, expected_args):
+    """Test successful parsing of related args from field metadata"""
+    parent = GraphQLObjectType(
+        name="User",
+        fields={
+            "id": GraphQLField(type_=GraphQLNonNull(GraphQLString)),
+            "email": GraphQLField(type_=GraphQLNonNull(GraphQLString)),
+        },
+    )
+
+    result = parse_related_args(
+        field="posts", field_metadata=field_metadata, parent=parent
+    )
+
+    assert result == expected_args
+
+
+def test_parse_related_args_invalid_field():
+    """Test error handling when metadata references invalid field"""
+    parent = GraphQLObjectType(
+        name="User", fields={"id": GraphQLField(type_=GraphQLNonNull(GraphQLString))}
+    )
+
+    field_metadata = {"args": "invalid_field"}
+
+    with pytest.raises(
+        SchemaValidationError,
+        match="Field posts Metadata Arg: invalid_field not found on User",
+    ):
+        parse_related_args(field="posts", field_metadata=field_metadata, parent=parent)
