@@ -172,7 +172,6 @@ class SQLAlchemyGenerator(CodeGenerator):
                 if fk := field.metadata.get("foreign_key"):
                     _table, _column = fk.split(".")
                     # Ensure the related type is also a database table
-                    print(db_tables, _table)
                     if _table not in db_tables:
                         raise SchemaValidationError(
                             f"{field} references foreign_key '{fk}' "

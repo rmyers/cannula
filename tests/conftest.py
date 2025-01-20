@@ -8,8 +8,12 @@ LOG = logging.getLogger("cannula.tests")
 
 
 logging.basicConfig(
-    level=logging.DEBUG, filename="reports/test-report.log", filemode="w"
+    level=logging.DEBUG,
+    filename="reports/test-report.log",
+    filemode="w",
 )
+# Add logger for sqlalchemy instead of using `echo=True` to avoid duplicate messages in failures
+logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
 
 
 def pytest_runtest_setup(item):

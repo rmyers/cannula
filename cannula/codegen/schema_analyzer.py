@@ -101,7 +101,6 @@ class SchemaAnalyzer:
         self.operation_fields: List[Field] = []
         # Add helper to access object types by name
         self.object_types_by_name: Dict[str, ObjectType] = {}
-        # Add helper for
 
         for name, type_def in self.schema.type_map.items():
             is_private = name.startswith("__")
