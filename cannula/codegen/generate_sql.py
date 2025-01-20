@@ -92,17 +92,6 @@ class SQLAlchemyGenerator(CodeGenerator):
 
         return args, keywords
 
-    def get_db_type(self, type_name: str) -> str:
-        """Get the SQLAlchemy type for a given GraphQL type."""
-        return next(
-            (
-                type_info.db_type
-                for type_info in self.analyzer.object_types
-                if type_name == type_info.py_type
-            ),
-            type_name,
-        )
-
     def create_field_definition(
         self, field: Field, type_info: ObjectType
     ) -> ast.AnnAssign:
