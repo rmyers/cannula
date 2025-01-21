@@ -30,7 +30,7 @@ class Config(BaseConfig):
 
     @functools.cached_property
     def engine(self) -> AsyncEngine:
-        return create_async_engine(self.database_uri, echo=True)
+        return create_async_engine(self.database_uri)
 
     @property
     def session(self) -> async_sessionmaker:

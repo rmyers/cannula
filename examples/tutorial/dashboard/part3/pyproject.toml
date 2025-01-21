@@ -6,4 +6,5 @@ scalars = [
     "cannula.scalars.util.JSON",
     "cannula.scalars.util.UUID",
 ]
-dest="_generated.py"
+dest = "gql"
+schema = "schema.graphql"

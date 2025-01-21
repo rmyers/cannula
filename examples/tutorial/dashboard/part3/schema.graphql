@@ -1,74 +1,32 @@
 scalar UUID
 
-interface Persona {
-    id: UUID!
-    name: String
-    email: String
+"@metadata(db_table: users)"
+type User {
+  "@metadata(primary_key: true)"
+  id: UUID!
+  name: String
+  email: String
+
+  "@metadata(where: user_id = :id, args: id)"
+  quota: [Quota]
 }
 
-type User implements Persona {
-    id: UUID!
-    name: String
-    email: String
-    quota: [Quota]
-}
-
-type Admin implements Persona {
-    id: UUID!
-    name: String
-    email: String
-}
-
-enum Resources {
-    BOARD
-    POST
-}
-
+"@metadata(db_table: quotas)"
 type Quota {
-    user: User
-    resource: String
-    limit: Int
-    count: Int
-}
+  "@metadata(primary_key: true)"
+  id: UUID!
 
-interface Resource {
-    quota: Quota
-    user: User
-    created: String
-}
-
-type Board implements Resource {
-    id: ID
-    quota: Quota
-    user: User
-    title: String
-    created: String
-    posts: [Post]
-}
-
-type Post implements Resource {
-    id: ID
-    quota: Quota
-    user: User
-    title: String
-    created: String
-    body: String
+  "@metadata(foreign_key: users.id)"
+  user_id: UUID!
+  user: User
+  resource: String
+  limit: Int
+  count: Int
 }
 
 type Query {
-    me: Persona
-    people: [Persona]
-    user(id: ID): User
-    boards(limit: Int = 100, offset: Int = 0): [Board]
-    posts(limit: Int = 100, offset: Int = 0): [Post]
-}
+  people: [User]
 
-type Mutation {
-    createPost(title: String!, body: String!): Post
-    deletePost(id: ID!): Boolean
-    editPost(id: ID!, title: String, body: String): Post
-    createBoard(title: String!): Board
-    deleteBoard(id: ID!): Boolean
-    editBoard(id: ID!, title: String): Board
-    addPost(board_id: ID!, post_id: ID!): Board
+  "@metadata(where: id = :id)"
+  user(id: UUID!): User
 }

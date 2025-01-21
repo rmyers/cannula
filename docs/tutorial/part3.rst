@@ -3,7 +3,7 @@ Part3: Code Generation
 
 One of the best benefits to using a schema first approach is that it makes it incredibly
 easy to parse and generate code from this well defined schema. Cannula offers a simple
-way to generate data classes and resolver type definitions to assist with type hints and
+way to generate data classes, models, and resolver definitions to assist with type hints and
 making sure your code is in sync with the schema.
 
 First we need to add some details to the `pyproject.toml` for your application:
@@ -14,30 +14,43 @@ You'll notice we are including some custom Scalars in this config, we can use th
 our schema file to alter the input/output of certain fields. Cannula provides some basic
 ones that are useful but you can add your own via this same config. Here is our schema
 that is using the `UUID` scalar. The `UUID` Scalar will convert a string into a UUID for
-output and convert a string to a `UUID` on input:
+output and convert a string to a `UUID` on input.
+
+Next in order to create SQLAlchemy models from the schema file we'll need to add metadata
+to the descriptions. Metadata is converted to yaml and allows us to descibe the relations
+within the graphql file. For example we can specify the `db_table` name or that a field is
+a `primary_key`. In the long form you simply need to provide 3 dashes `---` to separate
+the definition:
 
 .. code-block:: graphql
 
-    scalar UUID
+    """
+    My Fancy Type Class
 
-    interface Persona {
-        id: UUID!
-        name: String
-        email: String
+    ---
+    metadata:
+        db_table: fancy
+        index: fancy.group
+    """
+    type Fancy {
+       id: ID
+       group: String
     }
 
-    type User implements Persona {
-        id: UUID!
-        name: String
-        email: String
-        quota: [Quota]
-    }
+This can get a little verbose, so we can also add the metadata in a single line with a directive
+like syntax:
 
-    type Admin implements Persona {
-        id: UUID!
-        name: String
-        email: String
-    }
+.. code-block:: graphql
+
+    "@metadata(foreign_key: user.id)"
+    user_id: ID
+
+.. note:: We choose not to use an actual directive since this metadata is not really meant for using the graph by the server.
+
+Here is our simplied schema to demostrate some of the options:
+
+.. literalinclude:: ../examples/tutorial/dashboard/part3/schema.graphql
+    :language: graphql
 
 Now we just need to run the codegen command in this folder to generate the base types:
 
@@ -45,38 +58,55 @@ Now we just need to run the codegen command in this folder to generate the base 
 
     $ cannula codegen
 
-This will create the `_generated.py` file that we set in the `pyproject.toml`:
+This will create the `gql` folder that we set in the `pyproject.toml` and add the
+following files.
 
-.. literalinclude:: ../examples/tutorial/dashboard/part3/_generated.py
+types.py
+--------
 
-For each `type` in our schema cannula generates a dataclass and a TypedDict. Then it
-creates Protocols for the resolvers with the correct signature. For example the
-`peopleQuery` will return a list of `PersonaTypes` which is an 'interface' that both
-the `AdminType` and `UserType` satisfy. This will ensure that our `RootValue` will have
+.. literalinclude:: ../examples/tutorial/dashboard/part3/gql/types.py
+
+For each `type` in our schema cannula generates a dataclass with all the simple
+fields as class vars. The related fields that reference another `type` or have
+arguments are rendered as async resolver functions. These functions call the
+corresponding datasource on the context object to retrieve the results.
+
+Then it creates Protocols for the resolvers with the correct signature. For example the
+`peopleQuery` will return a list of `User` this will ensure that our `RootValue` will have
 the correct signature and return values and our editor will highlight these errors.
 
-While not technically needed it is good practice to use the GraphQLContext to hold a
-reference to all the data sources for our application. Here we need a way to make database
-queries to locate users for the `peopleQuery`. Our example application has a `UserRepository`
-which requires a sqlalchemy session object. In this example `Context` we provide access to
-`UserRespository` via a cached_property to ensure that it is lazy loaded only when we
-actually use it.
+sql.py
+------
 
-.. literalinclude:: ../examples/tutorial/dashboard/part3/context.py
+.. literalinclude:: ../examples/tutorial/dashboard/part3/gql/sql.py
 
-Next we need to make concrete classes for our base types. This isn't required either but
-we can use these classes to map our types to our sqlalchemy models. You might be tempted
-to just use the ORM models but it will only work for the most basic models. For anything
-complex you will need this wrapper model to handle serialization with the GraphQL engine.
+The sql file contains all the database table definitions that we have defined.
+For a full reference please refer to the :ref:`codegen`
 
-We can use the `DBMixin` which will assist mapping a sqlalchemy ORM model to our generated
-classes. This mixin provides a `from_db` constructor and stores a reference to the original
-as `_db_model`. Here is a simple example:
+
+context.py
+----------
+
+.. literalinclude:: ../examples/tutorial/dashboard/part3/gql/context.py
+
+The context is added to all the resolvers and is a way to share datasources between
+all the functions that are resolving data for a given query. Here we create a couple
+of classes for `QuotaDatasource` and `UserDatasource` that maps the types to the
+database models. The `Context` object exposes these and adds any initialization the
+datasources need.
+
+Wire everything up
+------------------
+
+With most of the code generated for us all we have to do is connect these pieces
+to our graph and FastAPI.
+
+First we'll add a bit of code to create the new tables and add some test data:
 
 .. literalinclude:: ../examples/tutorial/dashboard/part3/models.py
 
-Now that we have models and context wired up we just need our resolver for `peopleQuery`
-then we can connect this to our graphql application:
+We will call this in our tests to seed the database. Then we have to provide a couple
+resolvers that were not autogenerated for us and create a CannulaAPI instance:
 
 .. literalinclude:: ../examples/tutorial/dashboard/part3/graph.py
 
@@ -108,13 +138,13 @@ Once it loads you should see your schema and you can try the following query:
 
     query ExampleQuery {
         people {
-            ... on User {
-                email
-                id
-            }
-            ... on Admin {
-                email
-                id
+            email
+            id
+            quota {
+                limit
+                user {
+                    name
+                }
             }
         }
     }
@@ -126,14 +156,16 @@ This should return something like this:
     {
         "data": {
             "people": [
-            {
-                "email": "user@email.com",
-                "id": "683f89e1-b9e2-4af8-bb7e-7b2bccfe54a3"
-            },
-            {
-                "email": "admin@example.com",
-                "id": "3332ec67-8a38-4255-a09b-e31b2d0593cc"
-            }
+                {
+                    "email": "user@email.com",
+                    "id": "683f89e1-b9e2-4af8-bb7e-7b2bccfe54a3",
+                    "quota": {
+                        "limit": 100,
+                        "user": {
+                            "name": "test",
+                        }
+                    }
+                }
             ]
         },
         "errors": null,

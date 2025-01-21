@@ -1,42 +1,42 @@
 import httpx
-import uuid
 
-from dashboard.core.repository import UserRepository
+from dashboard.part3.models import add_data
 
 QUERY = """
-    query People {
+    query People($id: UUID!) {
         people {
             name
-            ... on User {
-                email
-                quota {
-                    limit
+            email
+            quota {
+                limit
+                user {
+                    name
                 }
             }
-            ... on Admin {
-                email
-            }
+        }
+        user(id: $id) {
+            id
+            name
         }
     }
     """
 
 
-async def test_part_three_graph(client: httpx.AsyncClient, session):
-    user_id = uuid.uuid4()
-    admin_id = uuid.uuid4()
-    users = UserRepository(session=session)
-    await users.add(id=user_id, name="test", email="sam@example.com", password="test")
-    await users.add(
-        id=admin_id, name="adder", email="admin@example.com", password="test"
+async def test_part_three_graph(client: httpx.AsyncClient):
+    user_id = await add_data()
+    resp = await client.post(
+        "/part3/graph", json={"query": QUERY, "variables": {"id": user_id.hex}}
     )
-
-    resp = await client.post("/part3/graph", json={"query": QUERY})
     assert resp.status_code == 200, resp.text
     data = resp.json()
     assert data.get("errors") is None
     assert data.get("data") == {
         "people": [
-            {"email": "sam@example.com", "name": "test", "quota": None},
-            {"email": "admin@example.com", "name": "adder"},
+            {
+                "email": "sam@ex.com",
+                "name": "test",
+                "quota": [{"limit": 100, "user": {"name": "test"}}],
+            },
         ],
+        "user": {"id": str(user_id), "name": "test"},
     }
