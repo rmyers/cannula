@@ -1,35 +1,28 @@
-from ..core.database import User as DBUser
-from ._generated import PersonaType, UserType, AdminType
+import uuid
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine, async_sessionmaker
+
+from .gql.sql import Base
+from .gql.context import (
+    UserDatasource,
+    QuotaDatasource,
+)
+
+engine: AsyncEngine = create_async_engine("sqlite+aiosqlite:///:memory:")
+session_maker = async_sessionmaker(engine, expire_on_commit=False)
 
 
-class User(UserType):
-    """User instance"""
-
-    @classmethod
-    def from_db(cls, db_user: DBUser) -> "User":
-        """Constructor for creating user from db object"""
-        return cls(
-            id=db_user.id,
-            name=db_user.name,
-            email=db_user.email,
-        )
+async def create_tables() -> None:
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
 
-class Admin(AdminType):
-    """Admin instance"""
+async def add_data() -> uuid.UUID:
+    users = UserDatasource(session_maker)
+    quotas = QuotaDatasource(session_maker)
 
-    @classmethod
-    def from_db(cls, db_user: DBUser) -> "Admin":
-        """Constructor for creating admin from db object"""
-        return cls(
-            id=db_user.id,
-            name=db_user.name,
-            email=db_user.email,
-        )
-
-
-def persona(db_user: DBUser) -> PersonaType:
-    # Check the `is_admin` field and return the correct Persona
-    if db_user.is_admin:
-        return Admin.from_db(db_user)
-    return User.from_db(db_user)
+    user_id = uuid.uuid4()
+    await users.add(id=user_id, name="test", email="sam@ex.com")
+    await quotas.add(
+        id=uuid.uuid4(), user_id=user_id, resource="test", limit=100, count=0
+    )
+    return user_id

@@ -9,8 +9,11 @@ import pytest
 from dashboard.main import app
 from dashboard.core.config import config
 from dashboard.core.database import create_tables, drop_tables
+from dashboard.part3.models import create_tables as create_part3_tables
 
 logging.basicConfig(level=logging.INFO)
+# Add logger for sqlalchemy instead of using `echo=True` to avoid duplicate messages in failures
+logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -21,6 +24,7 @@ async def test_config():
 @pytest.fixture(autouse=True, scope="function")
 async def db_session():
     await create_tables()
+    await create_part3_tables()
 
     yield
 

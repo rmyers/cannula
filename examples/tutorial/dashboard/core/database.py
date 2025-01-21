@@ -3,7 +3,7 @@ import datetime
 import uuid
 import typing
 
-from sqlalchemy import ForeignKey, select, func
+from sqlalchemy import ForeignKey, func
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase, mapped_column, Mapped, relationship
 

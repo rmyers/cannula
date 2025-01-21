@@ -1,7 +1,8 @@
+.. _codegen:
+
 Code Generation
 ===============
 
-.. _codegen:
 
 The ``cannula codegen`` command generates Python code from your GraphQL schema. It creates type definitions, SQLAlchemy models, and context classes based on your schema and metadata.
 

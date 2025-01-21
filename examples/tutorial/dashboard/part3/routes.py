@@ -1,11 +1,11 @@
 from typing import Annotated
 
 from cannula.contrib.asgi import GraphQLDepends, ExecutionResponse, GraphQLExec
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends
 
-from ..core.config import config
+from .gql.context import Context
 from .graph import cannula_app
-from .context import Context
+from .models import session_maker
 
 part3 = APIRouter(prefix="/part3")
 
@@ -16,8 +16,7 @@ async def part3_root(
         GraphQLExec,
         Depends(GraphQLDepends(cannula_app)),
     ],
-    request: Request,
 ) -> ExecutionResponse:
     # create a context instance for our resolvers to use
-    context = Context(config.session, request)
+    context = Context(session_maker)
     return await graph_call(context=context)

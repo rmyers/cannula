@@ -47,6 +47,4 @@ class QuotaRepository(
         return await self.get_models(DBQuota.user_id == id)
 
     async def get_over_quota(self, id: uuid.UUID, resource: str) -> Quota | None:
-        return await self.get_model_by_query(
-            DBQuota.user_id == id, DBQuota.resource == resource
-        )
+        return await self.get_model(DBQuota.user_id == id, DBQuota.resource == resource)

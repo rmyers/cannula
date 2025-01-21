@@ -24,7 +24,7 @@ async def resolve_person(
     info: cannula.ResolveInfo[Context],
     id: uuid.UUID,
 ) -> UserType | None:
-    return await info.context.user_repo.get_model(id)
+    return await info.context.user_repo.get_model_by_pk(id)
 
 
 # The RootType object from _generated will warn us if we use
