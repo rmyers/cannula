@@ -178,22 +178,20 @@ def build_and_extend_schema(
         if is_input_object_type(definition):
             definition = typing.cast(GraphQLInputObjectType, definition)
             definition.extensions["py_type"] = name
-            definition.extensions.update(**metadata.type_metadata[name])
-            field_meta = metadata.field_metadata[name]
+            field_meta = metadata.field_metadata.get(name, {})
             for field_name, field in definition.fields.items():
                 field = typing.cast(GraphQLField, field)
                 field.extensions.update(**field_meta.get(field_name, {}))
 
         elif is_union_type(definition):
             definition.extensions["py_type"] = name
-            definition.extensions.update(**metadata.type_metadata[name])
 
         elif is_object_type(definition) and not is_private:
             definition = typing.cast(GraphQLObjectType, definition)
             definition.extensions["py_type"] = name
             definition.extensions["db_type"] = f"DB{name}"
             definition.extensions.update(**metadata.type_metadata[name])
-            field_meta = metadata.field_metadata[name]
+            field_meta = metadata.field_metadata.get(name, {})
             for field_name, field in definition.fields.items():
                 field = typing.cast(GraphQLField, field)
                 field.extensions.update(**field_meta.get(field_name, {}))
@@ -201,8 +199,7 @@ def build_and_extend_schema(
         elif is_interface_type(definition):
             definition = typing.cast(GraphQLInterfaceType, definition)
             definition.extensions["py_type"] = name
-            definition.extensions.update(**metadata.type_metadata[name])
-            field_meta = metadata.field_metadata[name]
+            field_meta = metadata.field_metadata.get(name, {})
             for field_name, field in definition.fields.items():
                 field = typing.cast(GraphQLField, field)
                 field.extensions.update(**field_meta.get(field_name, {}))

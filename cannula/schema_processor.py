@@ -93,18 +93,6 @@ class SchemaVisitor(Visitor):
 
         self.processor.type_metadata[type_name] = meta
 
-    def enter_union_type_definition(self, node, *args) -> None:
-        type_name = node.name.value
-        self.processor.type_metadata[type_name] = {}
-
-    def enter_interface_type_definition(self, node, *args) -> None:
-        type_name = node.name.value
-        self.processor.type_metadata[type_name] = {}
-
-    def enter_input_object_type_definition(self, node, *args) -> None:
-        type_name = node.name.value
-        self.processor.type_metadata[type_name] = {}
-
     def enter_object_type_extension(self, node, *args) -> None:
         type_name = node.name.value
 
