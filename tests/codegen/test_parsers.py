@@ -15,7 +15,7 @@ from typing import Any
 
 from cannula.errors import SchemaValidationError
 from cannula.schema import build_and_extend_schema
-from cannula.types import Argument, FieldType
+from cannula.types import Argument, FieldMetadata, FieldType
 from cannula.codegen.parse_type import parse_graphql_type
 from cannula.codegen.parse_args import (
     parse_field_arguments,
@@ -332,25 +332,17 @@ def test_parse_default_invalid_ast():
     "field_metadata,expected_args",
     [
         pytest.param(
-            {"args": "id"},
+            FieldMetadata(args=["id"]),
             [Argument(name="id", type="str", required=True)],
             id="single-arg",
         ),
         pytest.param(
-            {"args": "id,email"},
+            FieldMetadata(args=["id", "email"]),
             [
                 Argument(name="id", type="str", required=True),
                 Argument(name="email", type="str", required=True),
             ],
             id="multiple-args",
-        ),
-        pytest.param(
-            {"args": ["id", "email"]},  # Test list format
-            [
-                Argument(name="id", type="str", required=True),
-                Argument(name="email", type="str", required=True),
-            ],
-            id="list-format",
         ),
     ],
 )
@@ -363,10 +355,7 @@ def test_parse_related_args(field_metadata, expected_args):
             "email": GraphQLField(type_=GraphQLNonNull(GraphQLString)),
         },
     )
-
-    result = parse_related_args(
-        field="posts", field_metadata=field_metadata, parent=parent
-    )
+    result = parse_related_args("posts", field_metadata, parent)
 
     assert result == expected_args
 
@@ -377,7 +366,7 @@ def test_parse_related_args_invalid_field():
         name="User", fields={"id": GraphQLField(type_=GraphQLNonNull(GraphQLString))}
     )
 
-    field_metadata = {"args": "invalid_field"}
+    field_metadata = FieldMetadata(args=["invalid_field"])
 
     with pytest.raises(
         SchemaValidationError,

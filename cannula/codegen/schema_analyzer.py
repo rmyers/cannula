@@ -36,10 +36,12 @@ from cannula.codegen.parse_args import parse_field_arguments, parse_related_args
 from cannula.codegen.parse_type import parse_graphql_type
 from cannula.types import (
     Field,
+    FieldMetadata,
     FieldType,
     InputType,
     InterfaceType,
     ObjectType,
+    SQLMetadata,
     UnionType,
 )
 from cannula.utils import ast_for_import_from
@@ -53,16 +55,11 @@ class SchemaExtension:
     def __init__(self, schema: GraphQLSchema) -> None:
         self.schema = schema
         self._type_metadata = schema.extensions.get("type_metadata", {})
-        self._field_metadata = schema.extensions.get("field_metadata", {})
         self._imports = schema.extensions.get("imports", {})
 
     @property
     def type_metadata(self) -> Dict[str, Dict[str, Any]]:
         return self._type_metadata
-
-    @property
-    def field_metadata(self) -> Dict[str, Dict[str, Dict[str, Any]]]:
-        return self._field_metadata
 
     @property
     def imports(self) -> Dict[str, set[str]]:
@@ -71,10 +68,6 @@ class SchemaExtension:
     def get_type_metadata(self, type_name: str) -> Dict[str, Any]:
         """Get metadata for a specific type"""
         return self.type_metadata.get(type_name, {})
-
-    def get_field_metadata(self, type_name: str, field_name: str) -> Dict[str, Any]:
-        """Get metadata for a specific field"""
-        return self.field_metadata.get(type_name, {}).get(str(field_name), {})
 
 
 class SchemaAnalyzer:
@@ -147,9 +140,9 @@ class SchemaAnalyzer:
         types = [parse_graphql_type(t) for t in node.types]
 
         return UnionType(
+            node=node,
             name=node.name,
             py_type=metadata.get("py_type", node.name),
-            description=metadata.get("description"),
             types=types,
         )
 
@@ -162,7 +155,6 @@ class SchemaAnalyzer:
             py_type=node.name,
             fields=self.get_fields(node, metadata),
             metadata=metadata,
-            description=metadata.get("description"),
         )
 
     def parse_input(self, node: GraphQLInputObjectType) -> InputType:
@@ -174,20 +166,18 @@ class SchemaAnalyzer:
             py_type=node.name,
             fields=self.get_fields(node, metadata),
             metadata=metadata,
-            description=metadata.get("description"),
         )
 
     def parse_object(self, node: GraphQLObjectType) -> ObjectType:
         """Parse a GraphQL Object type into ObjectType object."""
-        metadata = self.extensions.get_type_metadata(node.name)
-
         fk_fields: dict[str, GraphQLField] = {}
 
-        for field_name, field_def in node.fields.items():
-            field_extension = self.extensions.get_field_metadata(node.name, field_name)
-            field_meta = field_extension.get("metadata", {})
-            if fk := field_meta.get("foreign_key"):
-                fk = cast(str, fk)
+        for _field_name, field_def in node.fields.items():
+            field_meta = cast(
+                FieldMetadata,
+                field_def.extensions.get("field_meta", FieldMetadata()),
+            )
+            if fk := field_meta.foreign_key:
                 table_name = fk.split(".")[0]
                 fk_fields[table_name] = cast(GraphQLField, field_def)
 
@@ -195,8 +185,6 @@ class SchemaAnalyzer:
             type_def=node,
             name=node.name,
             py_type=node.extensions.get("py_type", node.name),
-            description=metadata.get("description"),
-            metadata=metadata.get("metadata", {}),
             fields=self.get_fields(node, fk_fields),
         )
 
@@ -225,19 +213,15 @@ class SchemaAnalyzer:
             return None
 
         related_meta = self.extensions.get_type_metadata(field_type.of_type)
-        meta = related_meta.get("metadata", {})
-        if table_name := meta.get("db_table"):
-            if fk_field := fk_fields.get(table_name):
+        if sql_meta := related_meta.get("sql_metadata"):
+            sql_meta = cast(SQLMetadata, sql_meta)
+            if fk_field := fk_fields.get(sql_meta.table_name):
                 field_type = parse_graphql_type(fk_field.type)
                 assert fk_field.ast_node
                 field_name = fk_field.ast_node.name.value
-                metadata = self.extensions.get_field_metadata(parent.name, field_name)
-                meta = metadata.get("metadata", {})
                 return Field.from_field(
                     name=field_name,
                     field=fk_field,
-                    metadata=meta,
-                    description=metadata.get("description"),
                     parent=parent.name,
                     field_type=field_type,
                 )
@@ -252,22 +236,18 @@ class SchemaAnalyzer:
         fk_fields: Dict[str, GraphQLField],
     ) -> Field:
         field_type = parse_graphql_type(field_def.type)
-        extensions = self.extensions.get_field_metadata(parent.name, field_name)
-        directives = extensions.get("directives", [])
-        metadata = extensions.get("metadata", {})
-        description = extensions.get("description")
+        directives = field_def.extensions.get("directives", [])
         fk_field = self.get_fk_field(
             field_type=field_type,
             parent=parent,
             fk_fields=fk_fields,
         )
         args = parse_field_arguments(field_def)
-        related_args = parse_related_args(field_name, metadata, parent)
+        field_metadata = field_def.extensions.get("field_meta", FieldMetadata())
+        related_args = parse_related_args(field_name, field_metadata, parent)
         return Field.from_field(
             name=field_name,
             field=field_def,
-            metadata=metadata,
-            description=description,
             parent=parent.name,
             field_type=field_type,
             args=args,

@@ -8,48 +8,29 @@ SCHEMA = gql(
     '''
 """
 User model
----
-metadata:
-    db_table: users
+Here
 """
-type User {
-    "User ID @metadata(primary_key: true)"
-    id: ID!
+type User @db_sql {
+    id: ID! @field_meta(primary_key: true)
     name: String!
     email: String!
-    """
-    User's posts
-    ---
-    metadata:
-        where: "author_id = :id"
-        args: id
-    """
-    posts: [Post]
-    """
-    Latest post
-    ---
-    metadata:
-        where: "author_id = :id ORDER BY created_at DESC LIMIT 1"
-        args: id
-    """
-    latestPost: Post
+    posts: [Post] @field_meta(where: "author_id = :id", args: ["id"])
+    latestPost: Post @field_meta(where: "author_id = :id ORDER BY created_at DESC LIMIT 1", args: ["id"])
 }
 
 """
 Post model
----
-metadata:
-    db_table: posts
 """
-type Post {
-    "Post ID @metadata(primary_key: true)"
-    id: ID!
+type Post @db_sql {
+    id: ID! @field_meta(primary_key: true)
     title: String!
-    "@metadata(foreign_key: users.id)"
-    author_id: ID!
+    author_id: ID! @field_meta(foreign_key: "users.id")
     author: User
 }
 
+"""
+Remote Type is not a db model
+"""
 type RemoteType {
     id: ID!
     name: String!
@@ -103,63 +84,33 @@ def test_generate_context():
 
 
 INVALID_RELATION = gql(
-    '''
-"""
-User model
----
-metadata:
-    db_table: users
-"""
-type User {
-    "User ID @metadata(primary_key: true)"
-    id: ID!
     """
-    Latest post without where clause
-    """
+type User @db_sql {
+    id: ID!  @field_meta(primary_key: true)
+    "Invalid relation missing where clause"
     latestPost: Post
 }
-
-"""
-Post model
----
-metadata:
-    db_table: posts
-"""
-type Post {
+type Post @db_sql {
     id: ID!
     title: String!
 }
-'''
+"""
 )
 
 INVALID_LIST_FK = gql(
-    '''
-"""
-User model
----
-metadata:
-    db_table: users
-"""
-type User {
-    "User ID @metadata(primary_key: true)"
-    id: ID!
+    """
+type User @db_sql {
+    id: ID! @field_meta(primary_key: true)
     name: String!
 }
 
-"""
-Post model
----
-metadata:
-    db_table: posts
-"""
 type Post {
-    id: ID!
-    "@metadata(foreign_key: users.id)"
-    author_id: ID!
+    id: ID! @field_meta(primary_key: true)
+    author_id: ID!  @field_meta(foreign_key: "users.id")
     "Invalid list relation with foreign key"
     authors: [User]
 }
-'''
+"""
 )
 
 

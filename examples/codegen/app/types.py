@@ -19,7 +19,6 @@ class Quota(ABC):
     count: Optional[int] = None
 
     async def user(self, info: ResolveInfo["Context"]) -> Optional[User]:
-        """User that this quota is for."""
         return await info.context.users.get_model_by_pk(self.user_id)
 
 

@@ -107,28 +107,3 @@ def test_load_schema_from_directory():
         parsed = cannula.load_schema(os.path.dirname(graph_schema.name))
         assert len(parsed) == 1
         assert isinstance(parsed[0], DocumentNode)
-
-
-def test_parse_schema_metadata_invalid_yaml():
-    document = parse(
-        '''
-        """
-        Invalid YAML metadata
-
-        ---
-        metadata:
-            %@foo: bar
-        """
-        type Sender {
-            name: String
-        }
-        '''
-    )
-    processor = cannula.SchemaProcessor()
-    metadata = processor.process_schema(document)
-    assert metadata.type_metadata["Sender"]["metadata"] == {}
-    assert metadata.field_metadata["Sender"]["name"] == {
-        "description": "",
-        "metadata": {},
-        "directives": [],
-    }

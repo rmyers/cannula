@@ -7,6 +7,7 @@ from graphql import (
     GraphQLInputObjectType,
     GraphQLInterfaceType,
     GraphQLObjectType,
+    GraphQLUnionType,
 )
 
 from cannula.utils import (
@@ -19,6 +20,28 @@ from cannula.utils import (
     pluralize,
 )
 from cannula.errors import SchemaValidationError
+
+
+@dataclasses.dataclass
+class SQLMetadata:
+    table_name: str
+    composite_primary_key: bool = False
+    constraints: typing.List[str] = dataclasses.field(default_factory=list)
+
+
+@dataclasses.dataclass
+class FieldMetadata:
+    primary_key: bool = False
+    foreign_key: typing.Optional[str] = None
+    nullable: typing.Optional[bool] = None
+    index: bool = False
+    unique: typing.Optional[bool] = None
+    db_column: typing.Optional[str] = None
+    args: typing.List[str] = dataclasses.field(default_factory=list)
+    where: typing.Optional[str] = None
+    raw_sql: typing.Optional[str] = None
+    function: typing.Optional[str] = None
+    weight: typing.Optional[float] = None
 
 
 @dataclasses.dataclass
@@ -78,15 +101,16 @@ class Directive:
     name: str
     args: typing.List[Argument]
 
+    def to_dict(self) -> dict:
+        return {arg.name: arg.value for arg in self.args}
+
 
 @dataclasses.dataclass
 class Field:
     field: GraphQLField
-    metadata: typing.Dict[str, typing.Any]
     parent: str
     name: str
     field_type: FieldType
-    description: typing.Optional[str]
     args: typing.List[Argument]
     related_args: typing.List[Argument] = dataclasses.field(default_factory=list)
     directives: typing.List[Directive] = dataclasses.field(default_factory=list)
@@ -101,8 +125,6 @@ class Field:
         parent: str,
         field: GraphQLField,
         field_type: FieldType,
-        metadata: typing.Dict[str, typing.Any],
-        description: typing.Optional[str] = None,
         args: typing.Optional[typing.List[Argument]] = None,
         related_args: typing.Optional[typing.List[Argument]] = None,
         directives: typing.Optional[typing.List[Directive]] = None,
@@ -112,11 +134,9 @@ class Field:
         related_args = related_args or []
         return cls(
             field=field,
-            metadata=metadata,
             parent=parent,
             name=name,
             field_type=field_type,
-            description=description,
             args=args,
             related_args=related_args,
             directives=directives or [],
@@ -127,12 +147,20 @@ class Field:
         return f"Field<{self.parent}.{self.name}>"
 
     @property
+    def description(self) -> typing.Optional[str]:
+        return self.field.description
+
+    @property
     def type(self) -> str:
         return self.field_type.type
 
     @property
     def required(self) -> bool:
         return self.field_type.required
+
+    @property
+    def metadata(self) -> FieldMetadata:
+        return self.field.extensions.get("field_meta", FieldMetadata())
 
     @property
     def operation_name(self) -> str:
@@ -239,6 +267,14 @@ class Field:
             annotation=ast_for_name(self.field_type.safe_value),
         )
 
+    def validate_field_metadata(self):
+        if self.field_type.required and self.metadata.nullable:
+            raise SchemaValidationError(
+                f"Field '{self.name}' is marked as non-null in GraphQL schema, "
+                "but metadata specifies nullable=true. Remove the nullable metadata "
+                "or update the GraphQL schema."
+            )
+
 
 @dataclasses.dataclass
 class ObjectType:
@@ -247,14 +283,23 @@ class ObjectType:
     type_def: GraphQLObjectType
     name: str
     py_type: str
-    metadata: typing.Dict[str, typing.Any]
     fields: list[Field]
     related_fields: list[Field] = dataclasses.field(default_factory=list)
-    description: typing.Optional[str] = None
+
+    @property
+    def description(self) -> typing.Optional[str]:
+        return self.type_def.description
+
+    @property
+    def sqlmetadata(self) -> typing.Optional[SQLMetadata]:
+        return self.type_def.extensions.get("sql_metadata")
 
     @property
     def db_table(self) -> typing.Optional[str]:
-        return self.metadata.get("db_table")
+        if self.sqlmetadata:
+            return self.sqlmetadata.table_name
+
+        return None
 
     @property
     def is_db_type(self) -> bool:
@@ -277,7 +322,10 @@ class InterfaceType:
     py_type: str
     fields: typing.List[Field]
     metadata: typing.Dict[str, typing.Any]
-    description: typing.Optional[str] = None
+
+    @property
+    def description(self) -> typing.Optional[str]:
+        return self.node.description
 
     @property
     def as_ast(self) -> ast.ClassDef:
@@ -301,10 +349,10 @@ class InterfaceType:
 
 @dataclasses.dataclass
 class UnionType:
+    node: GraphQLUnionType
     name: str
     py_type: str
     types: typing.List[FieldType]
-    description: typing.Optional[str] = None
 
     @property
     def as_ast(self) -> ast.Assign:
@@ -322,7 +370,10 @@ class InputType:
     py_type: str
     fields: typing.List[Field]
     metadata: typing.Dict[str, typing.Any]
-    description: typing.Optional[str] = None
+
+    @property
+    def description(self) -> typing.Optional[str]:
+        return self.node.description
 
     @property
     def as_ast(self) -> ast.ClassDef:

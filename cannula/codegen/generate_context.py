@@ -116,7 +116,7 @@ class ContextGenerator(CodeGenerator):
             if related_field.fk_field is not None:
                 continue
 
-            where_clause = related_field.metadata.get("where")
+            where_clause = related_field.metadata.where
             if not where_clause and not related_field.field_type.is_list:
                 raise SchemaValidationError(
                     f"{related_field} includes a relation to {type_info.name} that requires "
