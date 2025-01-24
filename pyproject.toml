@@ -16,7 +16,7 @@ classifiers = [
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3.10",
 ]
-dependencies = ["graphql-core<=3.2.5", "pyyaml<=6.0.2"]
+dependencies = ["graphql-core<=3.2.5"]
 
 [project.optional-dependencies]
 codegen = [
@@ -47,7 +47,6 @@ test = [
     "twine==6.0.1",
     "types-python-dateutil",
     "types-requests",
-    "types-PyYAML",
     "hatch",
     "greenlet",
 ]

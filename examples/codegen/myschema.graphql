@@ -2,40 +2,18 @@ scalar UUID
 
 """
 User Model
-
----
-metadata:
-  db_table: users
 """
-type User {
-  "@metadata(primary_key: true)"
-  id: UUID!
+type User @db_sql {
+  id: UUID! @field_meta(primary_key: true)
   name: String
   email: String
-  "@metadata(args: id)"
-  quota: [Quota!]
-  """
-  ---
-  metadata:
-    where: "user_id = :id AND resource = :resource"
-    args:
-      - id
-  """
+  quota: [Quota!] @field_meta(args: ["id"])
   overQuota(resource: String!): Quota
+    @field_meta(where: "user_id = :id AND resource = :resource", args: ["id"])
 }
 
-"@metadata(db_table: quota)"
-type Quota {
-  "@metadata(foreign_key: users.id)"
-  user_id: UUID!
-  """
-  User that this quota is for.
-  ---
-  metadata:
-    relation:
-       back_populates: quota
-       where: user.id == :id
-  """
+type Quota @db_sql(table_name: "quota") {
+  user_id: UUID! @field_meta(foreign_key: "users.id")
   user: User
   resource: String
   limit: Int

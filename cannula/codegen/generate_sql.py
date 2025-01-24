@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import List
 import ast
 
 from cannula.utils import (
@@ -19,44 +19,28 @@ from cannula.types import Field
 class SQLAlchemyGenerator(CodeGenerator):
     """Generates SQLAlchemy models from GraphQL schema."""
 
-    def validate_field_metadata(
-        self, field_name: str, is_required: bool, metadata: Dict[str, Any]
-    ) -> None:
-        """Validate that field metadata doesn't conflict with GraphQL schema definitions."""
-        metadata_nullable = metadata.get("nullable")
-
-        if is_required and metadata_nullable is True:
-            raise SchemaValidationError(
-                f"Field '{field_name}' is marked as non-null in GraphQL schema, "
-                "but metadata specifies nullable=true. Remove the nullable metadata "
-                "or update the GraphQL schema."
-            )
-
     def get_primary_key_fields(self, type_info: ObjectType) -> List[str]:
         """Get list of field names that are marked as primary keys."""
         primary_keys = []
         for field in type_info.fields:
-            if field.metadata.get("primary_key"):
+            if field.metadata.primary_key:
                 primary_keys.append(field.name)
         return primary_keys
 
     def create_column_args(
-        self, field_name: str, is_required: bool, metadata: Dict[str, Any]
+        self, field: Field
     ) -> tuple[list[ast.expr], list[ast.keyword]]:
         """Create SQLAlchemy Column arguments for a regular column."""
         args: list[ast.expr] = []
         keywords: list[ast.keyword] = []
 
-        # Validate metadata against schema
-        self.validate_field_metadata(field_name, is_required, metadata)
-
         # Handle primary key
-        is_primary_key = metadata.get("primary_key", False)
-        if is_primary_key:
+        is_primary_key = field.metadata.primary_key
+        if field.metadata.primary_key:
             keywords.append(ast_for_keyword("primary_key", True))
 
         # Handle foreign key
-        if foreign_key := metadata.get("foreign_key"):
+        if foreign_key := field.metadata.foreign_key:
             keywords.append(
                 # This does not use a constant so we cannot use ast_for_keyword
                 ast.keyword(
@@ -70,23 +54,23 @@ class SQLAlchemyGenerator(CodeGenerator):
             )
 
         # Handle index
-        if not is_primary_key and metadata.get("index"):
+        if not is_primary_key and field.metadata.index:
             keywords.append(ast_for_keyword(arg="index", value=True))
 
         # Handle unique constraint
-        if not is_primary_key and metadata.get("unique"):
+        if not is_primary_key and field.metadata.unique:
             keywords.append(ast_for_keyword(arg="unique", value=True))
 
         # Handle custom column name
-        if db_column := metadata.get("db_column"):
+        if db_column := field.metadata.db_column:
             keywords.append(ast_for_keyword(arg="name", value=db_column))
 
         # Handle nullable based on GraphQL schema
         if not is_primary_key:
-            metadata_nullable = metadata.get("nullable")
+            metadata_nullable = field.metadata.nullable
             # GraphQL non-null fields are not nullable unless explicitly overridden
             nullable = (
-                not is_required if metadata_nullable is None else metadata_nullable
+                not field.required if metadata_nullable is None else metadata_nullable
             )
             keywords.append(ast_for_keyword(arg="nullable", value=nullable))
 
@@ -97,10 +81,11 @@ class SQLAlchemyGenerator(CodeGenerator):
     ) -> ast.AnnAssign:
         """Create field definition AST node based on field type and metadata."""
 
+        # Validate Field Metadata
+        field.validate_field_metadata()
+
         func_name = "mapped_column"
-        args, keywords = self.create_column_args(
-            field.name, field.field_type.required, field.metadata
-        )
+        args, keywords = self.create_column_args(field)
         # Create the Mapped[Type] annotation
         mapped_type = ast_for_subscript(ast_for_name("Mapped"), field.field_type.type)
 
@@ -119,9 +104,12 @@ class SQLAlchemyGenerator(CodeGenerator):
         # Check for multiple primary keys
         primary_keys = self.get_primary_key_fields(type_info)
 
-        if len(primary_keys) > 1 and not type_info.metadata.get(
-            "composite_primary_key"
-        ):
+        has_composite_key = (
+            type_info.sqlmetadata.composite_primary_key
+            if type_info.sqlmetadata
+            else False
+        )
+        if len(primary_keys) > 1 and not has_composite_key:
             error_msg = (
                 f"Multiple primary keys found in type '{type_info.name}': {', '.join(primary_keys)}. "
                 "To create a composite primary key, add 'composite_primary_key: true' to the type's metadata."
@@ -135,11 +123,10 @@ class SQLAlchemyGenerator(CodeGenerator):
             body.append(ast_for_docstring(type_info.description))
 
         # Add table name
-        table_name = type_info.metadata.get("db_table", type_info.name.lower())
         body.append(
             ast_for_assign(
                 "__tablename__",
-                value=ast.Constant(value=table_name),
+                value=ast.Constant(value=type_info.db_table),
             )
         )
 
@@ -165,11 +152,11 @@ class SQLAlchemyGenerator(CodeGenerator):
         db_tables = [t.db_table for t in self.get_db_types()]
 
         for type_info in self.analyzer.object_types:
-            if "db_table" not in type_info.metadata:
+            if not type_info.is_db_type:
                 continue
 
             for field in type_info.fields:
-                if fk := field.metadata.get("foreign_key"):
+                if fk := field.metadata.foreign_key:
                     _table, _column = fk.split(".")
                     # Ensure the related type is also a database table
                     if _table not in db_tables:
@@ -198,7 +185,7 @@ class SQLAlchemyGenerator(CodeGenerator):
 
         # Generate model classes for each type
         for type_info in self.analyzer.object_types:
-            if "db_table" not in type_info.metadata:
+            if not type_info.is_db_type:
                 continue
 
             model_class = self.create_model_class(type_info)

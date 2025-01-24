@@ -7,48 +7,30 @@ SCHEMA = gql(
     '''
 """
 User in the system
-
----
-metadata:
-    db_table: users
-    cache: false
-    ttl: 0
-    weight: 1.2
 """
-type User {
-    "User ID @metadata(primary_key: true)"
-    id: ID!
-    "@metadata(index: true)"
-    name: String!
-    "@metadata(db_column: email_address, unique: true)"
-    email: String!
-    "@metadata(nullable: true, cache: false)"
-    age: Int
+type User @db_sql {
+    "User ID"
+    id: ID! @field_meta(primary_key: true)
+    name: String! @field_meta(index: true)
+    email: String! @field_meta(db_column: "email_address", unique: true)
+    age: Int @field_meta(nullable: true)
     """
     User Projects
-    ---
-    metadata:
-        where: "author_id = :id"
-        args: id
     """
-    projects(limit: Int = 10): [Project]
+    projects(limit: Int = 10): [Project] @field_meta(where: "author_id = :id")
     is_active: Boolean
 }
 
 """
 Project for users to work on
-
-@metadata(db_table:"projects")
 """
-type Project {
-    "Project ID @metadata(primary_key: true)"
-    id: ID!
+type Project @db_sql {
+    "Project ID"
+    id: ID!  @field_meta(primary_key: true)
     name: String!
-    "@metadata(foreign_key: users.id)"
-    author_id: ID!
+    author_id: ID!  @field_meta(foreign_key: "users.id")
     author: User!
     description: String
-    "@metadata(wieght: 1.5, fancy: $100)"
     is_active: Boolean
 }
 
@@ -69,11 +51,8 @@ EXTENTIONS = gql(
 extend type Query {
     """
     User by id
-    ---
-    metadata:
-        where: "id = :id"
     """
-    user(id: ID!): User
+    user(id: ID!): User @field_meta(where: "id = :id")
     projects(userId: ID!): [Project]
 }
 '''
@@ -125,36 +104,27 @@ def test_generate_sql():
 
 INVALID_NULLABLE = gql(
     """
-"@metadata(db_table:users)"
-type User {
-    "User ID @metadata(primary_key: true)"
-    id: ID!
-    "@metadata(nullable: true, index: true)"
-    name: String!
+type User @db_sql {
+    id: ID! @field_meta(primary_key: true)
+    name: String! @field_meta(nullable: true, index: true)
 }
 """
 )
 
 INVALID_COMPOSITE = gql(
     """
-"@metadata(db_table:users)"
-type User {
-    "User ID @metadata(primary_key: true)"
-    id: ID!
-    "@metadata(primary_key: true)"
-    name: String!
+type User @db_sql {
+    id: ID! @field_meta(primary_key: true)
+    name: String! @field_meta(primary_key: true)
 }
 """
 )
 
 INVALID_RELATION = gql(
     """
-"@metadata(db_table:users)"
-type User {
-    "User ID @metadata(primary_key: true)"
-    id: ID!
-    "@metadata(foreign_key: projects.id)"
-    project_id: String!
+type User @db_sql {
+    id: ID! @field_meta(primary_key: true)
+    project_id: String! @field_meta(foreign_key: "projects.id")
 }
 
 "not a db table"

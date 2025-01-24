@@ -9,9 +9,14 @@ import pathlib
 import typing
 
 from graphql import (
+    GraphQLField,
+    GraphQLInputObjectType,
+    GraphQLInterfaceType,
+    GraphQLObjectType,
     GraphQLScalarType,
     GraphQLSchema,
     DocumentNode,
+    DirectiveDefinitionNode,
     TypeDefinitionNode,
     build_ast_schema,
     concat_ast,
@@ -27,7 +32,7 @@ from typing_extensions import TypedDict
 
 from cannula.scalars import ScalarInterface
 from cannula.schema_processor import SchemaProcessor
-
+from cannula.directives import DB_SQL, FIELD_META
 
 LOG = logging.getLogger(__name__)
 QUERY_TYPE = parse("type Query { _empty: String }")
@@ -69,6 +74,27 @@ def assert_has_query_and_mutation(ast: DocumentNode) -> DocumentNode:
     if not has_query_definition:
         LOG.debug("Adding default empty Query type")
         ast = concat_ast([ast, QUERY_TYPE])
+
+    return ast
+
+
+def ensure_schema_has_directive(ast: DocumentNode) -> DocumentNode:
+    """Add default directives if missing"""
+    directive_definitions = [
+        node.name.value
+        for node in ast.definitions
+        if isinstance(node, DirectiveDefinitionNode)
+    ]
+    has_db_sql = "db_sql" in directive_definitions
+    has_field_meta = "field_meta" in directive_definitions
+
+    if not has_db_sql:
+        LOG.debug("Adding db_sql directive")
+        ast = concat_ast([ast, DB_SQL])
+
+    if not has_field_meta:
+        LOG.debug("Adding field_meta directive")
+        ast = concat_ast([ast, FIELD_META])
 
     return ast
 
@@ -124,6 +150,7 @@ def build_and_extend_schema(
     ast_document = concat_documents(type_defs)
 
     ast_document = assert_has_query_and_mutation(ast_document)
+    ast_document = ensure_schema_has_directive(ast_document)
 
     processor = SchemaProcessor()
     metadata = processor.process_schema(ast_document)
@@ -149,17 +176,36 @@ def build_and_extend_schema(
         is_private = name.startswith("__")
 
         if is_input_object_type(definition):
+            definition = typing.cast(GraphQLInputObjectType, definition)
             definition.extensions["py_type"] = name
+            definition.extensions.update(**metadata.type_metadata[name])
+            field_meta = metadata.field_metadata[name]
+            for field_name, field in definition.fields.items():
+                field = typing.cast(GraphQLField, field)
+                field.extensions.update(**field_meta.get(field_name, {}))
 
         elif is_union_type(definition):
             definition.extensions["py_type"] = name
+            definition.extensions.update(**metadata.type_metadata[name])
 
         elif is_object_type(definition) and not is_private:
+            definition = typing.cast(GraphQLObjectType, definition)
             definition.extensions["py_type"] = name
             definition.extensions["db_type"] = f"DB{name}"
+            definition.extensions.update(**metadata.type_metadata[name])
+            field_meta = metadata.field_metadata[name]
+            for field_name, field in definition.fields.items():
+                field = typing.cast(GraphQLField, field)
+                field.extensions.update(**field_meta.get(field_name, {}))
 
         elif is_interface_type(definition):
+            definition = typing.cast(GraphQLInterfaceType, definition)
             definition.extensions["py_type"] = name
+            definition.extensions.update(**metadata.type_metadata[name])
+            field_meta = metadata.field_metadata[name]
+            for field_name, field in definition.fields.items():
+                field = typing.cast(GraphQLField, field)
+                field.extensions.update(**field_meta.get(field_name, {}))
 
         elif is_scalar_type(definition):
 
