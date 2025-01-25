@@ -45,9 +45,17 @@ class ContextGenerator(CodeGenerator):
         if where_clause:
             call_args = [
                 ast.Call(
-                    func=ast_for_name("text"),
-                    args=[ast.Constant(where_clause)],
-                    keywords=[],
+                    func=ast.Attribute(
+                        value=ast.Call(
+                            func=ast_for_name("text"),
+                            args=[ast.Constant(where_clause)],
+                            keywords=[],
+                        ),
+                        attr="bindparams",
+                        ctx=ast.Load(),
+                    ),
+                    args=[],
+                    keywords=related_field.related_keywords,
                 )
             ]
 
@@ -61,7 +69,7 @@ class ContextGenerator(CodeGenerator):
                             ctx=ast.Load(),
                         ),
                         args=call_args,
-                        keywords=related_field.related_keywords,
+                        keywords=[],
                     )
                 )
             )
@@ -114,6 +122,10 @@ class ContextGenerator(CodeGenerator):
             # will use that to construct `get_model_by_pk` and we don't need
             # a special resolver function in that case.
             if related_field.fk_field is not None:
+                continue
+
+            # Mutations are special
+            if related_field.parent == "Mutation":
                 continue
 
             where_clause = related_field.metadata.where

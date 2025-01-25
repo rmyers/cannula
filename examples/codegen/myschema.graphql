@@ -12,6 +12,17 @@ type User @db_sql {
     @field_meta(where: "user_id = :id AND resource = :resource", args: ["id"])
 }
 
+input userCreate {
+  name: String!
+  email: String!
+}
+
+input userModify {
+  id: ID!
+  name: String
+  email: String
+}
+
 type Quota @db_sql(table_name: "quota") {
   user_id: UUID! @field_meta(foreign_key: "users.id")
   user: User
@@ -22,4 +33,9 @@ type Quota @db_sql(table_name: "quota") {
 
 type Query {
   people: [User]
+}
+
+type Mutation {
+  createPerson(user: userCreate!): User
+  updatePerson(user: userModify!): User
 }

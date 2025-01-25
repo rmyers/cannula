@@ -54,11 +54,11 @@ class PostDatasource(
 ):
 
     async def user_posts(self, id: str) -> Optional[Sequence[Post]]:
-        return await self.get_models(text("author_id = :id"), id=id)
+        return await self.get_models(text("author_id = :id").bindparams(id=id))
 
     async def user_latestPost(self, id: str) -> Optional[Post]:
         return await self.get_model(
-            text("author_id = :id ORDER BY created_at DESC LIMIT 1"), id=id
+            text("author_id = :id ORDER BY created_at DESC LIMIT 1").bindparams(id=id)
         )
 
 

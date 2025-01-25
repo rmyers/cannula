@@ -10,6 +10,17 @@ if TYPE_CHECKING:
     from .context import Context
 
 
+class userCreate(TypedDict):
+    name: str
+    email: str
+
+
+class userModify(TypedDict):
+    id: str
+    name: str
+    email: str
+
+
 @dataclass(kw_only=True)
 class Quota(ABC):
     __typename = "Quota"
@@ -40,6 +51,13 @@ class User(ABC):
         return await info.context.quotas.user_overQuota(id=self.id, resource=resource)
 
 
+class createPersonMutation(Protocol):
+
+    async def __call__(
+        self, info: ResolveInfo["Context"], user: userCreate
+    ) -> Optional[User]: ...
+
+
 class peopleQuery(Protocol):
 
     async def __call__(
@@ -47,5 +65,14 @@ class peopleQuery(Protocol):
     ) -> Optional[Sequence[User]]: ...
 
 
+class updatePersonMutation(Protocol):
+
+    async def __call__(
+        self, info: ResolveInfo["Context"], user: userModify
+    ) -> Optional[User]: ...
+
+
 class RootType(TypedDict, total=False):
+    createPerson: Optional[createPersonMutation]
     people: Optional[peopleQuery]
+    updatePerson: Optional[updatePersonMutation]
