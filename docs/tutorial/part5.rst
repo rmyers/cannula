@@ -60,35 +60,12 @@ datasources between the different resolvers. These datasource objects will cache
 queries that are safe to replay and return the same results so that we only query the
 database once.
 
-.. literalinclude:: ../examples/tutorial/dashboard/part5/context.py
+.. literalinclude:: ../examples/tutorial/dashboard/part5/gql/context.py
 
 .. note::
     The :class:`cannula.datasource.orm.DatabaseRepository` has an optional read only
     :func:`async_sessionmaker` as the second argument. This will be used if provided
     to preform read only queries.
-
-
-Update Graph Models
--------------------
-
-With our Context configured we can setup the computed functions to use these from
-the context. Adding our datasources to the context is not only handy for access it
-helps prevent circular references. As our our Graph Models are used in the datasource
-definition.
-
-.. code-block:: python
-
-    # This is to avoid circular imports, we only need this reference for
-    # checking types in like: `cannula.ResolveInfo["Context"]`
-    if TYPE_CHECKING:
-        from .context import Context
-
-
-    class User(UserType):
-        """User Graph Model"""
-
-        async def quota(self, info: cannula.ResolveInfo["Context"]) -> list["Quota"] | None:
-            return await info.context.quota_repo.get_quota_for_user(self.id)
 
 
 This example shows how our `User` Graph Model can fetch the related data using

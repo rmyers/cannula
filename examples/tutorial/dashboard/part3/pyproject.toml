@@ -1,10 +1,4 @@
 [tool.cannula.codegen]
-scalars = [
-    "cannula.scalars.date.Date",
-    "cannula.scalars.date.Datetime",
-    "cannula.scalars.date.Time",
-    "cannula.scalars.util.JSON",
-    "cannula.scalars.util.UUID",
-]
+scalars = ["cannula.scalars.util.UUID"]
 dest = "gql"
 schema = "schema.graphql"

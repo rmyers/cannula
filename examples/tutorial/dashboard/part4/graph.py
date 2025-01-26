@@ -1,33 +1,35 @@
 import pathlib
-from typing import List
+import uuid
+from typing import Sequence, Optional
 
 import cannula
-
-from sqlalchemy import select
+from cannula.scalars.util import UUID
 
 from ..core.config import config
-from ..core.database import User as DBUser
-from ._generated import UserType, RootType
-from .context import Context
-from .models import User
+from .gql.types import User, RootType
+from .gql.context import Context
 
 
 async def resolve_people(
-    # Using this type hint for the ResolveInfo will make it so that
-    # we can inspect the `info` object in our editors and find the `user_repo`
     info: cannula.ResolveInfo[Context],
-) -> List[UserType]:
-    async with info.context.session() as session:
-        query = select(DBUser)
-        all_users = await session.scalars(query)
-        return [User.from_db(user) for user in all_users]
+) -> Optional[Sequence[User]]:
+    return await info.context.users.query_people()
 
 
-# The RootType object from _generated will warn us if we use
-# a resolver with an incorrect signature
-root_value: RootType = {"people": resolve_people}
+async def resolve_person(
+    info: cannula.ResolveInfo[Context],
+    id: uuid.UUID,
+) -> Optional[User]:
+    return await info.context.users.query_person(id=id)
+
+
+root_value: RootType = {
+    "people": resolve_people,
+    "person": resolve_person,
+}
 
 cannula_app = cannula.CannulaAPI[RootType](
     schema=pathlib.Path(config.root / "part4"),
+    scalars=[UUID],
     root_value=root_value,
 )

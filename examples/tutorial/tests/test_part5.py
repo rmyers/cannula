@@ -1,62 +1,34 @@
 import httpx
 import uuid
 
-from dashboard.core.config import config
-from dashboard.part5.models import QuotaRepository, UserRepository
+from dashboard.core.config import Config
+from dashboard.part5.seed_part5 import seed_data
+from dashboard.part5.gql.context import UserDatasource
 
 QUERY = """
-    query People($id: UUID!) {
+    query People {
         people {
             name
             email
             quota {
                 resource
                 limit
+                user {
+                    name
+                }
             }
             overQuota(resource: "water") {
                 count
             }
-            again: overQuota(resource: "water") {
-                limit
-            }
-        }
-        person(id: $id) {
-            name
-            email
-            quota {
-                resource
-            }
-        }
-        another: person(id: $id) {
-            name
-            email
         }
     }
     """
 
 
-async def test_part_five_graph(client: httpx.AsyncClient, mocker):
-    user_id = uuid.uuid4()
-    admin_id = uuid.uuid4()
-    users = UserRepository(config.session)
-    quotas = QuotaRepository(config.session)
-    user_from_db = mocker.spy(users, "from_db")
-    quotas_from_db = mocker.spy(quotas, "from_db")
-    await users.add(id=user_id, name="test", email="sam@example.com", password="test")
-    await users.add(
-        id=admin_id, name="adder", email="admin@example.com", password="test"
-    )
-    await quotas.add(user_id=user_id, resource="fire", limit=10, count=4)
-    await quotas.add(user_id=user_id, resource="water", limit=15, count=4)
-    await quotas.add(user_id=admin_id, resource="fire", limit=5, count=4)
+async def test_part_four_graph(client: httpx.AsyncClient, test_config: Config):
+    await seed_data(test_config.session)
 
-    resp = await client.post(
-        "/part5/graph",
-        json={
-            "query": QUERY,
-            "variables": {"id": str(user_id)},
-        },
-    )
+    resp = await client.post("/part5/graph", json={"query": QUERY})
     assert resp.status_code == 200, resp.text
     data = resp.json()
     assert data.get("errors") is None
@@ -66,36 +38,57 @@ async def test_part_five_graph(client: httpx.AsyncClient, mocker):
                 "email": "sam@example.com",
                 "name": "test",
                 "overQuota": {"count": 4},
-                "again": {"limit": 15},
                 "quota": [
-                    {"limit": 10, "resource": "fire"},
-                    {"limit": 15, "resource": "water"},
+                    {"limit": 10, "resource": "fire", "user": {"name": "test"}},
+                    {"limit": 15, "resource": "water", "user": {"name": "test"}},
                 ],
             },
             {
                 "email": "admin@example.com",
                 "name": "adder",
                 "overQuota": None,
-                "quota": [{"limit": 5, "resource": "fire"}],
-                "again": None,
+                "quota": [{"limit": 5, "resource": "fire", "user": {"name": "adder"}}],
             },
         ],
-        "person": {
-            "email": "sam@example.com",
-            "name": "test",
-            "quota": [
-                {"resource": "fire"},
-                {"resource": "water"},
-            ],
+    }
+
+
+MULTI_QUERY = """
+    query People($id: UUID!) {
+        person(id: $id) {
+            name
+            email
+        }
+        another: person(id: $id) {
+            name
+            email
+        }
+    }
+    """
+
+
+async def test_datasources_cache_identical_queries(
+    client: httpx.AsyncClient, mocker, test_config: Config
+):
+    user_id = uuid.uuid4()
+    await UserDatasource(test_config.session).add(
+        id=user_id, name="frank", email="no@uc.com"
+    )
+    user_from_db = mocker.spy(UserDatasource, "from_db")
+    resp = await client.post(
+        "/part5/graph",
+        json={
+            "query": MULTI_QUERY,
+            "variables": {"id": str(user_id)},
         },
-        "another": {"email": "sam@example.com", "name": "test"},
+    )
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data.get("errors") is None
+    assert data.get("data") == {
+        "person": {"email": "no@uc.com", "name": "frank"},
+        "another": {"email": "no@uc.com", "name": "frank"},
     }
 
     # Make sure we only called the database the correct amount
     assert user_from_db.call_count == 2
-    assert quotas_from_db.call_count == 3
-
-
-async def test_part5_root(client):
-    resp = await client.get("/part5/")
-    assert resp.status_code == 200, resp.text
