@@ -2,7 +2,8 @@
 OpenTelemetry Integration
 =========================
 
-This package provides OpenTelemetry instrumentation for CannulaAPI, enabling detailed tracing of GraphQL operations including parsing, validation, and execution phases.
+This package provides OpenTelemetry instrumentation for CannulaAPI, enabling detailed
+tracing of GraphQL operations including parsing, validation, and execution phases.
 
 Installation
 --------------
