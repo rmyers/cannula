@@ -36,7 +36,6 @@ test = [
     "mypy==1.14.1",
     "opentelemetry-api~=1.0",
     "opentelemetry-sdk~=1.0",
-    "opentelemetry-instrumentation>=0.41b0",
     "pycodestyle",
     "pytest-asyncio",
     "pytest-cov",
