@@ -1,32 +1,11 @@
 scalar UUID
 
-"@metadata(db_table: users)"
-type User {
-  "@metadata(primary_key: true)"
-  id: UUID!
-  name: String
-  email: String
-
-  "@metadata(where: user_id = :id, args: id)"
-  quota: [Quota]
-}
-
-"@metadata(db_table: quotas)"
-type Quota {
-  "@metadata(primary_key: true)"
-  id: UUID!
-
-  "@metadata(foreign_key: users.id)"
-  user_id: UUID!
-  user: User
-  resource: String
-  limit: Int
-  count: Int
+type User @db_sql(table_name: "users_part3") {
+  id: UUID! @field_meta(primary_key: true)
+  name: String!
+  email: String @field_meta(index: true, unique: true)
 }
 
 type Query {
   people: [User]
-
-  "@metadata(where: id = :id)"
-  user(id: UUID!): User
 }

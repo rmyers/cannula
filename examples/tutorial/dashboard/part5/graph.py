@@ -1,21 +1,21 @@
 import pathlib
 import uuid
-from typing import Sequence
+from typing import Sequence, Optional
 
 import cannula
 from cannula.scalars.util import UUID
 
 from ..core.config import config
-from ._generated import UserType, RootType
-from .context import Context
+from .gql.types import User, RootType
+from .gql.context import Context
 
 
 async def resolve_people(
     # Using this type hint for the ResolveInfo will make it so that
     # we can inspect the `info` object in our editors and find the `user_repo`
     info: cannula.ResolveInfo[Context],
-) -> Sequence[UserType]:
-    return await info.context.user_repo.get_models()
+) -> Optional[Sequence[User]]:
+    return await info.context.users.query_people()
 
 
 async def resolve_person(
@@ -23,8 +23,8 @@ async def resolve_person(
     # we can inspect the `info` object in our editors and find the `user_repo`
     info: cannula.ResolveInfo[Context],
     id: uuid.UUID,
-) -> UserType | None:
-    return await info.context.user_repo.get_model_by_pk(id)
+) -> User | None:
+    return await info.context.users.query_person(id=id)
 
 
 # The RootType object from _generated will warn us if we use

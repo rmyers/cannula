@@ -1,5 +1,5 @@
-Part4: Computed and Complex Fields
-==================================
+Part4: Related Field Resolution
+===============================
 
 In many web applications not everything fits in the same data types or structures. We
 usually have a relation from one thing to another and that relation can be either hard
@@ -9,42 +9,57 @@ and code up. However what if your manager asked you to find all the cousins of a
 person, well that is not so simple, the data is there but your gonna have to do a bunch
 of work to get the answer.
 
-Cannula has built into the codegen logic the concept of `computed` fields. These are fields
+Cannula has built into the codegen logic the concept of `Related` fields. These are fields
 you want to expose on the model but you don't have an easy attribute to lookup. While it
 doesn't make the work of finding cousins easier, it does make it possible to do in an easy
 to follow structure. We already saw this in the generated Python, all the Query and
-Mutations are examples of this. To add a computed field you just need to add args to the
-field or the `@computed` directive.
+Mutations are examples of this. Any field that has arguments will be rendered as a function
+on the base type. In the case of SQLAlchemy types if any field's return type is a SQLAlchemy
+model Cannula will automatically add a resolver for it.
 
-Here is our example schema:
+In some cases where there is no clear foreign key relation we must provide a `where` clause
+to preform the query. This uses a `text` query to allow a great deal of flexibility to write
+queries. Then Cannula will use `bindparams` to map all the graphql arguments plus any defined
+by the directive. For example the graphql query arguments might include a secondary rule but
+the primary lookup would be the `id` of the parent.
+
+.. code-block:: graphql
+
+    type User {
+        id: ID!
+        # imaging you have a lookup that finds the users best bestFriend
+        # by some sort of ranking system
+        bestFriends(ranking: Int): Friend
+            @field_meta(
+                # Query the 'friends' table sorted by rank
+                where: "user_id = :id AND ranking >= :ranking ORDER BY ranking ASC",
+                # "id" here is the id of the user aka `self.id` since this is a field
+                # on the user object it does not make since to require it in the graphql
+                # query but we have to tell the system which field to use to relate them.
+                args: ["id"],
+            )
+    }
+
+Starting with the schema from part3, we have added a new type 'Quota' that is has a foreign_key
+to the 'User' type for a simple example of how the relations work:
 
 .. literalinclude:: ../examples/tutorial/dashboard/part4/schema.graphql
-    :emphasize-lines: 7,8
+    :language: graphql
 
-Now when we run `cannula codegen` we get this:
+Now when we run `cannula codegen` we get these types and sql:
 
-.. literalinclude:: ../examples/tutorial/dashboard/part4/_generated.py
-    :emphasize-lines: 26,27,30,31
+.. literalinclude:: ../examples/tutorial/dashboard/part4/gql/types.py
 
-Our `UserTypeBase` now has the fields represented with an abstract method which we just
-need to implement. The `Quota` type is a foreign key relation so it is easy to add that
-in, and the nice thing is that this field is lazy. If our query doesn't ask for this
-data then the relation is not queried. In sqlalchemy this is exposed via the `AsyncAttrs`
+.. literalinclude:: ../examples/tutorial/dashboard/part4/gql/sql.py
 
-.. code-block:: python
+You can see that we have foreign_key relations in the db and our types
+now have resolvers that call the context which is where all the magic happens.
+let's look at the context that was generated to see our custom queries in
+action:
 
-    from sqlalchemy.ext.asyncio import AsyncAttrs
-    from sqlalchemy.orm import DeclarativeBase
+.. literalinclude:: ../examples/tutorial/dashboard/part4/gql/context.py
 
-    class Base(AsyncAttrs, DeclarativeBase):
-        pass
-
-Here is how we can use that in our updated `models.py`:
-
-.. literalinclude:: ../examples/tutorial/dashboard/part4/models.py
-    :emphasize-lines: 35,36,37,38,39,41,42,43,44,45,46,47,48,49
-
-The graph changes slightly because we simplied the schema:
+Now we just need to add in the new query we added to the `RootType`:
 
 .. literalinclude:: ../examples/tutorial/dashboard/part4/graph.py
 

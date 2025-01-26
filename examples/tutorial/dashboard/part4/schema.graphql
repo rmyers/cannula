@@ -1,20 +1,24 @@
 scalar UUID
 
-type User {
-  id: UUID!
-  name: String
-  email: String
-  quota: [Quota!]
+type User @db_sql(table_name: "users_part4") {
+  id: UUID! @field_meta(primary_key: true)
+  name: String!
+  email: String! @field_meta(index: true, unique: true)
+  quota: [Quota!] @field_meta(where: "user_id = :id", args: ["id"])
   overQuota(resource: String!): Quota
+    @field_meta(where: "user_id = :id AND resource = :resource", args: ["id"])
 }
 
-type Quota {
+type Quota @db_sql(table_name: "quotas_part4") {
+  id: UUID! @field_meta(primary_key: true)
+  user_id: UUID! @field_meta(foreign_key: "users_part4.id")
   user: User
-  resource: String
-  limit: Int
-  count: Int
+  resource: String!
+  limit: Int!
+  count: Int!
 }
 
 type Query {
   people: [User]
+  person(id: UUID!): User @field_meta(where: "id = :id")
 }

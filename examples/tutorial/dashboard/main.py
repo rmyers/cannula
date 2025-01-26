@@ -5,8 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from .core.config import config
-from .core.database import create_tables
-from .core.session import SessionMiddleware, auth_router
+from .core.seed_data import create_tables
 from .part1.routes import part1
 from .part2.routes import part2
 from .part3.routes import part3
@@ -17,7 +16,7 @@ from .part5.routes import part5
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Make sure the database has been created
-    await create_tables()
+    await create_tables(config.engine)
     # Run the app
     yield
     # tear down things right now there is nothing to do
@@ -40,7 +39,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.add_middleware(SessionMiddleware)
 
 app.mount("/static", StaticFiles(directory=config.static_files), name="static")
 
@@ -50,7 +48,6 @@ def home(request: Request):
     return config.templates.TemplateResponse(request, "index.html")
 
 
-app.include_router(auth_router)
 app.include_router(part1)
 app.include_router(part2)
 app.include_router(part3)
