@@ -269,4 +269,4 @@ def instrument_cannula(api_instance: "cannula.CannulaAPI") -> None:
                 raise
 
     # Replace the original call method with our wrapped version
-    api_instance.call = wrapped_call
+    api_instance.call = wrapped_call  # type: ignore
