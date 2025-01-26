@@ -31,7 +31,11 @@ test = [
     "black",
     "coverage==7.6.10",
     "flake8==7.1.1",
+    "greenlet",
+    "hatch",
     "mypy==1.14.1",
+    "opentelemetry-api~=1.0",
+    "opentelemetry-sdk~=1.0",
     "pycodestyle",
     "pytest-asyncio",
     "pytest-cov",
@@ -47,8 +51,6 @@ test = [
     "twine==6.0.1",
     "types-python-dateutil",
     "types-requests",
-    "hatch",
-    "greenlet",
 ]
 performance = [
     "pytest<9",
