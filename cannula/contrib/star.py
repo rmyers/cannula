@@ -1,3 +1,4 @@
+import sys
 from typing import Optional, Dict, Any, AsyncGenerator
 import json
 import asyncio
@@ -12,6 +13,7 @@ from starlette.websockets import WebSocket, WebSocketDisconnect
 from cannula import CannulaAPI
 
 logger = logging.getLogger(__name__)
+logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
 
 
 # GraphQL over WebSocket Protocol Messages
@@ -94,14 +96,33 @@ class SubscriptionManager:
                 request=websocket,
             )
 
+            if hasattr(result, "errors") and result.errors:
+                error_msg = GQLMessage(
+                    type=GQLMessageType.ERROR,
+                    id=subscription_id,
+                    payload={"errors": result.errors},
+                )
+                logger.error(str(error_msg))
+                await websocket.send_json(error_msg.__dict__)
+                return
+
             if result.data:
-                # If the result is an async generator (subscription)
-                if isinstance(result.data, AsyncGenerator):
-                    async for item in result.data:
+                # Handle the AsyncGenerator for subscriptions
+                if isinstance(result.data, dict) and any(
+                    isinstance(v, AsyncGenerator) for v in result.data.values()
+                ):
+                    # Get the first generator from the data dict
+                    field_name, generator = next(
+                        (k, v)
+                        for k, v in result.data.items()
+                        if isinstance(v, AsyncGenerator)
+                    )
+
+                    async for item in generator:
                         message = GQLMessage(
                             type=GQLMessageType.NEXT,
                             id=subscription_id,
-                            payload={"data": item},
+                            payload={"data": {field_name: item}},
                         )
                         await websocket.send_json(message.__dict__)
 
@@ -185,6 +206,7 @@ class StarletteGraphQLHandler:
                 {"errors": [{"message": "Method not allowed"}]}, status_code=405
             )
 
+        logger.info("Handling request")
         try:
             if request.method == "GET":
                 query = request.query_params.get("query")
@@ -234,14 +256,23 @@ class StarletteGraphQLHandler:
             return JSONResponse({"errors": [{"message": str(e)}]}, status_code=500)
 
     async def handle_websocket(self, websocket: WebSocket):
-        await websocket.accept()
+        logger.info(str(websocket))
+        await websocket.accept(subprotocol="graphql-transport-ws")
+        logger.info("WebSocket connection accepted")
+
         try:
             # Wait for connection init message
-            async for message in websocket.iter_json():
-                msg = GQLMessage(**message)
+            async for raw_message in websocket.iter_json():
+                logger.info(f"Received message: {raw_message}")
+                try:
+                    msg = GQLMessage(**raw_message)
+                except Exception as e:
+                    logger.error(f"Failed to parse message: {e}")
+                    continue
 
                 if msg.type == GQLMessageType.CONNECTION_INIT:
                     # Send connection acknowledgment
+                    logger.info("Sending connection ack")
                     ack = GQLMessage(type=GQLMessageType.CONNECTION_ACK)
                     await websocket.send_json(ack.__dict__)
 
