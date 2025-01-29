@@ -148,14 +148,15 @@ class GraphQLHandler:
             )
 
         try:
+            variables: Optional[Dict[str, Any]] = None
             if request.method == "GET":
                 query = request.query_params.get("query")
-                variables = request.query_params.get("variables")
+                variables_params = request.query_params.get("variables")
                 operation_name = request.query_params.get("operationName")
 
-                if variables:
+                if variables_params:
                     try:
-                        variables = json.loads(variables)
+                        variables = json.loads(variables_params)
                     except json.JSONDecodeError:
                         return JSONResponse(
                             {"errors": [{"message": "Invalid variables format"}]},
@@ -175,7 +176,7 @@ class GraphQLHandler:
 
             result = await self.graph.call(
                 document=query,
-                variables=variables or {},
+                variables=variables,
                 operation_name=operation_name,
                 request=request,
             )
@@ -264,12 +265,12 @@ class GraphQLHandler:
                     type=GQLMessageType.CONNECTION_ERROR, payload={"message": str(e)}
                 )
                 await websocket.send_json(error_msg.to_dict())
-            except:
+            except Exception:
                 pass
         finally:
             try:
                 await websocket.close()
-            except:
+            except Exception:
                 pass
 
     def routes(self) -> list:
