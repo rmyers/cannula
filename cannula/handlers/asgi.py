@@ -1,19 +1,20 @@
-import sys
-from typing import Optional, Dict, Any, AsyncGenerator
-import json
 import asyncio
+import json
 import logging
 from dataclasses import dataclass
 from enum import Enum
+from typing import Optional, Dict, Any
+
+from graphql import ExecutionResult
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse, Response
 from starlette.routing import Route, WebSocketRoute
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
-from cannula import CannulaAPI
+from cannula import CannulaAPI, format_errors
+from cannula.handlers.const import GRAPHIQL_TEMPLATE
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(stream=sys.stderr, level=logging.DEBUG)
 
 
 # GraphQL over WebSocket Protocol Messages
@@ -28,51 +29,24 @@ class GQLMessageType(str, Enum):
     ERROR = "error"
     COMPLETE = "complete"
 
+    def __str__(self):
+        return self.value
+
 
 @dataclass
 class GQLMessage:
     type: str
     id: Optional[str] = None
-    payload: Optional[Dict[str, Any]] = None
+    payload: Optional[Any] = None
 
-
-GRAPHIQL_TEMPLATE = """
-<!DOCTYPE html>
-<html>
-<head>
-    <title>GraphiQL</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/graphiql/2.4.7/graphiql.min.css" rel="stylesheet" />
-</head>
-<body style="margin: 0; height: 100vh;">
-    <div id="graphiql" style="height: 100vh;"></div>
-    <script
-        crossorigin
-        src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"
-    ></script>
-    <script
-        crossorigin
-        src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"
-    ></script>
-    <script
-        crossorigin
-        src="https://cdnjs.cloudflare.com/ajax/libs/graphiql/2.4.7/graphiql.min.js"
-    ></script>
-    <script>
-        const fetcher = GraphiQL.createFetcher({
-            url: window.location.href,
-            subscriptionUrl: 'ws://' + window.location.host + window.location.pathname,
-        });
-        ReactDOM.render(
-            React.createElement(GraphiQL, {
-                fetcher: fetcher,
-                defaultQuery: "# Write your query here",
-            }),
-            document.getElementById('graphiql'),
-        );
-    </script>
-</body>
-</html>
-"""
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert message to dictionary, excluding None values."""
+        result: Dict[str, Any] = {"type": str(self.type)}
+        if self.id is not None:
+            result["id"] = self.id
+        if self.payload is not None:
+            result["payload"] = self.payload
+        return result
 
 
 class SubscriptionManager:
@@ -89,77 +63,44 @@ class SubscriptionManager:
         operation_name: Optional[str] = None,
     ):
         try:
-            result = await graph.call(
+            result = await graph.subscribe(
                 document=query,
                 variables=variables,
                 operation_name=operation_name,
                 request=websocket,
             )
 
-            if hasattr(result, "errors") and result.errors:
+            if isinstance(result, ExecutionResult):
                 error_msg = GQLMessage(
                     type=GQLMessageType.ERROR,
                     id=subscription_id,
-                    payload={"errors": result.errors},
+                    payload=format_errors(result.errors, graph.logger, graph.level),
                 )
-                logger.error(str(error_msg))
-                await websocket.send_json(error_msg.__dict__)
+                await websocket.send_json(error_msg.to_dict())
                 return
 
-            if result.data:
-                # Handle the AsyncGenerator for subscriptions
-                if isinstance(result.data, dict) and any(
-                    isinstance(v, AsyncGenerator) for v in result.data.values()
-                ):
-                    # Get the first generator from the data dict
-                    field_name, generator = next(
-                        (k, v)
-                        for k, v in result.data.items()
-                        if isinstance(v, AsyncGenerator)
-                    )
-
-                    async for item in generator:
-                        message = GQLMessage(
-                            type=GQLMessageType.NEXT,
-                            id=subscription_id,
-                            payload={"data": {field_name: item}},
-                        )
-                        await websocket.send_json(message.__dict__)
-
-                    # Send complete message when generator is done
-                    complete_msg = GQLMessage(
-                        type=GQLMessageType.COMPLETE, id=subscription_id
-                    )
-                    await websocket.send_json(complete_msg.__dict__)
-                else:
-                    # Handle non-subscription queries over websocket
-                    message = GQLMessage(
-                        type=GQLMessageType.NEXT,
-                        id=subscription_id,
-                        payload={"data": result.data},
-                    )
-                    await websocket.send_json(message.__dict__)
-
-                    complete_msg = GQLMessage(
-                        type=GQLMessageType.COMPLETE, id=subscription_id
-                    )
-                    await websocket.send_json(complete_msg.__dict__)
-
-            if result.errors:
-                error_msg = GQLMessage(
-                    type=GQLMessageType.ERROR,
+            async for item in result:
+                message = GQLMessage(
+                    type=GQLMessageType.NEXT,
                     id=subscription_id,
-                    payload={"errors": result.errors},
+                    payload={
+                        "data": item.data,
+                        "errors": format_errors(item.errors, graph.logger, graph.level),
+                    },
                 )
-                await websocket.send_json(error_msg.__dict__)
+                await websocket.send_json(message.to_dict())
+
+            # Send complete message when generator is done
+            complete_msg = GQLMessage(type=GQLMessageType.COMPLETE, id=subscription_id)
+            await websocket.send_json(complete_msg.to_dict())
 
         except Exception as e:
             error_msg = GQLMessage(
                 type=GQLMessageType.ERROR,
                 id=subscription_id,
-                payload={"errors": [{"message": str(e)}]},
+                payload=[{"message": str(e)}],
             )
-            await websocket.send_json(error_msg.__dict__)
+            await websocket.send_json(error_msg.to_dict())
         finally:
             if subscription_id in self.active_subscriptions:
                 del self.active_subscriptions[subscription_id]
@@ -170,7 +111,7 @@ class SubscriptionManager:
             del self.active_subscriptions[subscription_id]
 
 
-class StarletteGraphQLHandler:
+class GraphQLHandler:
     def __init__(
         self,
         graph: CannulaAPI,
@@ -206,7 +147,6 @@ class StarletteGraphQLHandler:
                 {"errors": [{"message": "Method not allowed"}]}, status_code=405
             )
 
-        logger.info("Handling request")
         try:
             if request.method == "GET":
                 query = request.query_params.get("query")
@@ -235,7 +175,7 @@ class StarletteGraphQLHandler:
 
             result = await self.graph.call(
                 document=query,
-                variables=variables,
+                variables=variables or {},
                 operation_name=operation_name,
                 request=request,
             )
@@ -256,14 +196,13 @@ class StarletteGraphQLHandler:
             return JSONResponse({"errors": [{"message": str(e)}]}, status_code=500)
 
     async def handle_websocket(self, websocket: WebSocket):
-        logger.info(str(websocket))
         await websocket.accept(subprotocol="graphql-transport-ws")
-        logger.info("WebSocket connection accepted")
+        logger.debug("WebSocket connection accepted")
 
         try:
             # Wait for connection init message
             async for raw_message in websocket.iter_json():
-                logger.info(f"Received message: {raw_message}")
+                logger.debug(f"Received message: {raw_message}")
                 try:
                     msg = GQLMessage(**raw_message)
                 except Exception as e:
@@ -272,14 +211,14 @@ class StarletteGraphQLHandler:
 
                 if msg.type == GQLMessageType.CONNECTION_INIT:
                     # Send connection acknowledgment
-                    logger.info("Sending connection ack")
+                    logger.debug("Sending connection ack")
                     ack = GQLMessage(type=GQLMessageType.CONNECTION_ACK)
-                    await websocket.send_json(ack.__dict__)
+                    await websocket.send_json(ack.to_dict())
 
                 elif msg.type == GQLMessageType.PING:
                     # Respond to ping with pong
                     pong = GQLMessage(type=GQLMessageType.PONG)
-                    await websocket.send_json(pong.__dict__)
+                    await websocket.send_json(pong.to_dict())
 
                 elif msg.type == GQLMessageType.SUBSCRIBE and msg.id and msg.payload:
                     # Handle subscription request
@@ -291,9 +230,9 @@ class StarletteGraphQLHandler:
                         error_msg = GQLMessage(
                             type=GQLMessageType.ERROR,
                             id=msg.id,
-                            payload={"errors": [{"message": "No query provided"}]},
+                            payload=[{"message": "No query provided"}],
                         )
-                        await websocket.send_json(error_msg.__dict__)
+                        await websocket.send_json(error_msg.to_dict())
                         continue
 
                     # Create and store subscription task
@@ -320,12 +259,11 @@ class StarletteGraphQLHandler:
             ):
                 self.subscription_manager.stop_subscription(subscription_id)
         except Exception as e:
-            logger.exception("WebSocket handler error")
             try:
                 error_msg = GQLMessage(
                     type=GQLMessageType.CONNECTION_ERROR, payload={"message": str(e)}
                 )
-                await websocket.send_json(error_msg.__dict__)
+                await websocket.send_json(error_msg.to_dict())
             except:
                 pass
         finally:
@@ -347,29 +285,3 @@ class StarletteGraphQLHandler:
             )
 
         return routes
-
-
-# Example usage:
-"""
-from starlette.applications import Starlette
-from cannula import CannulaAPI
-
-# Initialize your CannulaAPI with subscription support
-api = CannulaAPI(schema='''
-    type Subscription {
-        countdown(from: Int!): Int!
-    }
-''')
-
-@api.resolver('Subscription')
-async def countdown(root, info, from_: int) -> AsyncGenerator[int, None]:
-    for i in range(from_, -1, -1):
-        yield i
-        await asyncio.sleep(1)
-
-# Create the handler
-handler = StarletteGraphQLHandler(api, path="/graphql", graphiql=True)
-
-# Create Starlette app
-app = Starlette(routes=handler.routes())
-"""

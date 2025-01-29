@@ -23,6 +23,7 @@ from graphql import (
     ExecutionResult,
     GraphQLSchema,
     parse,
+    subscribe,
     validate_schema,
     validate,
 )
@@ -292,6 +293,54 @@ class CannulaAPI(typing.Generic[RootType]):
         if inspect.isawaitable(result):
             return await result
         return typing.cast(ExecutionResult, result)
+
+    async def subscribe(
+        self,
+        document: typing.Union[DocumentNode, str],
+        *,
+        variables: typing.Optional[typing.Dict[str, typing.Any]] = None,
+        operation_name: typing.Optional[str] = None,
+        context: typing.Optional[typing.Any] = None,
+        request: typing.Optional[typing.Any] = None,
+    ) -> typing.AsyncIterable[ExecutionResult] | ExecutionResult:
+        """Preform a query against the schema.
+
+        This is meant to be called in an asyncio.loop, if you are using a
+        web framework that is synchronous use the `call_sync` method.
+
+        :param document:
+            The query or mutation to execute.
+        :param variables:
+            Dictionary of variable values.
+        :param operation_name:
+            The named operation this can be used to cache queries.
+        :param context:
+            The context instance to use for this operation.
+        :param request:
+            The original request instance for the query, this is used when
+            no context is passed. By default it will be set on the info object:
+            `info.context.request`
+        """
+        if isinstance(document, str):
+            document, errors = self._parse_document(document)
+            if errors:
+                return ExecutionResult(data=None, errors=errors)
+
+        if validation_errors := self._validate(document):
+            return ExecutionResult(data=None, errors=validation_errors)
+
+        if context is None:
+            context = self.get_context(request)
+
+        return await subscribe(
+            schema=self.schema,
+            document=document,
+            context_value=context,
+            variable_values=variables,
+            operation_name=operation_name,
+            root_value=self._root_value,
+            **self._kwargs,
+        )
 
     def call_sync(
         self,

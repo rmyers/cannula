@@ -1,15 +1,15 @@
 import asyncio
-from typing import Any, AsyncGenerator
+import logging
+from typing import AsyncIterable
 from starlette.applications import Starlette
-from cannula import CannulaAPI
-from cannula.contrib.star import StarletteGraphQLHandler
+from cannula import CannulaAPI, gql
+from cannula.handlers.asgi import GraphQLHandler
 
-# Initialize your CannulaAPI
-api = CannulaAPI(
-    schema="""
-    type Query {
-        hello: String
-    }
+logging.basicConfig(level=logging.DEBUG)
+
+
+schema = gql(
+    """
     type Subscription {
         countdown(from_: Int!): Int!
     }
@@ -17,15 +17,37 @@ api = CannulaAPI(
 )
 
 
-@api.resolver("Subscription")
-async def countdown(root, info, from_: int) -> AsyncGenerator[int, None]:
-    for i in range(from_, -1, -1):
-        yield i
-        await asyncio.sleep(1)
+class AsyncRange:
+    def __init__(self, start, end):
+        self.start = start
+        self.end = end
 
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        if self.start > self.end:
+            await asyncio.sleep(1)
+            value = self.start
+            self.start -= 1
+            return value
+        else:
+            raise StopAsyncIteration
+
+
+async def countdown(info, from_: int) -> AsyncIterable[dict]:
+    async for i in AsyncRange(from_, -1):
+        yield {"countdown": i}
+
+
+# Initialize your CannulaAPI
+api = CannulaAPI(
+    schema=schema,
+    root_value={"countdown": countdown},
+)
 
 # Create the handler
-handler = StarletteGraphQLHandler(api, path="/graphql", graphiql=True)
+handler = GraphQLHandler(api, path="/graphql", graphiql=True)
 
 # Create Starlette app
 app = Starlette(routes=handler.routes())
