@@ -36,6 +36,9 @@ def valid_schema() -> DocumentNode:
         type Mutation {
             createMe(name: String!): User
         }
+        type Subscription {
+            countdown(from_: Int!): Int!
+        }
         """
     )
 

@@ -2,8 +2,9 @@ import asyncio
 import logging
 from typing import AsyncIterable
 from starlette.applications import Starlette
-from cannula import CannulaAPI, gql
+from cannula import gql
 from cannula.handlers.asgi import GraphQLHandler
+from cannula.contrib.otel import create_instrumented_api
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -41,7 +42,7 @@ async def countdown(info, from_: int) -> AsyncIterable[dict]:
 
 
 # Initialize your CannulaAPI
-api = CannulaAPI(
+api = create_instrumented_api(
     schema=schema,
     root_value={"countdown": countdown},
 )

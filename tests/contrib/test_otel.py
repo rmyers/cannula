@@ -1,219 +1,345 @@
+import asyncio
 import pytest
-from unittest.mock import Mock, AsyncMock
-from graphql import parse, GraphQLError, ExecutionResult
+from typing import AsyncIterable, List
 from opentelemetry import trace
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import (
-    SimpleSpanProcessor,
-    SpanExporter,
-)
+from opentelemetry.sdk.trace import TracerProvider, SpanProcessor
+from opentelemetry.trace import StatusCode, Span
 
-from cannula.contrib.otel import instrument_cannula
+from cannula.contrib.otel import create_instrumented_api
 
 
-class MockCannulaAPI:
-    """Mock CannulaAPI class for testing"""
+class MockSpanProcessor(SpanProcessor):
+    """Custom span processor that captures spans for testing"""
 
     def __init__(self):
-        self.call = AsyncMock()
-        self._parse_document = Mock()
-        self._validate = Mock()
+        self.spans: List[Span] = []
+
+    def on_start(self, span: Span, parent_context):
+        pass
+
+    def on_end(self, span: Span):
+        self.spans.append(span)
+
+    def shutdown(self):
+        pass
+
+    def force_flush(self, timeout_millis=30000):
+        pass
+
+
+spans = MockSpanProcessor()
+provider = TracerProvider()
+provider.add_span_processor(spans)
+trace.set_tracer_provider(provider)
 
 
 @pytest.fixture
-def api():
-    """Create a mock CannulaAPI instance"""
-    return MockCannulaAPI()
+def tracer_spans():
+    """Setup tracer and return span collector"""
+    yield spans
+    spans.spans = []
 
 
-async def test_successful_string_query(api):
-    """Test successful query with string document"""
-    # Setup
-    query = "query { hello }"
-    parsed_doc = parse(query)
-    api._parse_document.return_value = Mock(document_ast=parsed_doc, errors=[])
-    api._validate.return_value = []
-    api.call.return_value = ExecutionResult(data={"hello": "world"})
+@pytest.fixture
+def test_schema():
+    return """
+    type Query {
+        syncField: String
+        asyncField: String
+        errorField: String
+        errorAsyncField: String
+        optionalArg(name: String): String
+        requiredArg(name: String!): String
+    }
+    type Subscription {
+        countdown(from_: Int!): Int!
+    }
+    """
 
-    # Instrument the API
-    instrument_cannula(api)
 
-    # Execute
+@pytest.mark.asyncio
+async def test_sync_resolver(tracer_spans, test_schema):
+    """Test tracing of synchronous resolver"""
+    api = create_instrumented_api(schema=test_schema)
+
+    @api.query(field_name="syncField")
+    def syncField(parent, info):
+        return "sync result"
+
     result = await api.call(
-        document=query, operation_name="TestQuery", variables={"test": "var"}
+        """
+        query {
+            syncField
+        }
+    """
     )
 
-    # Verify
-    assert result.data == {"hello": "world"}
-    api._parse_document.assert_called_once_with(query)
-    api._validate.assert_called_once_with(parsed_doc)
+    assert result.data == {"syncField": "sync result"}
+    assert not result.errors
+
+    # Find the resolver span
+    resolver_span = next(
+        span for span in tracer_spans.spans if span.name == "graphql.resolve.syncField"
+    )
+
+    assert resolver_span.attributes["graphql.field"] == "syncField"
+    assert resolver_span.attributes["graphql.parent_type"] == "Query"
+    assert resolver_span.attributes["graphql.return_type"] == "String"
+    assert resolver_span.status.status_code == StatusCode.UNSET
 
 
-async def test_parsing_error(api):
-    """Test handling of parsing errors"""
-    # Setup
-    query = "invalid query {"
-    parse_error = GraphQLError("Syntax Error")
-    api._parse_document.return_value = Mock(document_ast=None, errors=[parse_error])
+@pytest.mark.asyncio
+async def test_async_resolver(tracer_spans, test_schema):
+    """Test tracing of asynchronous resolver"""
+    api = create_instrumented_api(schema=test_schema)
 
-    # Instrument the API
-    instrument_cannula(api)
+    @api.query(field_name="asyncField")
+    async def asyncField(parent, info):
+        return "async result"
 
-    # Execute
-    result = await api.call(document=query)
+    result = await api.call(
+        """
+        query {
+            asyncField
+        }
+    """
+    )
 
-    # Verify
-    assert result.errors == [parse_error]
-    assert result.data is None
-    api._parse_document.assert_called_once_with(query)
-    api._validate.assert_not_called()
+    assert result.data == {"asyncField": "async result"}
+    assert not result.errors
 
+    # Find the resolver span
+    resolver_span = next(
+        span for span in tracer_spans.spans if span.name == "graphql.resolve.asyncField"
+    )
 
-async def test_validation_error(api):
-    """Test handling of validation errors"""
-    # Setup
-    query = "query { hello }"
-    parsed_doc = parse(query)
-    validation_error = GraphQLError("Validation Error")
-    api._parse_document.return_value = Mock(document_ast=parsed_doc, errors=[])
-    api._validate.return_value = [validation_error]
-
-    # Instrument the API
-    instrument_cannula(api)
-
-    # Execute
-    result = await api.call(document=query)
-
-    # Verify
-    assert result.errors == [validation_error]
-    assert result.data is None
-    api._validate.assert_called_once_with(parsed_doc)
+    assert resolver_span.attributes["graphql.field"] == "asyncField"
+    assert resolver_span.attributes["graphql.parent_type"] == "Query"
+    assert resolver_span.attributes["graphql.return_type"] == "String"
+    assert resolver_span.status.status_code == StatusCode.UNSET
 
 
-async def test_execution_error(api):
-    """Test handling of execution errors"""
-    # Setup
-    query = "query { hello }"
-    parsed_doc = parse(query)
-    execution_error = GraphQLError("Execution Error")
-    api._parse_document.return_value = Mock(document_ast=parsed_doc, errors=[])
-    api._validate.return_value = []
-    api.call.return_value = ExecutionResult(data=None, errors=[execution_error])
+@pytest.mark.asyncio
+async def test_resolver_error(tracer_spans, test_schema):
+    """Test tracing of resolver that raises an error"""
+    api = create_instrumented_api(schema=test_schema)
 
-    # Instrument the API
-    instrument_cannula(api)
+    @api.query(field_name="errorField")
+    def errorField(parent, info):
+        raise ValueError("test error")
 
-    # Execute
-    result = await api.call(document=query)
+    @api.query(field_name="errorAsyncField")
+    async def errorAsyncField(parent, info):
+        raise ValueError("test async error")
 
-    # Verify
-    assert result.errors == [execution_error]
-    assert result.data is None
+    result = await api.call(
+        """
+        query {
+            errorField
+            errorAsyncField
+        }
+    """
+    )
 
+    assert result.data == {"errorField": None, "errorAsyncField": None}
+    assert result.errors is not None
 
-async def test_already_parsed_document(api):
-    """Test handling of pre-parsed DocumentNode"""
-    # Setup
-    parsed_doc = parse("query { hello }")
-    api._validate.return_value = []
-    api.call.return_value = ExecutionResult(data={"hello": "world"})
+    # Find the resolver span
+    resolver_span = next(
+        span for span in tracer_spans.spans if span.name == "graphql.resolve.errorField"
+    )
 
-    # Instrument the API
-    instrument_cannula(api)
+    assert resolver_span.status.status_code == StatusCode.ERROR
+    # events will contain the exception data
+    error_event = next(
+        event for event in resolver_span.events if event.name == "exception"
+    )
+    assert "test error" in error_event.attributes["exception.message"]
 
-    # Execute
-    result = await api.call(document=parsed_doc)
+    # Find the async resolver span
+    async_resolver_span = next(
+        span
+        for span in tracer_spans.spans
+        if span.name == "graphql.resolve.errorAsyncField"
+    )
 
-    # Verify
-    assert result.data == {"hello": "world"}
-    api._parse_document.assert_not_called()
-    api._validate.assert_called_once_with(parsed_doc)
-
-
-async def test_unexpected_exception(api):
-    """Test handling of unexpected exceptions during execution"""
-    # Setup
-    query = "query { hello }"
-    parsed_doc = parse(query)
-    api._parse_document.return_value = Mock(document_ast=parsed_doc, errors=[])
-    api._validate.return_value = []
-    api.call.side_effect = Exception("Unexpected error")
-
-    # Instrument the API
-    instrument_cannula(api)
-
-    # Execute and verify exception is raised
-    with pytest.raises(Exception) as exc_info:
-        await api.call(document=query)
-
-    assert str(exc_info.value) == "Unexpected error"
+    assert async_resolver_span.status.status_code == StatusCode.ERROR
+    # events will contain the exception data
+    error_event = next(
+        event for event in async_resolver_span.events if event.name == "exception"
+    )
+    assert "test async error" in error_event.attributes["exception.message"]
 
 
-async def test_span_attributes(api):
-    """Test that span attributes are correctly set"""
-    captured_spans = []
+@pytest.mark.asyncio
+async def test_resolver_with_args(tracer_spans, test_schema):
+    """Test tracing of resolver with arguments"""
+    api = create_instrumented_api(schema=test_schema)
 
-    # Create a custom SpanProcessor to capture spans
-    class TestSpanProcessor(SimpleSpanProcessor):
-        def __init__(self, span_exporter):
-            self.span_exporter = span_exporter
+    @api.query(field_name="optionalArg")
+    def optionalArg(parent, info, name=None):
+        return f"Hello, {name or 'World'}"
 
-        def on_start(self, span, parent_context):
-            print(span)
-            pass
+    @api.query(field_name="requiredArg")
+    def requiredArg(parent, info, name):
+        return f"Hello, {name}"
 
-        def on_end(self, span):
-            captured_spans.append(span)
+    # Test optional arg
+    result = await api.call(
+        """
+        query {
+            withoutArg: optionalArg
+            withArg: optionalArg(name: "Test")
+        }
+    """
+    )
 
-        def shutdown(self):
-            pass
+    assert result.data == {"withoutArg": "Hello, World", "withArg": "Hello, Test"}
 
-        def force_flush(self, timeout_millis=30000):
-            pass
+    # Test required arg
+    result = await api.call(
+        """
+        query {
+            requiredArg(name: "Required")
+        }
+    """
+    )
 
-    # Setup
-    provider = TracerProvider()
-    provider.add_span_processor(TestSpanProcessor(SpanExporter()))
-    trace.set_tracer_provider(provider)
+    assert result.data == {"requiredArg": "Hello, Required"}
 
-    query = "query TestOp { hello }"
-    parsed_doc = parse(query)
-    api._parse_document.return_value = Mock(document_ast=parsed_doc, errors=[])
-    api._validate.return_value = []
-    api.call.return_value = ExecutionResult(data={"hello": "world"})
+    # Verify all resolver spans were created
+    resolver_spans = [
+        span for span in tracer_spans.spans if span.name.startswith("graphql.resolve.")
+    ]
+    assert len(resolver_spans) == 3  # Two optionalArg calls and one requiredArg
 
-    # Instrument the API
-    instrument_cannula(api)
 
-    # Execute
-    await api.call(document=query, operation_name="TestOp", variables={"test": "var"})
+@pytest.mark.asyncio
+async def test_multiple_resolvers_same_query(tracer_spans, test_schema):
+    """Test tracing of multiple resolvers in a single query"""
+    api = create_instrumented_api(schema=test_schema)
 
-    # Verify spans were captured
+    @api.query(field_name="syncField")
+    def syncField(parent, info):
+        return "sync"
+
+    @api.query(field_name="asyncField")
+    async def asyncField(parent, info):
+        return "async"
+
+    result = await api.call(
+        """
+        query {
+            syncField
+            asyncField
+        }
+    """
+    )
+
+    assert result.data == {"syncField": "sync", "asyncField": "async"}
+
+    # Verify both resolver spans were created
+    resolver_spans = [
+        span for span in tracer_spans.spans if span.name.startswith("graphql.resolve.")
+    ]
+    assert len(resolver_spans) == 2
+
+    span_names = {span.name for span in resolver_spans}
+    assert "graphql.resolve.syncField" in span_names
+    assert "graphql.resolve.asyncField" in span_names
+
+
+class AsyncRange:
+    def __init__(self, start, end):
+        self.start = start
+        self.end = end
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        if self.start > self.end:
+            await asyncio.sleep(0.001)
+            value = self.start
+            self.start -= 1
+            return value
+        else:
+            raise StopAsyncIteration
+
+
+async def countdown(info, from_: int) -> AsyncIterable[dict]:
+    async for i in AsyncRange(from_, -1):
+        yield {"countdown": i}
+
+
+async def test_subscriptions(tracer_spans, test_schema):
+    """Test tracing of multiple resolvers in a single query"""
+    api = create_instrumented_api(
+        schema=test_schema, root_value={"countdown": countdown}
+    )
+
+    result = await api.subscribe(
+        """
+            subscription Subby{
+                countdown(from_: 5)
+            }
+        """,
+        operation_name="Subby",
+    )
+
+    assert result is not None
+    assert isinstance(result, AsyncIterable)
+    async for d in result:
+        print(d)
+
+    assert len(tracer_spans.spans) == 3
+    subscribe_span = next(
+        span for span in tracer_spans.spans if span.name == "graphql.subscribe"
+    )
+
+    assert subscribe_span.attributes["graphql.operation_name"] == "Subby"
+    assert subscribe_span.status.status_code == StatusCode.UNSET
+
+
+async def test_validation_errors(tracer_spans, test_schema):
+    api = create_instrumented_api(schema=test_schema)
+
+    result = await api.call(
+        """
+        query {
+            asyncField(arg: "invalid")
+        }
+    """
+    )
+    assert result.errors is not None
+
+    validate_span = next(
+        span for span in tracer_spans.spans if span.name == "graphql.validation"
+    )
+    assert validate_span.status.status_code == StatusCode.ERROR
+    # events will contain the exception data
+    error_event = next(
+        event for event in validate_span.events if event.name == "exception"
+    )
     assert (
-        len(captured_spans) >= 4
-    ), f"Expected at least 4 spans, got {len(captured_spans)}"
-
-    # Find the main request span
-    request_span = next(
-        (span for span in captured_spans if span.name == "graphql.request"), None
+        "Unknown argument 'arg' on field 'Query.asyncField'"
+        in error_event.attributes["exception.message"]
     )
-    assert request_span is not None, "Could not find graphql.request span"
-
-    # Verify span attributes
-    assert request_span.attributes.get("graphql.operation.name") == "TestOp"
-    assert request_span.attributes.get("graphql.document") == query
-
-    # Verify child spans exist
-    span_names = {span.name for span in captured_spans}
-    assert "graphql.parse" in span_names, "Missing parse span"
-    assert "graphql.validate" in span_names, "Missing validate span"
-    assert "graphql.execute" in span_names, "Missing execute span"
 
 
-def test_wrapper_preserves_function_metadata(api):
-    """Test that the wrapper preserves the original function's metadata"""
-    original_call = api.call
-    instrument_cannula(api)
+async def test_parser_errors(tracer_spans, test_schema):
+    api = create_instrumented_api(schema=test_schema)
 
-    assert api.call.__name__ == original_call.__name__
-    assert api.call.__doc__ == original_call.__doc__
+    result = await api.call("query {")
+    assert result.errors is not None
+
+    parse_span = next(
+        span for span in tracer_spans.spans if span.name == "graphql.parse.document"
+    )
+    assert parse_span.attributes["graphql.document"] == "query {"
+    assert parse_span.status.status_code == StatusCode.ERROR
+    # events will contain the exception data
+    error_event = next(
+        event for event in parse_span.events if event.name == "exception"
+    )
+    assert "Syntax Error: Expected Name" in error_event.attributes["exception.message"]

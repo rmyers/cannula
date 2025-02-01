@@ -40,6 +40,10 @@ LOG = logging.getLogger(__name__)
 RootType = typing.TypeVar("RootType", covariant=True)
 
 
+class SchemaValidationError(Exception):
+    pass
+
+
 class ParseResults(typing.NamedTuple):
     document_ast: DocumentNode
     errors: typing.List[GraphQLError] = []
@@ -205,21 +209,23 @@ class CannulaAPI(typing.Generic[RootType]):
 
         schema_validation_errors = validate_schema(schema)
         if schema_validation_errors:
-            raise Exception(f"Invalid schema: {schema_validation_errors}")
+            raise SchemaValidationError(f"Invalid schema: {schema_validation_errors}")
 
         return schema
 
     def _validate_field(self, type_name: str, field_name: str) -> GraphQLField:
         object_type = self.schema.get_type(type_name)
         if object_type is None:
-            raise Exception(f"Invalid type '{type_name}' in resolver decorator")
+            raise SchemaValidationError(
+                f"Invalid type '{type_name}' in resolver decorator"
+            )
 
         # Need to cast this to object_type to satisfy mypy checks
         object_type = typing.cast(GraphQLObjectType, object_type)
         field_map = typing.cast(GraphQLFieldMap, object_type.fields)
         field_definition = field_map.get(field_name)
         if not field_definition:
-            raise Exception(
+            raise SchemaValidationError(
                 f"Invalid field '{type_name}.{field_name}' in resolver decorator"
             )
 

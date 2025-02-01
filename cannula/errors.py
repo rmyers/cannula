@@ -27,7 +27,6 @@ def format_errors(
     for err in errors:
         log_error(err, logger, level)
         formatted_errors.append(err.formatted)
-
     return formatted_errors
 
 

@@ -184,7 +184,9 @@ class GraphQLHandler:
             return JSONResponse(
                 {
                     "data": result.data,
-                    "errors": result.errors,
+                    "errors": format_errors(
+                        result.errors, self.graph.logger, self.graph.level
+                    ),
                     "extensions": result.extensions,
                 }
             )
