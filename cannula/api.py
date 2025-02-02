@@ -12,7 +12,6 @@ import inspect
 import pathlib
 import typing
 
-from cannula.scalars import ScalarInterface
 from graphql import (
     DocumentNode,
     GraphQLError,
@@ -29,6 +28,8 @@ from graphql import (
 )
 
 from .context import Context
+from .errors import SchemaValidationError
+from .scalars import ScalarInterface
 from .schema import (
     build_and_extend_schema,
     load_schema,
@@ -38,10 +39,6 @@ from .schema import (
 LOG = logging.getLogger(__name__)
 
 RootType = typing.TypeVar("RootType", covariant=True)
-
-
-class SchemaValidationError(Exception):
-    pass
 
 
 class ParseResults(typing.NamedTuple):
@@ -234,19 +231,27 @@ class CannulaAPI(typing.Generic[RootType]):
     def get_context(self, request) -> typing.Any:
         return self._context.init(request)
 
-    @functools.lru_cache(maxsize=128)
-    def _validate(self, document: DocumentNode) -> typing.List[GraphQLError]:
+    def validate(self, document: DocumentNode) -> typing.List[GraphQLError]:
         """Validate the document against the schema and store results in lru_cache."""
-        return validate(self.schema, document)
 
-    @functools.lru_cache(maxsize=128)
-    def _parse_document(self, document: str) -> ParseResults:
+        @functools.lru_cache(maxsize=128)
+        def _validate(document: DocumentNode) -> typing.List[GraphQLError]:
+            return validate(self.schema, document)
+
+        return _validate(document)
+
+    def parse_document(self, document: str) -> ParseResults:
         """Parse and store the document in lru_cache."""
-        try:
-            document_ast = parse(document)
-            return ParseResults(document_ast, [])
-        except GraphQLError as err:
-            return ParseResults(DocumentNode(), [err])
+
+        @functools.lru_cache(maxsize=128)
+        def _parse_document(document: str) -> ParseResults:
+            try:
+                document_ast = parse(document)
+                return ParseResults(document_ast, [])
+            except GraphQLError as err:
+                return ParseResults(DocumentNode(), [err])
+
+        return _parse_document(document)
 
     async def call(
         self,
@@ -276,11 +281,11 @@ class CannulaAPI(typing.Generic[RootType]):
             `info.context.request`
         """
         if isinstance(document, str):
-            document, errors = self._parse_document(document)
+            document, errors = self.parse_document(document)
             if errors:
                 return ExecutionResult(data=None, errors=errors)
 
-        if validation_errors := self._validate(document):
+        if validation_errors := self.validate(document):
             return ExecutionResult(data=None, errors=validation_errors)
 
         if context is None:
@@ -328,11 +333,11 @@ class CannulaAPI(typing.Generic[RootType]):
             `info.context.request`
         """
         if isinstance(document, str):
-            document, errors = self._parse_document(document)
+            document, errors = self.parse_document(document)
             if errors:
                 return ExecutionResult(data=None, errors=errors)
 
-        if validation_errors := self._validate(document):
+        if validation_errors := self.validate(document):
             return ExecutionResult(data=None, errors=validation_errors)
 
         if context is None:

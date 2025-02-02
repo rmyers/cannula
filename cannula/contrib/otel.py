@@ -212,14 +212,14 @@ The OpenTelemetry instrumentation adds minimal overhead to your application. How
 * Configure appropriate flush intervals for batch processors
 """
 
-from functools import wraps
-from inspect import iscoroutinefunction
-from typing import AsyncIterable, List, Dict, Any, Callable
+from typing import AsyncIterable, List, Dict, Any, Callable, Mapping
 
 from graphql import (
     DocumentNode,
     ExecutionResult,
     GraphQLError,
+    GraphQLObjectType,
+    GraphQLResolveInfo,
 )
 from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
@@ -229,74 +229,119 @@ from cannula.api import CannulaAPI, ParseResults
 TRACER = trace.get_tracer("cannula")
 
 
-def trace_resolver(resolver: Callable) -> Callable:
-    """Wraps a resolver function to add tracing."""
+def resolve_name(func: Callable) -> str:
+    """Return a string with the dotted path of the function"""
+    klass = func.__class__.__name__
+    func_name = func.__qualname__
+    resolver = func_name if klass == "function" else f"{klass}.{func_name}"
+    return f"{func.__module__}.{resolver}"
 
-    @wraps(resolver)
-    async def async_wrapper(parent, info, **kwargs):
+
+def trace_field_resolver(
+    source: GraphQLObjectType,
+    info: GraphQLResolveInfo,
+    **kwargs,
+):
+    """Defualt field resolver that wraps callables in spans.
+
+    Typically the fields are simple attributes and these do not
+    matter for tracing and in fact may slow down processing since
+    they are so common.
+
+    This resolver will instead just add spans and attributes for
+    anything that is callable.
+    """
+    field_name = info.field_name
+    value = (
+        source.get(field_name)
+        if isinstance(source, Mapping)
+        else getattr(source, field_name, None)
+    )
+    if callable(value):
         with TRACER.start_span(
-            f"graphql.resolve.{info.field_name}",
+            f"graphql.resolve.{field_name}",
             attributes={
-                "graphql.field": info.field_name,
+                "graphql.field": field_name,
                 "graphql.parent_type": info.parent_type.name,
-                "graphql.return_type": info.return_type.name,
+                "graphql.return_type": str(info.return_type),
+                "graphql.resolve_function": resolve_name(value),
             },
         ) as span:
             try:
-                return await resolver(parent, info, **kwargs)
+                return value(info, **kwargs)
             except Exception as e:
                 span.record_exception(e)
                 span.set_status(Status(StatusCode.ERROR))
                 raise
+    return value
 
-    @wraps(resolver)
-    def sync_wrapper(parent, info, **kwargs):
-        with TRACER.start_span(
-            f"graphql.resolve.{info.field_name}",
-            attributes={
-                "graphql.field": info.field_name,
-                "graphql.parent_type": info.parent_type.name,
-                "graphql.return_type": info.return_type.name,
-            },
-        ) as span:
-            try:
-                return resolver(parent, info, **kwargs)
-            except Exception as e:
-                span.record_exception(e)
-                span.set_status(Status(StatusCode.ERROR))
-                raise
 
-    return async_wrapper if iscoroutinefunction(resolver) else sync_wrapper
+def trace_middleware(
+    next_fn: Callable[..., Any],
+    parent_object: GraphQLObjectType,
+    info: GraphQLResolveInfo,
+    **kwargs,
+):
+    """Trace resolver functions middleware.
+
+    This will add spans to any resolvers that are callable.
+
+    Usage::
+
+        api = create_instrumented_api(
+            schema="...",
+            middleware=[trace_middleware]
+        )
+
+    """
+    function_name = next_fn.__name__
+    field_name = info.field_name
+    parent_name = info.parent_type.name
+
+    if parent_name.startswith("__"):
+        return next_fn(parent_object, info, **kwargs)
+
+    if field_name.startswith("__"):
+        return next_fn(parent_object, info, **kwargs)
+
+    if function_name == "default_field_resolver":
+        return trace_field_resolver(parent_object, info, **kwargs)
+
+    with TRACER.start_span(
+        f"graphql.resolve.{field_name}",
+        attributes={
+            "graphql.field": field_name,
+            "graphql.parent_type": parent_name,
+            "graphql.return_type": str(info.return_type),
+            "graphql.resolver_function": resolve_name(next_fn),
+        },
+    ) as span:
+        try:
+            return next_fn(parent_object, info, **kwargs)
+        except Exception as e:
+            span.record_exception(e)
+            span.set_status(Status(StatusCode.ERROR))
+            raise
 
 
 class InstrumentedCannulaAPI(CannulaAPI):
 
-    def _validate(self, document: DocumentNode) -> List[GraphQLError]:
+    def validate(self, document: DocumentNode) -> List[GraphQLError]:
         with TRACER.start_span("graphql.validation") as span:
-            errors = super()._validate(document)
+            errors = super().validate(document)
             for error in errors:
                 span.record_exception(error)
                 span.set_status(Status(StatusCode.ERROR))
             return errors
 
-    def _parse_document(self, document: str) -> ParseResults:
+    def parse_document(self, document: str) -> ParseResults:
         with TRACER.start_span("graphql.parse.document") as span:
             span.set_attribute("graphql.document", document)
-            parsed_results = super()._parse_document(document)
+            parsed_results = super().parse_document(document)
             for error in parsed_results.errors:
                 span.record_exception(error)
                 span.set_status(Status(StatusCode.ERROR))
             return parsed_results
-
-    def resolver(self, type_name: str, field_name: str | None = None):
-        """Override resolver decorator to add tracing."""
-        original_decorator = super().resolver(type_name, field_name)
-
-        def wrapper(func):
-            traced_resolver = trace_resolver(func)
-            return original_decorator(traced_resolver)
-
-        return wrapper
 
     async def call(
         self,

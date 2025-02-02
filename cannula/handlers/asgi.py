@@ -29,7 +29,7 @@ class GQLMessageType(str, Enum):
     ERROR = "error"
     COMPLETE = "complete"
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.value
 
 
@@ -50,7 +50,7 @@ class GQLMessage:
 
 
 class SubscriptionManager:
-    def __init__(self):
+    def __init__(self) -> None:
         self.active_subscriptions: Dict[str, asyncio.Task] = {}
 
     async def add_subscription(
@@ -61,7 +61,7 @@ class SubscriptionManager:
         query: str,
         variables: Optional[Dict[str, Any]] = None,
         operation_name: Optional[str] = None,
-    ):
+    ) -> None:
         try:
             result = await graph.subscribe(
                 document=query,
@@ -105,7 +105,7 @@ class SubscriptionManager:
             if subscription_id in self.active_subscriptions:
                 del self.active_subscriptions[subscription_id]
 
-    def stop_subscription(self, subscription_id: str):
+    def stop_subscription(self, subscription_id: str) -> None:
         if subscription_id in self.active_subscriptions:
             self.active_subscriptions[subscription_id].cancel()
             del self.active_subscriptions[subscription_id]

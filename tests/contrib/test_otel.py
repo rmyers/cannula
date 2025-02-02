@@ -5,7 +5,7 @@ from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider, SpanProcessor
 from opentelemetry.trace import StatusCode, Span
 
-from cannula.contrib.otel import create_instrumented_api
+from cannula.contrib.otel import create_instrumented_api, trace_middleware
 
 
 class MockSpanProcessor(SpanProcessor):
@@ -43,6 +43,10 @@ def tracer_spans():
 @pytest.fixture
 def test_schema():
     return """
+    type Book {
+        name: String
+        related: String
+    }
     type Query {
         syncField: String
         asyncField: String
@@ -50,6 +54,7 @@ def test_schema():
         errorAsyncField: String
         optionalArg(name: String): String
         requiredArg(name: String!): String
+        book: Book
     }
     type Subscription {
         countdown(from_: Int!): Int!
@@ -60,7 +65,7 @@ def test_schema():
 @pytest.mark.asyncio
 async def test_sync_resolver(tracer_spans, test_schema):
     """Test tracing of synchronous resolver"""
-    api = create_instrumented_api(schema=test_schema)
+    api = create_instrumented_api(schema=test_schema, middleware=[trace_middleware])
 
     @api.query(field_name="syncField")
     def syncField(parent, info):
@@ -91,7 +96,7 @@ async def test_sync_resolver(tracer_spans, test_schema):
 @pytest.mark.asyncio
 async def test_async_resolver(tracer_spans, test_schema):
     """Test tracing of asynchronous resolver"""
-    api = create_instrumented_api(schema=test_schema)
+    api = create_instrumented_api(schema=test_schema, middleware=[trace_middleware])
 
     @api.query(field_name="asyncField")
     async def asyncField(parent, info):
@@ -122,7 +127,7 @@ async def test_async_resolver(tracer_spans, test_schema):
 @pytest.mark.asyncio
 async def test_resolver_error(tracer_spans, test_schema):
     """Test tracing of resolver that raises an error"""
-    api = create_instrumented_api(schema=test_schema)
+    api = create_instrumented_api(schema=test_schema, middleware=[trace_middleware])
 
     @api.query(field_name="errorField")
     def errorField(parent, info):
@@ -163,18 +168,41 @@ async def test_resolver_error(tracer_spans, test_schema):
         if span.name == "graphql.resolve.errorAsyncField"
     )
 
-    assert async_resolver_span.status.status_code == StatusCode.ERROR
-    # events will contain the exception data
-    error_event = next(
-        event for event in async_resolver_span.events if event.name == "exception"
+    assert async_resolver_span.status.status_code == StatusCode.UNSET
+
+    # Async failures are deferred
+    graph_span = next(
+        span for span in tracer_spans.spans if span.name == "graphql.execute"
     )
-    assert "test async error" in error_event.attributes["exception.message"]
+    assert graph_span.status.status_code == StatusCode.ERROR
+    # events will contain the exception data
+    error_events = [
+        event.attributes["exception.message"]
+        for event in graph_span.events
+        if event.name == "exception"
+    ]
+    assert error_events == [
+        "test error\n"
+        "\n"
+        "GraphQL request:3:13\n"
+        "2 |         query {\n"
+        "3 |             errorField\n"
+        "  |             ^\n"
+        "4 |             errorAsyncField",
+        "test async error\n"
+        "\n"
+        "GraphQL request:4:13\n"
+        "3 |             errorField\n"
+        "4 |             errorAsyncField\n"
+        "  |             ^\n"
+        "5 |         }",
+    ]
 
 
 @pytest.mark.asyncio
 async def test_resolver_with_args(tracer_spans, test_schema):
     """Test tracing of resolver with arguments"""
-    api = create_instrumented_api(schema=test_schema)
+    api = create_instrumented_api(schema=test_schema, middleware=[trace_middleware])
 
     @api.query(field_name="optionalArg")
     def optionalArg(parent, info, name=None):
@@ -217,7 +245,7 @@ async def test_resolver_with_args(tracer_spans, test_schema):
 @pytest.mark.asyncio
 async def test_multiple_resolvers_same_query(tracer_spans, test_schema):
     """Test tracing of multiple resolvers in a single query"""
-    api = create_instrumented_api(schema=test_schema)
+    api = create_instrumented_api(schema=test_schema, middleware=[trace_middleware])
 
     @api.query(field_name="syncField")
     def syncField(parent, info):
@@ -302,7 +330,7 @@ async def test_subscriptions(tracer_spans, test_schema):
 
 
 async def test_validation_errors(tracer_spans, test_schema):
-    api = create_instrumented_api(schema=test_schema)
+    api = create_instrumented_api(schema=test_schema, middleware=[trace_middleware])
 
     result = await api.call(
         """
@@ -328,7 +356,7 @@ async def test_validation_errors(tracer_spans, test_schema):
 
 
 async def test_parser_errors(tracer_spans, test_schema):
-    api = create_instrumented_api(schema=test_schema)
+    api = create_instrumented_api(schema=test_schema, middleware=[trace_middleware])
 
     result = await api.call("query {")
     assert result.errors is not None
@@ -343,3 +371,120 @@ async def test_parser_errors(tracer_spans, test_schema):
         event for event in parse_span.events if event.name == "exception"
     )
     assert "Syntax Error: Expected Name" in error_event.attributes["exception.message"]
+
+
+@pytest.mark.asyncio
+async def test_field_resolvers(tracer_spans, test_schema):
+    """Test tracing of objects"""
+
+    class Book:
+        name = "best"
+
+        @staticmethod
+        def related(info) -> str:
+            return "computed_value"
+
+    api = create_instrumented_api(schema=test_schema, middleware=[trace_middleware])
+
+    @api.query(field_name="book")
+    async def book(parent, info):
+        return Book
+
+    result = await api.call(
+        """
+        query {
+            book {
+                __typename
+                name
+                related
+            }
+        }
+    """
+    )
+
+    assert result.data == {
+        "book": {"__typename": "Book", "name": "best", "related": "computed_value"},
+    }
+    assert not result.errors
+
+    # There should not be a span for name
+    name_span = next(
+        (span for span in tracer_spans.spans if span.name == "graphql.resolve.name"),
+        None,
+    )
+    assert name_span is None
+
+    related_span = next(
+        span for span in tracer_spans.spans if span.name == "graphql.resolve.related"
+    )
+
+    assert related_span.attributes["graphql.field"] == "related"
+    assert related_span.attributes["graphql.parent_type"] == "Book"
+    assert related_span.attributes["graphql.return_type"] == "String"
+    assert (
+        related_span.attributes["graphql.resolve_function"]
+        == "tests.contrib.test_otel.test_field_resolvers.<locals>.Book.related"
+    )
+    assert related_span.status.status_code == StatusCode.UNSET
+
+
+async def test_trace_resolver_error(tracer_spans, test_schema):
+    class Book:
+        name = "best"
+
+        @staticmethod
+        def related(info) -> str:
+            raise TypeError("computed_value error")
+
+    api = create_instrumented_api(schema=test_schema, middleware=[trace_middleware])
+
+    @api.query(field_name="book")
+    async def book(parent, info):
+        return Book
+
+    result = await api.call(
+        """
+        query {
+            book {
+                related
+            }
+        }
+    """
+    )
+
+    assert result.data == {"book": {"related": None}}
+    assert result.errors is not None
+
+    # Find the resolver span
+    resolver_span = next(
+        span for span in tracer_spans.spans if span.name == "graphql.resolve.related"
+    )
+
+    assert resolver_span.status.status_code == StatusCode.ERROR
+    # events will contain the exception data
+    error_event = next(
+        event for event in resolver_span.events if event.name == "exception"
+    )
+    assert "computed_value error" in error_event.attributes["exception.message"]
+
+
+async def test_builtin_field_resolvers_not_traced(tracer_spans, test_schema):
+    api = create_instrumented_api(schema=test_schema, middleware=[trace_middleware])
+
+    result = await api.call("query { __schema { description }}")
+
+    assert result.data == {
+        "__schema": {"description": None},
+    }
+    assert not result.errors
+
+    # There should not be a span for __schema
+    schema_span = next(
+        (
+            span
+            for span in tracer_spans.spans
+            if span.name == "graphql.resolve.__schema"
+        ),
+        None,
+    )
+    assert schema_span is None
