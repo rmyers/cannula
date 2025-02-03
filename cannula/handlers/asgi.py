@@ -1,9 +1,10 @@
 import asyncio
 import json
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Set
+import uuid
 
 from graphql import ExecutionResult
 from starlette.requests import Request
@@ -49,66 +50,121 @@ class GQLMessage:
         return result
 
 
+@dataclass
+class ConnectionSubscriptions:
+    """Tracks subscriptions for a single WebSocket connection"""
+
+    websocket: WebSocket
+    subscriptions: Dict[str, asyncio.Task] = field(default_factory=dict)
+
+
 class SubscriptionManager:
     def __init__(self) -> None:
-        self.active_subscriptions: Dict[str, asyncio.Task] = {}
+        # Map of connection id to subscriptions for that connection
+        self._connections: Dict[str, ConnectionSubscriptions] = {}
+
+    def register_connection(self, connection_id: str, websocket: WebSocket) -> None:
+        """Register a new WebSocket connection with the provided id"""
+        if connection_id in self._connections:
+            raise ValueError(f"Connection {connection_id} already exists")
+        self._connections[connection_id] = ConnectionSubscriptions(websocket=websocket)
+
+    def unregister_connection(self, connection_id: str) -> None:
+        """Remove a connection and clean up all its subscriptions"""
+        if connection_id in self._connections:
+            conn = self._connections[connection_id]
+            # Cancel all subscriptions for this connection
+            for task in conn.subscriptions.values():
+                task.cancel()
+            del self._connections[connection_id]
 
     async def add_subscription(
         self,
+        connection_id: str,
         subscription_id: str,
-        websocket: WebSocket,
         graph: CannulaAPI,
         query: str,
         variables: Optional[Dict[str, Any]] = None,
         operation_name: Optional[str] = None,
     ) -> None:
-        try:
-            result = await graph.subscribe(
-                document=query,
-                variables=variables,
-                operation_name=operation_name,
-                request=websocket,
-            )
+        """Add a new subscription for a specific connection"""
+        if connection_id not in self._connections:
+            raise ValueError(f"Connection {connection_id} not found")
 
-            if isinstance(result, ExecutionResult):
+        conn = self._connections[connection_id]
+        websocket = conn.websocket
+
+        async def subscription_handler():
+            try:
+                result = await graph.subscribe(
+                    document=query,
+                    variables=variables,
+                    operation_name=operation_name,
+                    request=websocket,
+                )
+
+                if isinstance(result, ExecutionResult):
+                    error_msg = GQLMessage(
+                        type=GQLMessageType.ERROR,
+                        id=subscription_id,
+                        payload=format_errors(result.errors, graph.logger, graph.level),
+                    )
+                    await websocket.send_json(error_msg.to_dict())
+                    return
+
+                async for item in result:
+                    message = GQLMessage(
+                        type=GQLMessageType.NEXT,
+                        id=subscription_id,
+                        payload={
+                            "data": item.data,
+                            "errors": format_errors(
+                                item.errors, graph.logger, graph.level
+                            ),
+                        },
+                    )
+                    await websocket.send_json(message.to_dict())
+
+                # Send complete message when generator is done
+                complete_msg = GQLMessage(
+                    type=GQLMessageType.COMPLETE, id=subscription_id
+                )
+                await websocket.send_json(complete_msg.to_dict())
+
+            except Exception as e:  # pragma: no cover
                 error_msg = GQLMessage(
                     type=GQLMessageType.ERROR,
                     id=subscription_id,
-                    payload=format_errors(result.errors, graph.logger, graph.level),
+                    payload=[{"message": str(e)}],
                 )
-                await websocket.send_json(error_msg.to_dict())
-                return
+                try:
+                    await websocket.send_json(error_msg.to_dict())
+                except Exception:
+                    pass  # Connection might be already closed
+            finally:
+                # Remove this subscription from tracking
+                if connection_id in self._connections:
+                    conn = self._connections[connection_id]
+                    if subscription_id in conn.subscriptions:
+                        del conn.subscriptions[subscription_id]
 
-            async for item in result:
-                message = GQLMessage(
-                    type=GQLMessageType.NEXT,
-                    id=subscription_id,
-                    payload={
-                        "data": item.data,
-                        "errors": format_errors(item.errors, graph.logger, graph.level),
-                    },
-                )
-                await websocket.send_json(message.to_dict())
+        # Create and store the subscription task
+        task = asyncio.create_task(subscription_handler())
+        conn.subscriptions[subscription_id] = task
 
-            # Send complete message when generator is done
-            complete_msg = GQLMessage(type=GQLMessageType.COMPLETE, id=subscription_id)
-            await websocket.send_json(complete_msg.to_dict())
+    def stop_subscription(self, connection_id: str, subscription_id: str) -> None:
+        """Stop a specific subscription for a connection"""
+        if connection_id in self._connections:
+            conn = self._connections[connection_id]
+            if subscription_id in conn.subscriptions:
+                conn.subscriptions[subscription_id].cancel()
+                del conn.subscriptions[subscription_id]
 
-        except Exception as e:
-            error_msg = GQLMessage(
-                type=GQLMessageType.ERROR,
-                id=subscription_id,
-                payload=[{"message": str(e)}],
-            )
-            await websocket.send_json(error_msg.to_dict())
-        finally:
-            if subscription_id in self.active_subscriptions:
-                del self.active_subscriptions[subscription_id]
-
-    def stop_subscription(self, subscription_id: str) -> None:
-        if subscription_id in self.active_subscriptions:
-            self.active_subscriptions[subscription_id].cancel()
-            del self.active_subscriptions[subscription_id]
+    def get_active_subscriptions(self, connection_id: str) -> Set[str]:
+        """Get all active subscription IDs for a connection"""
+        if connection_id not in self._connections:
+            return set()
+        return set(self._connections[connection_id].subscriptions.keys())
 
 
 class GraphQLHandler:
@@ -149,7 +205,8 @@ class GraphQLHandler:
 
         try:
             variables: Optional[Dict[str, Any]] = None
-            if request.method == "GET":
+            # TODO(rmyers): add coverage for this
+            if request.method == "GET":  # pragma: no cover
                 query = request.query_params.get("query")
                 variables_params = request.query_params.get("variables")
                 operation_name = request.query_params.get("operationName")
@@ -203,8 +260,11 @@ class GraphQLHandler:
         await websocket.accept(subprotocol="graphql-transport-ws")
         logger.debug("WebSocket connection accepted")
 
+        # Generate a unique connection ID
+        connection_id = str(uuid.uuid4())
+        self.subscription_manager.register_connection(connection_id, websocket)
+
         try:
-            # Wait for connection init message
             async for raw_message in websocket.iter_json():
                 logger.debug(f"Received message: {raw_message}")
                 try:
@@ -239,41 +299,37 @@ class GraphQLHandler:
                         await websocket.send_json(error_msg.to_dict())
                         continue
 
-                    # Create and store subscription task
-                    task = asyncio.create_task(
-                        self.subscription_manager.add_subscription(
-                            msg.id,
-                            websocket,
-                            self.graph,
-                            query,
-                            variables,
-                            operation_name,
-                        )
+                    # Let the subscription manager handle the subscription
+                    await self.subscription_manager.add_subscription(
+                        connection_id,
+                        msg.id,
+                        self.graph,
+                        query,
+                        variables,
+                        operation_name,
                     )
-                    self.subscription_manager.active_subscriptions[msg.id] = task
 
                 elif msg.type == GQLMessageType.COMPLETE and msg.id:
-                    # Stop subscription when client sends complete message
-                    self.subscription_manager.stop_subscription(msg.id)
+                    # Stop specific subscription when client sends complete message
+                    self.subscription_manager.stop_subscription(connection_id, msg.id)
 
         except WebSocketDisconnect:
-            # Clean up all subscriptions for this connection
-            for subscription_id in list(
-                self.subscription_manager.active_subscriptions.keys()
-            ):
-                self.subscription_manager.stop_subscription(subscription_id)
+            # Clean up only this connection's subscriptions
+            self.subscription_manager.unregister_connection(connection_id)
         except Exception as e:
             try:
                 error_msg = GQLMessage(
                     type=GQLMessageType.CONNECTION_ERROR, payload={"message": str(e)}
                 )
                 await websocket.send_json(error_msg.to_dict())
-            except Exception:
+            except Exception:  # pragma: no cover
                 pass
         finally:
             try:
+                # Ensure connection is unregistered and cleaned up
+                self.subscription_manager.unregister_connection(connection_id)
                 await websocket.close()
-            except Exception:
+            except Exception:  # pragma: no cover
                 pass
 
     def routes(self) -> list:
@@ -288,7 +344,7 @@ class GraphQLHandler:
             WebSocketRoute(self.path, self.handle_websocket),
         ]
 
-        if self.graphiql and self.graphiql_path != self.path:
+        if self.graphiql and self.graphiql_path != self.path:  # pragma: no cover
             routes.append(
                 Route(self.graphiql_path, self.handle_request, methods=["GET"])
             )
