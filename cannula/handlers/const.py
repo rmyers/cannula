@@ -69,6 +69,7 @@ GRAPHIQL_TEMPLATE = """
           fetcher,
           defaultEditorToolsVisibility: true,
           plugins: [explorerPlugin],
+          defaultQuery: '# Welcome to Cannula, write your queries here\\n',
         }),
       );
     </script>

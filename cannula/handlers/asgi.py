@@ -195,7 +195,8 @@ class GraphQLHandler:
             return JSONResponse(
                 {"errors": [{"message": "Invalid JSON"}]}, status_code=400
             )
-        except Exception as e:
+        except Exception as e:  # pragma: no cover
+            logger.error(f"Unknown error: {e}")
             return JSONResponse({"errors": [{"message": str(e)}]}, status_code=500)
 
     async def handle_websocket(self, websocket: WebSocket):
@@ -278,7 +279,12 @@ class GraphQLHandler:
     def routes(self) -> list:
         """Return the list of routes to be added to a Starlette application."""
         routes = [
-            Route(self.path, self.handle_request, methods=["GET", "POST"]),
+            Route(
+                self.path,
+                self.handle_request,
+                # Allow all methods so we can respond with an error
+                methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
+            ),
             WebSocketRoute(self.path, self.handle_websocket),
         ]
 
