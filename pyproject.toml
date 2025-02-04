@@ -45,7 +45,7 @@ test = [
     "Sphinx==8.1.3",
     "sphinx-autodoc-typehints",
     "sphinx-argparse==0.5.2",
-    "sqlalchemy==2.0.36",
+    "sqlalchemy==2.0.37",
     "aiosqlite==0.20.0",
     "pydata-sphinx-theme",
     "twine==6.0.1",
