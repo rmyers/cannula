@@ -158,6 +158,5 @@ As you can see Cannula is close to the raw performance of FastAPI. Granted real 
 <h2 id="examples">Examples and Documentation</h2>
 
 - [hello world](examples/hello.py)
-- [using mocks](examples/mocks.py)
 
 [Documentation](https://cannula.readthedocs.io/)

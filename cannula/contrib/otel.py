@@ -6,7 +6,7 @@ This package provides OpenTelemetry instrumentation for CannulaAPI, enabling det
 tracing of GraphQL operations including parsing, validation, and execution phases.
 
 Installation
---------------
+------------
 
 .. code-block:: bash
 
@@ -16,7 +16,10 @@ Installation
 Basic Usage
 -----------
 
-Here's a simple example of how to instrument your CannulaAPI application:
+There are two ways to use the instrumentation:
+
+1. Using the Factory Function (Recommended)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
@@ -30,9 +33,34 @@ Here's a simple example of how to instrument your CannulaAPI application:
     provider.add_span_processor(processor)
     trace.set_tracer_provider(provider)
 
-    # Create and instrument your API
-    api = CannulaAPI(schema="...")
-    instrument_cannula(api)
+    # Create an instrumented API
+    api = create_instrumented_api(schema="type Query { hello: String }")
+
+2. Using the Class Directly
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: python
+
+    # Create an instrumented API using the class
+    api = InstrumentedCannulaAPI(schema="type Query { hello: String }")
+
+Type Safety
+~~~~~~~~~~~
+
+The instrumented API maintains full type safety with your root types:
+
+.. code-block:: python
+
+    from typing import TypedDict
+
+    class MyRootType(TypedDict, total=False):
+        hello: str
+
+    # Type-safe instrumented API
+    api = create_instrumented_api[MyRootType](
+        schema="type Query { hello: String }",
+        root_value={"hello": "world"}
+    )
 
 
 Generated Spans
@@ -40,24 +68,26 @@ Generated Spans
 
 The instrumentation creates the following spans for each GraphQL operation:
 
-1. `graphql.request` (Parent span) Attributes:
+1. ``graphql.execute`` (Parent span)
+    - Attributes:
+        - ``graphql.operation_name``: Name of the operation if provided, "anonymous" otherwise
+        - ``graphql.context``: String representation of the context
+        - ``graphql.response.size``: Size of the response data (if available)
 
-    - `graphql.operation.name`: Name of the operation if provided
-    - `graphql.document`: The GraphQL query string
-
-2. `graphql.parse` (Child span)
-
+2. ``graphql.parse.document`` (Child span)
     - Created when parsing string queries
+    - Attributes:
+        - ``graphql.document``: The GraphQL query string
     - Records parsing errors if they occur
 
-3. `graphql.validate` (Child span)
-
+3. ``graphql.validation`` (Child span)
     - Records validation errors if they occur
 
-4. `graphql.execute` (Child span) Attributes:
+4. ``graphql.subscribe`` (Subscription span)
+    - Attributes:
+        - ``graphql.operation_name``: Name of the operation if provided, "anonymous" otherwise
+        - ``graphql.context``: String representation of the context
 
-    - `graphql.response.size`: Size of the response data
-    - Records execution errors if they occur
 
 Error Handling
 --------------
@@ -67,7 +97,8 @@ All spans automatically capture errors with appropriate status codes:
 * Parsing errors are captured in the parse span
 * Validation errors are captured in the validate span
 * Execution errors are captured in the execute span
-* Unexpected errors are captured in the main request span
+* All errors are recorded using ``span.record_exception()`` and set appropriate error status
+
 
 Integration with Other Exporters
 --------------------------------
@@ -118,7 +149,7 @@ The instrumentation will automatically include any context from your CannulaAPI 
             self.user_id = request.headers.get('X-User-Id')
             self.tenant_id = request.headers.get('X-Tenant-Id')
 
-    api = CannulaAPI(
+    api = InstrumentedCannulaAPI(
         schema="...",
         context=MyContext
     )
@@ -137,14 +168,14 @@ You can extend the instrumentation by adding custom middleware that adds attribu
         current_span.set_attribute("custom.attribute", "value")
         return await resolve(root, info, **args)
 
-    api = CannulaAPI(
+    api = InstrumentedCannulaAPI(
         schema="...",
         middleware=[custom_middleware]
     )
 
 
 Testing
--------
+--------
 
 When testing instrumented code, you can use the provided test utilities:
 
@@ -162,7 +193,7 @@ When testing instrumented code, you can use the provided test utilities:
 
 
 Best Practices
-~~~~~~~~~~~~~~
+--------------
 
 1. Use BatchSpanProcessor in production for better performance
 2. Configure appropriate sampling rates for high-traffic services
@@ -171,7 +202,7 @@ Best Practices
 5. Consider using sampling in production environments
 
 Performance Considerations
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+--------------------------
 
 The OpenTelemetry instrumentation adds minimal overhead to your application. However, consider the following:
 
@@ -181,93 +212,196 @@ The OpenTelemetry instrumentation adds minimal overhead to your application. How
 * Configure appropriate flush intervals for batch processors
 """
 
-from functools import wraps
-from typing import Optional, Dict, Any, Union
+from typing import AsyncIterable, List, Dict, Any, Callable, Mapping
 
-from graphql import DocumentNode, ExecutionResult
+from graphql import (
+    DocumentNode,
+    ExecutionResult,
+    GraphQLError,
+    GraphQLObjectType,
+    GraphQLResolveInfo,
+)
 from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
 
-import cannula
+from cannula.api import CannulaAPI, ParseResults
+
+TRACER = trace.get_tracer("cannula")
 
 
-def instrument_cannula(api_instance: "cannula.CannulaAPI") -> None:
+def resolve_name(func: Callable) -> str:
+    """Return a string with the dotted path of the function"""
+    klass = func.__class__.__name__
+    func_name = func.__qualname__
+    resolver = func_name if klass == "function" else f"{klass}.{func_name}"
+    return f"{func.__module__}.{resolver}"
+
+
+def trace_field_resolver(
+    source: GraphQLObjectType,
+    info: GraphQLResolveInfo,
+    **kwargs,
+):
+    """Defualt field resolver that wraps callables in spans.
+
+    Typically the fields are simple attributes and these do not
+    matter for tracing and in fact may slow down processing since
+    they are so common.
+
+    This resolver will instead just add spans and attributes for
+    anything that is callable.
     """
-    Instruments a CannulaAPI instance with OpenTelemetry tracing.
-
-    Args:
-        api_instance: The CannulaAPI instance to instrument
-    """
-    tracer = trace.get_tracer("cannula.graphql")
-    original_call = api_instance.call
-
-    @wraps(original_call)
-    async def wrapped_call(
-        document: Union[DocumentNode, str],
-        *,
-        variables: Optional[Dict[str, Any]] = None,
-        operation_name: Optional[str] = None,
-        context: Optional[Any] = None,
-        request: Optional[Any] = None,
-    ) -> ExecutionResult:
-        with tracer.start_as_current_span(
-            name="graphql.request",
-            kind=trace.SpanKind.SERVER,
+    field_name = info.field_name
+    value = (
+        source.get(field_name)
+        if isinstance(source, Mapping)
+        else getattr(source, field_name, None)
+    )
+    if callable(value):
+        with TRACER.start_span(
+            f"graphql.resolve.{field_name}",
+            attributes={
+                "graphql.field": field_name,
+                "graphql.parent_type": info.parent_type.name,
+                "graphql.return_type": str(info.return_type),
+                "graphql.resolve_function": resolve_name(value),
+            },
         ) as span:
-            # Set basic span attributes
-            if operation_name:
-                span.set_attribute("graphql.operation.name", operation_name)
-
-            # Record the query as span attribute
-            if isinstance(document, str):
-                span.set_attribute("graphql.document", document)
-
-            # Create child span for parsing if needed
-            if isinstance(document, str):
-                with tracer.start_span("graphql.parse") as parse_span:
-                    parse_result = api_instance._parse_document(document)
-                    if parse_result.errors:
-                        parse_span.set_status(Status(StatusCode.ERROR))
-                        parse_span.record_exception(parse_result.errors[0])
-                        return ExecutionResult(data=None, errors=parse_result.errors)
-                    document = parse_result.document_ast
-
-            # Create child span for validation
-            with tracer.start_span("graphql.validate") as validate_span:
-                validation_errors = api_instance._validate(document)
-                if validation_errors:
-                    validate_span.set_status(Status(StatusCode.ERROR))
-                    validate_span.record_exception(validation_errors[0])
-                    return ExecutionResult(data=None, errors=validation_errors)
-
             try:
-                # Execute the query
-                with tracer.start_span("graphql.execute") as execute_span:
-                    result = await original_call(
-                        document=document,
-                        variables=variables,
-                        operation_name=operation_name,
-                        context=context,
-                        request=request,
-                    )
-
-                    if result.errors:
-                        execute_span.set_status(Status(StatusCode.ERROR))
-                        for error in result.errors:
-                            execute_span.record_exception(error)
-
-                    # Add response size metrics
-                    if result.data:
-                        execute_span.set_attribute(
-                            "graphql.response.size", len(str(result.data))
-                        )
-
-                    return result
-
+                return value(info, **kwargs)
             except Exception as e:
-                span.set_status(Status(StatusCode.ERROR))
                 span.record_exception(e)
+                span.set_status(Status(StatusCode.ERROR))
                 raise
+    return value
 
-    # Replace the original call method with our wrapped version
-    api_instance.call = wrapped_call  # type: ignore
+
+def trace_middleware(
+    next_fn: Callable[..., Any],
+    parent_object: GraphQLObjectType,
+    info: GraphQLResolveInfo,
+    **kwargs,
+):
+    """Trace resolver functions middleware.
+
+    This will add spans to any resolvers that are callable.
+
+    Usage::
+
+        api = create_instrumented_api(
+            schema="...",
+            middleware=[trace_middleware]
+        )
+
+    """
+    function_name = next_fn.__name__
+    field_name = info.field_name
+    parent_name = info.parent_type.name
+
+    if parent_name.startswith("__"):
+        return next_fn(parent_object, info, **kwargs)
+
+    if field_name.startswith("__"):
+        return next_fn(parent_object, info, **kwargs)
+
+    if function_name == "default_field_resolver":
+        return trace_field_resolver(parent_object, info, **kwargs)
+
+    with TRACER.start_span(
+        f"graphql.resolve.{field_name}",
+        attributes={
+            "graphql.field": field_name,
+            "graphql.parent_type": parent_name,
+            "graphql.return_type": str(info.return_type),
+            "graphql.resolver_function": resolve_name(next_fn),
+        },
+    ) as span:
+        try:
+            return next_fn(parent_object, info, **kwargs)
+        except Exception as e:
+            span.record_exception(e)
+            span.set_status(Status(StatusCode.ERROR))
+            raise
+
+
+class InstrumentedCannulaAPI(CannulaAPI):
+
+    def validate(self, document: DocumentNode) -> List[GraphQLError]:
+        with TRACER.start_span("graphql.validation") as span:
+            errors = super().validate(document)
+            for error in errors:
+                span.record_exception(error)
+                span.set_status(Status(StatusCode.ERROR))
+            return errors
+
+    def parse_document(self, document: str) -> ParseResults:
+        with TRACER.start_span("graphql.parse.document") as span:
+            span.set_attribute("graphql.document", document)
+            parsed_results = super().parse_document(document)
+            for error in parsed_results.errors:
+                span.record_exception(error)
+                span.set_status(Status(StatusCode.ERROR))
+            return parsed_results
+
+    async def call(
+        self,
+        document: DocumentNode | str,
+        *,
+        variables: Dict[str, Any] | None = None,
+        operation_name: str | None = None,
+        context: Any | None = None,
+        request: Any | None = None,
+    ) -> ExecutionResult:
+        with TRACER.start_as_current_span("graphql.execute") as span:
+            span.set_attribute("graphql.operation_name", operation_name or "anonymous")
+            span.set_attribute("graphql.context", str(context))
+
+            results = await super().call(
+                document,
+                variables=variables,
+                operation_name=operation_name,
+                context=context,
+                request=request,
+            )
+
+            if results.data:
+                span.set_attribute("graphql.response.size", len(str(results.data)))
+
+            if results.errors is not None:
+                for error in results.errors:
+                    span.record_exception(error)
+                    span.set_status(Status(StatusCode.ERROR))
+
+            return results
+
+    async def subscribe(
+        self,
+        document: DocumentNode | str,
+        *,
+        variables: Dict[str, Any] | None = None,
+        operation_name: str | None = None,
+        context: Any | None = None,
+        request: Any | None = None,
+    ) -> AsyncIterable[ExecutionResult] | ExecutionResult:
+        with TRACER.start_as_current_span("graphql.subscribe") as span:
+            span.set_attribute("graphql.operation_name", operation_name or "anonymous")
+            span.set_attribute("graphql.context", str(context))
+            return await super().subscribe(
+                document,
+                variables=variables,
+                operation_name=operation_name,
+                context=context,
+                request=request,
+            )
+
+
+def create_instrumented_api(*args, **kwargs) -> InstrumentedCannulaAPI:
+    """
+    Factory function to create an instrumented CannulaAPI instance.
+    This provides a more convenient way to create an instrumented API
+    without explicitly using the class.
+
+    Usage:
+        api = create_instrumented_api(schema="type Query { hello: String }")
+    """
+    return InstrumentedCannulaAPI(*args, **kwargs)

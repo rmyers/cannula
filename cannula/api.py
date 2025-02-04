@@ -12,7 +12,6 @@ import inspect
 import pathlib
 import typing
 
-from cannula.scalars import ScalarInterface
 from graphql import (
     DocumentNode,
     GraphQLError,
@@ -23,11 +22,14 @@ from graphql import (
     ExecutionResult,
     GraphQLSchema,
     parse,
+    subscribe,
     validate_schema,
     validate,
 )
 
 from .context import Context
+from .errors import SchemaValidationError
+from .scalars import ScalarInterface
 from .schema import (
     build_and_extend_schema,
     load_schema,
@@ -204,21 +206,23 @@ class CannulaAPI(typing.Generic[RootType]):
 
         schema_validation_errors = validate_schema(schema)
         if schema_validation_errors:
-            raise Exception(f"Invalid schema: {schema_validation_errors}")
+            raise SchemaValidationError(f"Invalid schema: {schema_validation_errors}")
 
         return schema
 
     def _validate_field(self, type_name: str, field_name: str) -> GraphQLField:
         object_type = self.schema.get_type(type_name)
         if object_type is None:
-            raise Exception(f"Invalid type '{type_name}' in resolver decorator")
+            raise SchemaValidationError(
+                f"Invalid type '{type_name}' in resolver decorator"
+            )
 
         # Need to cast this to object_type to satisfy mypy checks
         object_type = typing.cast(GraphQLObjectType, object_type)
         field_map = typing.cast(GraphQLFieldMap, object_type.fields)
         field_definition = field_map.get(field_name)
         if not field_definition:
-            raise Exception(
+            raise SchemaValidationError(
                 f"Invalid field '{type_name}.{field_name}' in resolver decorator"
             )
 
@@ -227,19 +231,27 @@ class CannulaAPI(typing.Generic[RootType]):
     def get_context(self, request) -> typing.Any:
         return self._context.init(request)
 
-    @functools.lru_cache(maxsize=128)
-    def _validate(self, document: DocumentNode) -> typing.List[GraphQLError]:
+    def validate(self, document: DocumentNode) -> typing.List[GraphQLError]:
         """Validate the document against the schema and store results in lru_cache."""
-        return validate(self.schema, document)
 
-    @functools.lru_cache(maxsize=128)
-    def _parse_document(self, document: str) -> ParseResults:
+        @functools.lru_cache(maxsize=128)
+        def _validate(document: DocumentNode) -> typing.List[GraphQLError]:
+            return validate(self.schema, document)
+
+        return _validate(document)
+
+    def parse_document(self, document: str) -> ParseResults:
         """Parse and store the document in lru_cache."""
-        try:
-            document_ast = parse(document)
-            return ParseResults(document_ast, [])
-        except GraphQLError as err:
-            return ParseResults(DocumentNode(), [err])
+
+        @functools.lru_cache(maxsize=128)
+        def _parse_document(document: str) -> ParseResults:
+            try:
+                document_ast = parse(document)
+                return ParseResults(document_ast, [])
+            except GraphQLError as err:
+                return ParseResults(DocumentNode(), [err])
+
+        return _parse_document(document)
 
     async def call(
         self,
@@ -269,11 +281,11 @@ class CannulaAPI(typing.Generic[RootType]):
             `info.context.request`
         """
         if isinstance(document, str):
-            document, errors = self._parse_document(document)
+            document, errors = self.parse_document(document)
             if errors:
                 return ExecutionResult(data=None, errors=errors)
 
-        if validation_errors := self._validate(document):
+        if validation_errors := self.validate(document):
             return ExecutionResult(data=None, errors=validation_errors)
 
         if context is None:
@@ -292,6 +304,54 @@ class CannulaAPI(typing.Generic[RootType]):
         if inspect.isawaitable(result):
             return await result
         return typing.cast(ExecutionResult, result)
+
+    async def subscribe(
+        self,
+        document: typing.Union[DocumentNode, str],
+        *,
+        variables: typing.Optional[typing.Dict[str, typing.Any]] = None,
+        operation_name: typing.Optional[str] = None,
+        context: typing.Optional[typing.Any] = None,
+        request: typing.Optional[typing.Any] = None,
+    ) -> typing.AsyncIterable[ExecutionResult] | ExecutionResult:
+        """Preform a query against the schema.
+
+        This is meant to be called in an asyncio.loop, if you are using a
+        web framework that is synchronous use the `call_sync` method.
+
+        :param document:
+            The query or mutation to execute.
+        :param variables:
+            Dictionary of variable values.
+        :param operation_name:
+            The named operation this can be used to cache queries.
+        :param context:
+            The context instance to use for this operation.
+        :param request:
+            The original request instance for the query, this is used when
+            no context is passed. By default it will be set on the info object:
+            `info.context.request`
+        """
+        if isinstance(document, str):
+            document, errors = self.parse_document(document)
+            if errors:
+                return ExecutionResult(data=None, errors=errors)
+
+        if validation_errors := self.validate(document):
+            return ExecutionResult(data=None, errors=validation_errors)
+
+        if context is None:
+            context = self.get_context(request)
+
+        return await subscribe(
+            schema=self.schema,
+            document=document,
+            context_value=context,
+            variable_values=variables,
+            operation_name=operation_name,
+            root_value=self._root_value,
+            **self._kwargs,
+        )
 
     def call_sync(
         self,
