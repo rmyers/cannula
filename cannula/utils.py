@@ -1,4 +1,5 @@
 import ast
+import pathlib
 import typing
 
 from graphql import parse, DocumentNode
@@ -7,6 +8,35 @@ from graphql import parse, DocumentNode
 NONE = ast.Constant(value=None)
 ELLIPSIS = ast.Expr(value=ast.Constant(value=Ellipsis))
 PASS = ast.Pass()
+
+
+class ProjectRootError(Exception):
+    pass
+
+
+def find_package_root(
+    start_path: typing.Optional[pathlib.Path] = None,
+    max_depth: int = 5,
+    required_markers: set[str] = {"pyproject.toml"},
+) -> pathlib.Path:
+    if start_path is None:
+        start_path = pathlib.Path(__file__).resolve()
+
+    current = start_path
+    depth = 0
+
+    while current != current.parent and depth < max_depth:
+        # Check if any required markers exist
+        if all((current / marker).exists() for marker in required_markers):
+            return current
+
+        current = current.parent
+        depth += 1
+
+    raise ProjectRootError(
+        f"Could not find project root with markers {required_markers} "
+        f"within {max_depth} levels up from {start_path}"
+    )
 
 
 def gql(schema: str) -> DocumentNode:

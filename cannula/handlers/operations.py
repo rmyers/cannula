@@ -13,7 +13,6 @@ from graphql import (
 )
 
 from cannula.codegen.parse_variables import parse_variable, Variable
-from cannula.codegen.schema_analyzer import SchemaAnalyzer
 
 
 @dataclass
@@ -27,17 +26,13 @@ class Operation:
 
     @property
     def template_path(self) -> str:
-        if "_" in self.name:
-            parts = self.name.split("_")
-            return f"{'/'.join(parts[:-1])}/{parts[-1]}.html"
         return f"{self.name}.html"
 
 
 class OperationAnalyzer:
     """Analyzes GraphQL operations with schema-aware type coercion"""
 
-    def __init__(self, schema_analyzer: SchemaAnalyzer):
-        self.schema_analyzer = schema_analyzer
+    def __init__(self):
         self.operations: Dict[str, Operation] = {}
 
     def parse_operations(self, operations_file: str) -> Dict[str, Operation]:

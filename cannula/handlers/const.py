@@ -1,4 +1,7 @@
-GRAPHIQL_TEMPLATE = """
+from string import Template
+
+GRAPHIQL_TEMPLATE = Template(
+    """
 <!doctype html>
 <html lang="en">
   <head>
@@ -69,10 +72,11 @@ GRAPHIQL_TEMPLATE = """
           fetcher,
           defaultEditorToolsVisibility: true,
           plugins: [explorerPlugin],
-          defaultQuery: '# Welcome to Cannula, write your queries here\\n',
+          query: '$default_query\\n',
         }),
       );
     </script>
   </body>
 </html>
 """
+)

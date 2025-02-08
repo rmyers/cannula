@@ -1,6 +1,4 @@
 import dataclasses
-from tkinter import N
-from typing import Any
 
 from graphql import (
     ListTypeNode,

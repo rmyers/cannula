@@ -6,7 +6,7 @@ from enum import Enum
 from typing import Optional, Dict, Any, Set
 import uuid
 
-from graphql import ExecutionResult
+from graphql import ExecutionResult, print_ast
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse, Response
 from starlette.routing import Route, WebSocketRoute
@@ -196,7 +196,15 @@ class GraphQLHandler:
             and self.graphiql
             and request.headers.get("accept", "").find("text/html") != -1
         ):
-            return HTMLResponse(GRAPHIQL_TEMPLATE)
+            default = "# Welcome to Cannula write your queries here"
+            operations = (
+                print_ast(self.graph.operations) if self.graph.operations else None
+            )
+            raw_query = operations or default
+            default_query = raw_query.replace("\n", "\\n")
+            return HTMLResponse(
+                GRAPHIQL_TEMPLATE.substitute(default_query=default_query)
+            )
 
         if request.method not in ("POST", "GET"):
             return JSONResponse(

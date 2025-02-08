@@ -4,22 +4,35 @@ Simple HTMX handler for Cannula that executes predefined GraphQL operations
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 import pathlib
-from typing import Optional
+from typing import Any, Dict, Optional
 from urllib.parse import parse_qs
 
+from graphql import DocumentNode, OperationDefinitionNode
 from jinja2 import Environment, FileSystemLoader, Undefined
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import HTMLResponse
 from starlette.routing import Route
 from cannula import CannulaAPI
-
-from cannula.codegen.schema_analyzer import SchemaAnalyzer
-from .operations import OperationAnalyzer
+from cannula.codegen.parse_variables import parse_variable, Variable
 
 logger = logging.getLogger(__name__)
+
+
+@dataclasses.dataclass
+class Operation:
+    """Represents a parsed GraphQL operation with its metadata"""
+
+    name: str
+    operation_type: str  # 'query' or 'mutation'
+    variable_types: Dict[str, Variable]  # Keep original GraphQL type nodes
+
+    @property
+    def template_path(self) -> str:
+        return f"{self.name}.html"
 
 
 class SilentUndefined(Undefined):
@@ -33,8 +46,6 @@ class HTMXHandler:
     def __init__(
         self,
         api: CannulaAPI,
-        schema_analyzer: SchemaAnalyzer,
-        operations_file: str | pathlib.Path,
         template_dir: str | pathlib.Path,
         jinja_env: Optional[Environment] = None,
     ):
@@ -45,21 +56,54 @@ class HTMXHandler:
             autoescape=True,
             undefined=SilentUndefined,
         )
+        self.operations: Dict[str, Operation] = {}
+        if api.operations is not None:
+            self.operations = self.parse_operations(api.operations)
 
-        # Initialize operation analyzer with schema
-        self.operation_analyzer = OperationAnalyzer(schema_analyzer)
+    def parse_operations(self, document: DocumentNode) -> Dict[str, Operation]:
+        """Parse operations and their variable types"""
 
-        # Parse operations
-        with open(operations_file) as f:
-            content = f.read()
-        self.operations = self.operation_analyzer.parse_operations(content)
-        print(self.operations)
+        for definition in document.definitions:
+            if not isinstance(definition, OperationDefinitionNode):
+                continue
+
+            if not definition.name:
+                continue
+
+            name = definition.name.value
+            variables = {}
+
+            # Store original TypeNodes for coercion
+            for var_def in definition.variable_definitions or []:
+                var_name = var_def.variable.name.value
+                variables[var_name] = parse_variable(var_def)
+
+            self.operations[name] = Operation(
+                name=name,
+                operation_type=definition.operation.value,
+                variable_types=variables,
+            )
+
+        return self.operations
+
+    def coerce_variables(
+        self, operation: Operation, raw_variables: Dict[str, str]
+    ) -> Dict[str, Any]:
+        """Coerce all variables for an operation using schema types"""
+        coerced = {}
+
+        for var_name, raw_value in raw_variables.items():
+            if var_name in operation.variable_types:
+                type_node = operation.variable_types[var_name]
+                coerced[var_name] = type_node.coerce_variable(raw_value)
+
+        return coerced
 
     async def handle_request(self, request: Request) -> HTMLResponse:
         """Handle incoming HTMX request"""
         name = request.path_params["name"]
 
-        operation = self.operation_analyzer.operations.get(name)
+        operation = self.operations.get(name)
         if not operation:
             return HTMLResponse(f"Operation '{name}' not found", status_code=404)
 
@@ -72,7 +116,7 @@ class HTMXHandler:
         }
 
         # Use schema analyzer to coerce variables
-        variables = self.operation_analyzer.coerce_variables(operation, raw_variables)
+        variables = self.coerce_variables(operation, raw_variables)
 
         # Check for missing required variables
         missing = []
@@ -86,11 +130,11 @@ class HTMXHandler:
             )
 
         # Execute GraphQL operation
-        result = await self.api.call(
-            operation.document,
+        result = await self.api.exec_operation(
             operation_name=operation.name,
             variables=variables,
             context={"request": request},
+            request=request,
         )
 
         if result.errors:
@@ -105,10 +149,8 @@ class HTMXHandler:
 
 def setup_htmx_app(
     api: CannulaAPI,
-    schema_analyzer: SchemaAnalyzer,
-    operations_file: str | pathlib.Path,
     template_dir: str | pathlib.Path,
 ) -> Starlette:
     """Create Starlette app with HTMX handler configured"""
-    handler = HTMXHandler(api, schema_analyzer, operations_file, template_dir)
-    return Starlette(routes=[Route("/operation/{name}", handler.handle_request)])
+    handler = HTMXHandler(api, template_dir)
+    return Starlette(routes=[Route("/operation/{name:str}", handler.handle_request)])

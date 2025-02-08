@@ -18,6 +18,7 @@ from graphql import (
     GraphQLField,
     GraphQLFieldMap,
     GraphQLObjectType,
+    concat_ast,
     execute,
     ExecutionResult,
     GraphQLSchema,
@@ -98,6 +99,7 @@ class CannulaAPI(typing.Generic[RootType]):
     _scalars: typing.List[ScalarInterface]
     _kwargs: typing.Dict[str, typing.Any]
     schema: GraphQLSchema
+    operations: typing.Optional[DocumentNode]
     logger: typing.Optional[logging.Logger]
     level: int
 
@@ -110,6 +112,7 @@ class CannulaAPI(typing.Generic[RootType]):
         scalars: typing.List[ScalarInterface] = [],
         logger: typing.Optional[logging.Logger] = None,
         level: int = logging.DEBUG,
+        operations: typing.Optional[pathlib.Path | str] = None,
         **kwargs,
     ):
         self._context = context or Context
@@ -121,6 +124,7 @@ class CannulaAPI(typing.Generic[RootType]):
         self.logger = logger
         self.level = level
         self.schema = self._build_schema()
+        self.operations = self._load_operations(operations)
 
     def query(self, field_name: typing.Optional[str] = None) -> typing.Any:
         """Query Resolver
@@ -227,6 +231,18 @@ class CannulaAPI(typing.Generic[RootType]):
             )
 
         return field_definition
+
+    def _load_operations(
+        self, operations: pathlib.Path | str | None
+    ) -> typing.Optional[DocumentNode]:
+        if operations is None:
+            return None
+
+        documents = load_schema(operations)
+        ops = concat_ast(documents)
+        for err in validate(self.schema, ops):
+            raise err
+        return ops
 
     def get_context(self, request) -> typing.Any:
         return self._context.init(request)
@@ -371,4 +387,20 @@ class CannulaAPI(typing.Generic[RootType]):
                 context=context,
                 request=request,
             )
+        )
+
+    async def exec_operation(
+        self,
+        operation_name: str,
+        variables: typing.Optional[typing.Dict[str, typing.Any]] = None,
+        context: typing.Optional[typing.Any] = None,
+        request: typing.Optional[typing.Any] = None,
+    ) -> ExecutionResult:
+        document = self.operations or ""
+        return await self.call(
+            document=document,
+            variables=variables,
+            operation_name=operation_name,
+            context=context,
+            request=request,
         )
