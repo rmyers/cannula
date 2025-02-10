@@ -34,6 +34,7 @@ def template_dir(tmp_path) -> Generator[Path, None, None]:
     (templates / "operations.graphql").write_text(
         """
         query Me { me { name } }
+        query AllUsers($limit: Int) { all(limit: $limit) { name }}
     """
     )
 

@@ -1,5 +1,5 @@
-from graphql import ExecutionResult
 import pytest
+from graphql import ExecutionResult, GraphQLError
 from pytest_mock import MockerFixture
 
 from cannula.api import CannulaAPI, SchemaValidationError
@@ -184,3 +184,21 @@ def test_invalid_field_arguments():
         CannulaAPI(schema=invalid_schema)
 
     assert "Unknown type 'FilterInput'" in str(exc_info.value)
+
+
+def test_invalid_operations(valid_schema, tmp_path):
+    operation_file = tmp_path / "operations.graphql"
+    operation_file.write_text(
+        """
+        query Invalid {
+            does_not_exist {
+                name
+            }
+        }
+    """
+    )
+
+    with pytest.raises(GraphQLError) as exc_info:
+        CannulaAPI(schema=valid_schema, operations=operation_file)
+
+    assert "Cannot query field 'does_not_exist' on type 'Query'" in str(exc_info.value)

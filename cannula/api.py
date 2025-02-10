@@ -33,7 +33,7 @@ from starlette.routing import Route
 from .context import Context
 from .errors import SchemaValidationError
 from .handlers.app_router import AppRouter
-from .handlers.application import HTMXHandler
+from .handlers.operations import HTMXHandler
 from .handlers.asgi import GraphQLHandler
 from .scalars import ScalarInterface
 from .schema import (
