@@ -12,19 +12,15 @@ logger = logging.getLogger(__name__)
 class AppRouter:
     def __init__(
         self,
-        templates_dir: str = "templates",
-        static_dir: str = "static",
-        enable_hot_reload: bool = False,
+        templates_dir: Path,
         debug: bool = False,
     ):
-        self.templates_dir = Path(templates_dir)
-        self.static_dir = static_dir
-        self.enable_hot_reload = enable_hot_reload
+        self.templates_dir = templates_dir
         self.debug = debug
 
         logger.debug(f"Initializing AppRouter with: {self.templates_dir}")
 
-        self.templates = Jinja2Templates(directory=str(self.templates_dir))
+        self.templates = Jinja2Templates(directory=self.templates_dir)
 
     def discover_routes(self) -> typing.List[Route]:
         """Automatically discover and create routes based on template directory structure."""
@@ -36,6 +32,12 @@ class AppRouter:
             logger.debug(f"\nProcessing template: {template_path}")
             relative_path = template_path.relative_to(self.templates_dir)
             parent_dir = relative_path.parent
+
+            resolved_template_path = str(relative_path)
+
+            # Skip over hidden folders
+            if resolved_template_path.startswith("_"):
+                continue
 
             # Convert template path to URL path
             if parent_dir.name == "":
@@ -51,7 +53,9 @@ class AppRouter:
                 # Extract dynamic parameters from request path
                 template_context = request.path_params
                 return self.templates.TemplateResponse(
-                    template, {"request": request, **template_context}
+                    request,
+                    template,
+                    context=template_context,
                 )
 
             routes.append(Route(url_path, get_handler, methods=["GET"]))

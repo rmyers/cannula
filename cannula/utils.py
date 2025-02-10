@@ -14,11 +14,12 @@ class ProjectRootError(Exception):
     pass
 
 
+# TODO(rmyers): use this / test it / delete it
 def find_package_root(
     start_path: typing.Optional[pathlib.Path] = None,
     max_depth: int = 5,
     required_markers: set[str] = {"pyproject.toml"},
-) -> pathlib.Path:
+) -> pathlib.Path:  # pragma: no cover
     if start_path is None:
         start_path = pathlib.Path(__file__).resolve()
 

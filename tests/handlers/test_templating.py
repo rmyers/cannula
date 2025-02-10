@@ -3,9 +3,9 @@ from pathlib import Path
 from typing import Generator
 
 import pytest
-from jinja2 import Environment
+from starlette.testclient import TestClient
 
-from cannula.handlers.templating import NextJSStyleLoader
+from cannula import CannulaAPI
 
 
 @pytest.fixture
@@ -30,6 +30,20 @@ def template_dir(tmp_path) -> Generator[Path, None, None]:
     templates = tmp_path / "templates"
     templates.mkdir()
 
+    # Create an operations file
+    (templates / "operations.graphql").write_text(
+        """
+        query Me { me { name } }
+    """
+    )
+
+    # Create an operation template
+    operations_dir = templates / "_operations"
+    operations_dir.mkdir()
+    (operations_dir / "Me.html").write_text(
+        """<p>Operation: {{ operation.name }}</p>"""
+    )
+
     # Create root layout
     (templates / "layout.html").write_text(
         """
@@ -49,7 +63,7 @@ def template_dir(tmp_path) -> Generator[Path, None, None]:
 
     (app_dir / "layout.html").write_text(
         """
-    {% extends "../layout.html" %}
+    {% extends "layout.html" %}
     {% block content %}
         <main>
             <nav>App Nav</nav>
@@ -61,7 +75,7 @@ def template_dir(tmp_path) -> Generator[Path, None, None]:
 
     (app_dir / "page.html").write_text(
         """
-    {% extends "layout.html" %}
+    {% extends "app/layout.html" %}
     {% block app_content %}
         <h1>App Home</h1>
     {% endblock %}
@@ -74,7 +88,7 @@ def template_dir(tmp_path) -> Generator[Path, None, None]:
 
     (users_dir / "layout.html").write_text(
         """
-    {% extends "../layout.html" %}
+    {% extends "app/layout.html" %}
     {% block app_content %}
         <div class="users-layout">
             {% block users_content %}{% endblock %}
@@ -85,7 +99,7 @@ def template_dir(tmp_path) -> Generator[Path, None, None]:
 
     (users_dir / "page.html").write_text(
         """
-    {% extends "layout.html" %}
+    {% extends "app/users/layout.html" %}
     {% block users_content %}
         <h1>Users List</h1>
     {% endblock %}
@@ -98,7 +112,7 @@ def template_dir(tmp_path) -> Generator[Path, None, None]:
 
     (user_detail_dir / "layout.html").write_text(
         """
-    {% extends "../layout.html" %}
+    {% extends "app/users/layout.html" %}
     {% block users_content %}
         <div class="user-detail-layout">
             {% block user_detail_content %}{% endblock %}
@@ -122,7 +136,7 @@ def template_dir(tmp_path) -> Generator[Path, None, None]:
 
     (user_typed_dir / "layout.html").write_text(
         """
-    {% extends "../layout.html" %}
+    {% extends "app/users/layout.html" %}
     {% block users_content %}
         <div class="user-uuid-layout">
             {% block user_detail_content %}{% endblock %}
@@ -133,97 +147,36 @@ def template_dir(tmp_path) -> Generator[Path, None, None]:
 
     (user_typed_dir / "page.html").write_text(
         """
-    {% extends "layout.html" %}
+    {% extends "app/users/layout.html" %}
     {% block user_detail_content %}
         <h1>User UUID: {{ user_id }}</h1>
     {% endblock %}
     """
     )
 
-    print(templates)
-    print([x for x in templates.glob("*.html")])
     yield templates
 
     # Cleanup
     shutil.rmtree(templates)
 
 
-def test_root_layout(template_dir):
-    """Test that root layout can be loaded directly"""
-    env = Environment(loader=NextJSStyleLoader(template_dir))
-    template = env.get_template("layout.html")
-    rendered = template.render()
-    assert "Root Layout" in rendered
+@pytest.fixture
+def application(template_dir, valid_schema) -> TestClient:
+    api = CannulaAPI(
+        schema=valid_schema,
+        app_directory=template_dir,
+        operations=template_dir / "operations.graphql",
+    )
+    return TestClient(api)
 
 
-def test_app_extends_root(template_dir):
-    """Test that app layout extends root layout"""
-    env = Environment(loader=NextJSStyleLoader(template_dir))
-    template = env.get_template("/app/layout.html")
-    rendered = template.render()
-    assert "Root Layout" in rendered
-    assert "App Nav" in rendered
+def test_application(application: TestClient):
+    not_found = application.get("/not_found")
+    assert not_found.status_code == 404, not_found.text
 
+    operation = application.get("/operation/Me?arg=anything")
+    assert operation.status_code == 200, operation.text
+    assert "Operation: Me" in operation.text
 
-def test_users_extends_app(template_dir):
-    """Test that users layout extends app layout"""
-    env = Environment(loader=NextJSStyleLoader(template_dir))
-    template = env.get_template("/app/users/layout.html")
-    rendered = template.render()
-    assert "Root Layout" in rendered
-    assert "App Nav" in rendered
-    assert "users-layout" in rendered
-
-
-def test_user_detail_extends_users(template_dir):
-    """Test that user detail extends users layout"""
-    env = Environment(loader=NextJSStyleLoader(template_dir))
-    template = env.get_template("/app/users/[id]/page.html")
-    rendered = template.render(user_id=123)
-    assert "Root Layout" in rendered
-    assert "users-layout" in rendered
-    assert "user-detail-layout" in rendered
-    assert "User 123 Details" in rendered
-
-
-def test_relative_extends(template_dir):
-    """Test that relative extends (../) work correctly"""
-    env = Environment(loader=NextJSStyleLoader(template_dir))
-    template = env.get_template("/app/users/[id]/page.html")
-    rendered = template.render(user_id=123)
-    assert "Root Layout" in rendered
-    assert "users-layout" in rendered
-
-
-def test_same_directory_extends(template_dir):
-    """Test that extends finds layouts in the same directory first"""
-    env = Environment(loader=NextJSStyleLoader(template_dir))
-    template = env.get_template("/app/users/page.html")
-    rendered = template.render()
-    # Should use users/layout.html, not app/layout.html or root layout.html
-    assert "users-layout" in rendered
-
-
-def test_missing_template(template_dir):
-    """Test that appropriate error is raised for missing templates"""
-    env = Environment(loader=NextJSStyleLoader(template_dir))
-    with pytest.raises(Exception):  # Replace with specific exception your loader raises
-        env.get_template("/app/missing.html")
-
-
-def test_typed_parameter_path(template_dir):
-    """Test that template loader handles typed parameters like [id:uuid]"""
-    env = Environment(loader=NextJSStyleLoader(template_dir))
-    template = env.get_template("/app/users/[id:uuid]/page.html")
-    rendered = template.render(user_id="123e4567-e89b-12d3-a456-426614174000")
-    assert "Root Layout" in rendered
-    assert "users-layout" in rendered
-    assert "user-uuid-layout" in rendered
-    assert "User UUID: 123e4567-e89b-12d3-a456-426614174000" in rendered
-
-
-def test_outside_root_traversal(template_dir):
-    """Test that template loader prevents traversal outside root directory"""
-    env = Environment(loader=NextJSStyleLoader(template_dir))
-    with pytest.raises(Exception):  # Replace with specific exception your loader raises
-        env.get_template("../outside.html")
+    users = application.get("/app/users/1234")
+    assert users.status_code == 200, users.text

@@ -7,19 +7,26 @@ from __future__ import annotations
 import dataclasses
 import logging
 import pathlib
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
 from urllib.parse import parse_qs
 
-from graphql import DocumentNode, OperationDefinitionNode
-from jinja2 import Environment, FileSystemLoader, Undefined
-from starlette.applications import Starlette
+from graphql import (
+    DocumentNode,
+    FieldNode,
+    FragmentDefinitionNode,
+    FragmentSpreadNode,
+    OperationDefinitionNode,
+    SelectionSetNode,
+)
+from jinja2 import Environment, FileSystemLoader, TemplateNotFound, Undefined
 from starlette.requests import Request
 from starlette.responses import HTMLResponse
-from starlette.routing import Route
-from cannula import CannulaAPI
 from cannula.codegen.parse_variables import parse_variable, Variable
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from cannula import CannulaAPI
 
 
 @dataclasses.dataclass
@@ -28,7 +35,8 @@ class Operation:
 
     name: str
     operation_type: str  # 'query' or 'mutation'
-    variable_types: Dict[str, Variable]  # Keep original GraphQL type nodes
+    variable_types: Dict[str, Variable]
+    node: OperationDefinitionNode
 
     @property
     def template_path(self) -> str:
@@ -45,7 +53,7 @@ class HTMXHandler:
 
     def __init__(
         self,
-        api: CannulaAPI,
+        api: "CannulaAPI",
         template_dir: str | pathlib.Path,
         jinja_env: Optional[Environment] = None,
     ):
@@ -57,11 +65,17 @@ class HTMXHandler:
             undefined=SilentUndefined,
         )
         self.operations: Dict[str, Operation] = {}
+        self.fragments: Dict[str, FragmentDefinitionNode] = {}
         if api.operations is not None:
             self.operations = self.parse_operations(api.operations)
 
     def parse_operations(self, document: DocumentNode) -> Dict[str, Operation]:
         """Parse operations and their variable types"""
+
+        # First pass: collect all fragments
+        for definition in document.definitions:
+            if isinstance(definition, FragmentDefinitionNode):
+                self.fragments[definition.name.value] = definition
 
         for definition in document.definitions:
             if not isinstance(definition, OperationDefinitionNode):
@@ -82,6 +96,7 @@ class HTMXHandler:
                 name=name,
                 operation_type=definition.operation.value,
                 variable_types=variables,
+                node=definition,
             )
 
         return self.operations
@@ -98,6 +113,89 @@ class HTMXHandler:
                 coerced[var_name] = type_node.coerce_variable(raw_value)
 
         return coerced
+
+    def _collect_fragments(
+        self, selection_set: SelectionSetNode, fragments: Set[str]
+    ) -> None:
+        """Recursively collect fragment spreads from a selection set."""
+        for selection in selection_set.selections:
+            if isinstance(selection, FragmentSpreadNode):
+                fragments.add(selection.name.value)
+                # Also collect fragments from the fragment definition
+                fragment_def = self.fragments.get(selection.name.value)
+                if fragment_def and fragment_def.selection_set:
+                    self._collect_fragments(fragment_def.selection_set, fragments)
+            elif isinstance(selection, FieldNode) and selection.selection_set:
+                self._collect_fragments(selection.selection_set, fragments)
+
+    def _get_field_template(
+        self, selection_set: SelectionSetNode, path: Optional[List[str]] = None
+    ) -> str:
+        """Generate template HTML for a selection set."""
+        if path is None:
+            path = []
+
+        template_parts = []
+
+        for selection in selection_set.selections:
+            if isinstance(selection, FieldNode):
+                field_path = path + [selection.name.value]
+                field_access = "-".join(field_path)
+
+                if selection.selection_set:
+                    nested_template = self._get_field_template(
+                        selection.selection_set, field_path
+                    )
+                    template_parts.append(
+                        f'<ul class="{field_access}">\n'
+                        f"    {nested_template}\n"
+                        f"</ul>"
+                    )
+                else:
+                    template_parts.append(
+                        f'<li class="{field_access}">'
+                        f'   <span class="header-{field_access}">{field_access}:</span> '
+                        f"{{{{ item.{selection.name.value} }}}}"
+                        f"</li>"
+                    )
+
+            elif isinstance(selection, FragmentSpreadNode):
+                fragment = self.fragments.get(selection.name.value)
+                if fragment:
+                    fragment_template = self._get_field_template(
+                        fragment.selection_set, path
+                    )
+                    template_parts.append(fragment_template)
+
+        return "\n    ".join(template_parts)
+
+    def _generate_htmx_template(self, query_node: OperationDefinitionNode) -> str:
+        """Generate an HTMX template for a query."""
+        query_name = query_node.name.value if query_node.name else "anonymous"
+
+        # Get the main query field name (usually the first field in the query)
+        main_field = next(
+            (
+                sel.name.value
+                for sel in query_node.selection_set.selections
+                if isinstance(sel, FieldNode)
+            ),
+            query_name,
+        )
+
+        # Generate the field template starting from the main query field
+        field_template = self._get_field_template(query_node.selection_set)
+
+        template = f"""
+<div id="{query_name}-container">
+    {{% for item in data.{main_field} %}}
+    <ul class="item">
+        {field_template}
+    </ul>
+    {{% endfor %}}
+</div>
+"""
+        return template
 
     async def handle_request(self, request: Request) -> HTMLResponse:
         """Handle incoming HTMX request"""
@@ -141,16 +239,17 @@ class HTMXHandler:
             return HTMLResponse(f"GraphQL Error: {result.errors[0]}", status_code=500)
 
         # Render template with result data
-        template = self.jinja_env.get_template(operation.template_path)
-        html = template.render(data=result.data)
+        try:
+            template = self.jinja_env.get_template(operation.template_path)
+        except TemplateNotFound:
+            generated = self._generate_htmx_template(operation.node)
+            template = self.jinja_env.from_string(generated)
+
+        html = template.render(
+            data=result.data,
+            variables=variables,
+            operation=operation,
+            request=request,
+        )
 
         return HTMLResponse(html)
-
-
-def setup_htmx_app(
-    api: CannulaAPI,
-    template_dir: str | pathlib.Path,
-) -> Starlette:
-    """Create Starlette app with HTMX handler configured"""
-    handler = HTMXHandler(api, template_dir)
-    return Starlette(routes=[Route("/operation/{name:str}", handler.handle_request)])

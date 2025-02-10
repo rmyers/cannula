@@ -3,7 +3,7 @@ import json
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional, Dict, Any, Set
+from typing import Optional, Dict, Any, Set, TYPE_CHECKING
 import uuid
 
 from graphql import ExecutionResult, print_ast
@@ -12,8 +12,11 @@ from starlette.responses import HTMLResponse, JSONResponse, Response
 from starlette.routing import Route, WebSocketRoute
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
-from cannula import CannulaAPI, format_errors
+from cannula.errors import format_errors
 from cannula.handlers.const import GRAPHIQL_TEMPLATE
+
+if TYPE_CHECKING:
+    from cannula import CannulaAPI
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +85,7 @@ class SubscriptionManager:
         self,
         connection_id: str,
         subscription_id: str,
-        graph: CannulaAPI,
+        graph: "CannulaAPI",
         query: str,
         variables: Optional[Dict[str, Any]] = None,
         operation_name: Optional[str] = None,
@@ -170,7 +173,7 @@ class SubscriptionManager:
 class GraphQLHandler:
     def __init__(
         self,
-        graph: CannulaAPI,
+        graph: "CannulaAPI",
         path: str = "/graphql",
         graphiql: bool = True,
         graphiql_path: Optional[str] = None,
