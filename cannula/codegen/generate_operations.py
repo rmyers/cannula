@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import pathlib
 from typing import Dict, List, Optional
+from cannula.types import ObjectType
 from graphql import (
     DocumentNode,
     FieldNode,
@@ -14,7 +15,6 @@ from graphql import (
 from jinja2 import Environment, FileSystemLoader
 
 from cannula.codegen.schema_analyzer import SchemaAnalyzer, CodeGenerator
-from cannula.codegen.parse_type import parse_graphql_type
 
 
 logger = logging.getLogger(__name__)
@@ -42,7 +42,7 @@ class TemplateGenerator(CodeGenerator):
     def _get_field_template(
         self,
         selection_set: SelectionSetNode,
-        field_type: Optional[str] = None,
+        object_type: ObjectType,
         path: Optional[List[str]] = None,
     ) -> str:
         """Generate template HTML for a selection set with type-specific markup."""
@@ -53,21 +53,15 @@ class TemplateGenerator(CodeGenerator):
 
         for selection in selection_set.selections:
             if isinstance(selection, FieldNode):
-                field_path = path + [selection.name.value]
+                selection_name = selection.name.value
+                field_path = path + [selection_name]
                 field_access = ".".join(field_path)
                 field_name = " ".join(field_path[1:])
 
-                # Get the field type from schema
-                field_type = None
-                print(selection.name.value)
-                if selection.name.value in self.analyzer.schema.type_map:
-                    field_type = parse_graphql_type(
-                        self.analyzer.schema.type_map[selection.name.value]
-                    ).value
-
                 if selection.selection_set:
+                    # This is an object type since it has selections
                     nested_template = self._get_field_template(
-                        selection.selection_set, field_type, field_path
+                        selection.selection_set, object_type, field_path
                     )
                     template_parts.append(
                         f'<div class="field-group {field_access}">\n'
@@ -76,15 +70,23 @@ class TemplateGenerator(CodeGenerator):
                         f"</div>"
                     )
                 else:
+                    field_type = next(
+                        (
+                            f.field_type.of_type
+                            for f in object_type.fields
+                            if f.name == selection_name
+                        ),
+                        "String",
+                    )
                     # Add type-specific markup based on field_type
-                    if field_type == "DateTime":
+                    if field_type == "datetime":
                         template_parts.append(
                             f'<div class="field {field_access}">\n'
                             f"    <label>{field_name}</label>\n"
                             f'    <sl-format-date date="{{{{ {field_access} }}}}"></sl-format-date>\n'
                             f"</div>"
                         )
-                    elif field_type == "Float" or field_type == "Int":
+                    elif field_type == "float" or field_type == "int":
                         template_parts.append(
                             f'<div class="field {field_access}">\n'
                             f"    <label>{field_name}</label>\n"
@@ -103,7 +105,7 @@ class TemplateGenerator(CodeGenerator):
                 fragment = self.fragments.get(selection.name.value)
                 if fragment:
                     fragment_template = self._get_field_template(
-                        fragment.selection_set, field_type, path
+                        fragment.selection_set, object_type, path
                     )
                     template_parts.append(fragment_template)
 
@@ -113,29 +115,21 @@ class TemplateGenerator(CodeGenerator):
         """Generate a complete template for an operation."""
         operation_name = operation.name.value if operation.name else "anonymous"
 
-        # Get the main query field name
-        main_field = next(
-            (
-                sel.name.value
-                for sel in operation.selection_set.selections
-                if isinstance(sel, FieldNode)
-            ),
-            operation_name,
-        )
+        field_templates: list[str] = []
 
-        # Generate field template starting from main query field
-        field_template = self._get_field_template(operation.selection_set)
+        for selection in operation.selection_set.selections:
+            operation_type = next(
+                f.field_type.of_type
+                for f in self.analyzer.operation_fields
+                if isinstance(selection, FieldNode) and f.name == selection.name.value
+            )
+            object_type = self.analyzer.object_types_by_name[operation_type]
+            field_templates.append(
+                self._get_field_template(operation.selection_set, object_type)
+            )
 
-        template = f"""
-<div id="{operation_name}-container" class="operation-container">
-    {{% for {main_field} in data.{main_field} %}}
-    <div class="item">
-        {field_template}
-    </div>
-    {{% endfor %}}
-</div>
-"""
-        return template
+        template = [f'<div class="{operation_name}">{t}</div>' for t in field_templates]
+        return "\n".join(template)
 
     def generate(self, document: DocumentNode) -> None:
         """Generate templates for all operations in the document."""
@@ -151,8 +145,6 @@ class TemplateGenerator(CodeGenerator):
 
             if not definition.name:
                 continue
-
-            print(definition.to_dict())
 
             name = definition.name.value
             template_content = self._generate_operation_template(definition)
@@ -173,5 +165,5 @@ class TemplateGenerator(CodeGenerator):
                 with open(template_path, "w") as f:
                     f.write(template_content)
                 logger.info(f"Generated template: {template_path}")
-            except IOError as e:
+            except IOError as e:  # pragma: no cover
                 logger.error(f"Failed to write template '{name}.html': {str(e)}")

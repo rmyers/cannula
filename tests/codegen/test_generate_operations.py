@@ -75,7 +75,7 @@ def test_basic_template_generation(template_generator, tmp_path):
 
     # Read content and verify structure
     content = expected_file.read_text()
-    assert 'id="GetUsers-container"' in content
+    assert 'class="GetUsers"' in content
     assert 'class="field users.id"' in content
     assert 'class="field users.name"' in content
     assert '<sl-format-date date="{{ users.createdAt }}">' in content
@@ -94,7 +94,7 @@ def test_fragment_template_generation(template_generator, tmp_path):
 
     # Read content and verify structure
     content = expected_file.read_text()
-    assert 'id="GetUsersWithFragment-container"' in content
+    assert 'class="GetUsersWithFragment"' in content
     assert 'class="field users.id"' in content
     assert 'class="field users.name"' in content
     assert '<sl-format-date date="{{ users.createdAt }}">' in content
@@ -133,7 +133,7 @@ def test_force_overwrite_template(schema_analyzer, tmp_path):
 
     # Verify content was overwritten
     content = template_path.read_text()
-    assert 'id="GetUsers-container"' in content
+    assert 'class="GetUsers"' in content
     assert content != "Existing content"
 
 
