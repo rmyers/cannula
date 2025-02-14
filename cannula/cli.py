@@ -44,13 +44,36 @@ codegen_parser.add_argument(
 )
 codegen_parser.add_argument(
     "--schema",
-    help="Specific a path or location for the schema files to use.",
+    help="Specify a path or location for the schema files to use.",
     default=".",
 )
 codegen_parser.add_argument(
     "--dest",
     help="Change the default location of the output folder.",
     default="gql",
+)
+codegen_parser.add_argument(
+    "--operations",
+    help="Specify a path or location for the operations to generate.",
+    default="operations.graphql",
+)
+codegen_parser.add_argument(
+    "--app-dir",
+    "--app_dir",
+    help="Change the default location of the application folder.",
+    default="app",
+)
+codegen_parser.add_argument(
+    "--operations-dir",
+    "--operations_dir",
+    help="Change the default location of the operations folder.",
+    default=None,
+)
+codegen_parser.add_argument(
+    "--force",
+    "-f",
+    action="store_true",
+    help="Force overwriting existing operations templates.",
 )
 codegen_parser.add_argument(
     "--scalar",
@@ -93,7 +116,14 @@ def resolve_scalars(scalars: list[str]) -> list[ScalarInterface]:
 
 
 def run_codegen(
-    dry_run: bool, schema: str, dest: str, scalars: list[str] | None, use_pydantic: bool
+    dry_run: bool,
+    schema: str,
+    dest: str,
+    scalars: list[str] | None,
+    use_pydantic: bool,
+    operations: str,
+    operations_dir: pathlib.Path,
+    force: bool,
 ):
     source = pathlib.Path(schema)
     documents = cannula.load_schema(source)
@@ -105,6 +135,9 @@ def run_codegen(
         dry_run=dry_run,
         scalars=_scalars,
         use_pydantic=use_pydantic,
+        operations=operations,
+        operations_dir=operations_dir,
+        force=force,
     )
 
 
@@ -126,10 +159,20 @@ def main():
             dest = codegen_config.get("dest", options.dest)
             scalars = codegen_config.get("scalars", options.scalars)
             use_pydantic = codegen_config.get("use_pydantic", options.use_pydantic)
+            operations = codegen_config.get("operations", options.operations)
+            app_dir = codegen_config.get("app_dir", options.app_dir)
+            operations_dir = codegen_config.get(
+                "operations_dir", options.operations_dir
+            )
+            if operations_dir is None:
+                operations_dir = pathlib.Path(app_dir) / "_operations"
             run_codegen(
                 dry_run=options.dry_run,
                 schema=schema,
                 dest=dest,
                 scalars=scalars,
                 use_pydantic=use_pydantic,
+                operations=operations,
+                operations_dir=operations_dir,
+                force=options.force,
             )

@@ -8,13 +8,14 @@ import logging
 import pathlib
 import typing
 
-from cannula.codegen.generate_types import PythonCodeGenerator
-from cannula.codegen.generate_sql import SQLAlchemyGenerator
 from cannula.codegen.generate_context import ContextGenerator
+from cannula.codegen.generate_operations import TemplateGenerator
+from cannula.codegen.generate_sql import SQLAlchemyGenerator
+from cannula.codegen.generate_types import PythonCodeGenerator
 from cannula.codegen.schema_analyzer import SchemaAnalyzer
 from cannula.scalars import ScalarInterface
-from cannula.schema import Imports, build_and_extend_schema
-from graphql import DocumentNode
+from cannula.schema import Imports, build_and_extend_schema, load_schema
+from graphql import DocumentNode, concat_ast
 
 LOG = logging.getLogger(__name__)
 
@@ -77,7 +78,13 @@ def render_file(
     scalars: list[ScalarInterface] = [],
     use_pydantic: bool = False,
     dry_run: bool = False,
+    force: bool = False,
+    operations: typing.Optional[typing.Union[str, pathlib.Path]] = None,
+    operations_dir: typing.Union[str, pathlib.Path] = "app/_operations",
 ) -> None:
+    schema = build_and_extend_schema(type_defs, scalars, {"imports": _IMPORTS})
+    analyzer = SchemaAnalyzer(schema)
+
     formatted_code = render_code(
         type_defs=type_defs, scalars=scalars, use_pydantic=use_pydantic
     )
@@ -97,3 +104,12 @@ def render_file(
     if formatted_code["context"]:
         with open(dest / "context.py", "w") as context_file:
             context_file.write(formatted_code["context"])
+
+    if operations:
+        document = concat_ast(load_schema(operations))
+        template_generator = TemplateGenerator(
+            analyzer=analyzer,
+            template_dir=operations_dir,
+            force=force,
+        )
+        template_generator.generate(document)
