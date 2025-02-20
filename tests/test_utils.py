@@ -1,4 +1,5 @@
 from __future__ import annotations
+import collections
 import pytest
 
 from cannula import utils
@@ -124,30 +125,20 @@ def test_find_package_root_no_markers(tmp_path):
     assert "Could not find project root" in str(exc_info.value)
 
 
-def test_find_package_root_none_start_path(tmp_path):
-    # Create project structure
+def test_find_package_root_skips_internal(tmp_path, monkeypatch):
+    # Create dummy internal file paths that should be skipped
+    def mock_stack():
+        Frame = collections.namedtuple("Frame", ["filename"])
+        return [
+            Frame(filename="cannula/utils.py"),
+            Frame(filename="cannula/api.py"),
+            Frame(filename=str(tmp_path / "user_code.py")),
+        ]
+
+    monkeypatch.setattr("inspect.stack", mock_stack)
+
+    # Create marker file
     (tmp_path / "pyproject.toml").touch()
 
-    # Create a module that will use find_package_root
-    test_dir = tmp_path / "src" / "package"
-    test_dir.mkdir(parents=True)
-    test_file = test_dir / "test_module.py"
-
-    # Write a Python file that imports and calls find_package_root
-    test_file.write_text(
-        """
-from cannula.utils import find_package_root
-
-print(find_package_root())
-"""
-    )
-
-    # Execute the file and capture output
-    import subprocess
-
-    result = subprocess.run(
-        ["python", str(test_file)], capture_output=True, text=True, cwd=str(test_dir)
-    )
-
-    # Check that the output matches our tmp_path
-    assert result.stdout.strip() == str(tmp_path)
+    result = utils.find_package_root()
+    assert result == tmp_path
