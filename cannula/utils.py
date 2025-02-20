@@ -43,6 +43,7 @@ def find_package_root(
 
     if start_path is None:
         for frame in inspect.stack():
+            print(frame.filename)
             should_skip = any(p in frame.filename for p in skip_paths)
             if should_skip:
                 continue
