@@ -16,7 +16,7 @@ classifiers = [
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3.10",
 ]
-dependencies = ["graphql-core<=3.2.5", "starlette<1.0"]
+dependencies = ["graphql-core<=3.2.6", "starlette<1.0"]
 
 [project.optional-dependencies]
 codegen = [
