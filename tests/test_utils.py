@@ -1,4 +1,5 @@
 from __future__ import annotations
+import collections
 import pytest
 
 from cannula import utils
@@ -83,3 +84,61 @@ def test_gql():
 def test_context_attr_pluralization(name: str, expected_plural: str):
     actual = utils.pluralize(name)
     assert actual == expected_plural
+
+
+def test_find_package_root_basic(tmp_path):
+    # Create pyproject.toml in tmp directory
+    (tmp_path / "pyproject.toml").touch()
+
+    # Test finding from a nested directory
+    nested_dir = tmp_path / "src" / "package" / "submodule"
+    nested_dir.mkdir(parents=True)
+
+    result = utils.find_package_root(nested_dir)
+    assert result == tmp_path
+
+
+def test_find_package_root_max_depth(tmp_path):
+    # Create deep nested structure without markers
+    deep_path = tmp_path
+    for i in range(6):
+        deep_path = deep_path / f"level_{i}"
+        deep_path.mkdir()
+
+    # Create marker file beyond max_depth
+    (tmp_path / "pyproject.toml").touch()
+
+    with pytest.raises(utils.ProjectRootError) as exc_info:
+        utils.find_package_root(deep_path, max_depth=3)
+
+    assert "Could not find project root" in str(exc_info.value)
+    assert "within 3 levels" in str(exc_info.value)
+
+
+def test_find_package_root_no_markers(tmp_path):
+    nested_dir = tmp_path / "src" / "package"
+    nested_dir.mkdir(parents=True)
+
+    with pytest.raises(utils.ProjectRootError) as exc_info:
+        utils.find_package_root(nested_dir)
+
+    assert "Could not find project root" in str(exc_info.value)
+
+
+def test_find_package_root_skips_internal(tmp_path, monkeypatch):
+    # Create dummy internal file paths that should be skipped
+    def mock_stack():
+        Frame = collections.namedtuple("Frame", ["filename"])
+        return [
+            Frame(filename="cannula/utils.py"),
+            Frame(filename="cannula/api.py"),
+            Frame(filename=str(tmp_path / "user_code.py")),
+        ]
+
+    monkeypatch.setattr("inspect.stack", mock_stack)
+
+    # Create marker file
+    (tmp_path / "pyproject.toml").touch()
+
+    result = utils.find_package_root()
+    assert result == tmp_path

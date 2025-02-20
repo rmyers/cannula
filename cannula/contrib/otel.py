@@ -351,6 +351,7 @@ class InstrumentedCannulaAPI(CannulaAPI):
         operation_name: str | None = None,
         context: Any | None = None,
         request: Any | None = None,
+        **kwargs,
     ) -> ExecutionResult:
         with TRACER.start_as_current_span("graphql.execute") as span:
             span.set_attribute("graphql.operation_name", operation_name or "anonymous")
@@ -362,6 +363,7 @@ class InstrumentedCannulaAPI(CannulaAPI):
                 operation_name=operation_name,
                 context=context,
                 request=request,
+                **kwargs,
             )
 
             if results.data:
@@ -382,6 +384,7 @@ class InstrumentedCannulaAPI(CannulaAPI):
         operation_name: str | None = None,
         context: Any | None = None,
         request: Any | None = None,
+        **kwargs,
     ) -> AsyncIterable[ExecutionResult] | ExecutionResult:
         with TRACER.start_as_current_span("graphql.subscribe") as span:
             span.set_attribute("graphql.operation_name", operation_name or "anonymous")
@@ -392,6 +395,7 @@ class InstrumentedCannulaAPI(CannulaAPI):
                 operation_name=operation_name,
                 context=context,
                 request=request,
+                **kwargs,
             )
 
 

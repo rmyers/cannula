@@ -6,13 +6,14 @@ from enum import Enum
 from typing import Optional, Dict, Any, Set
 import uuid
 
-from graphql import ExecutionResult
+from graphql import ExecutionResult, print_ast
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse, Response
-from starlette.routing import Route, WebSocketRoute
+from starlette.routing import BaseRoute, Route, WebSocketRoute
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
-from cannula import CannulaAPI, format_errors
+from cannula import CannulaAPI
+from cannula.errors import format_errors
 from cannula.handlers.const import GRAPHIQL_TEMPLATE
 
 logger = logging.getLogger(__name__)
@@ -82,7 +83,7 @@ class SubscriptionManager:
         self,
         connection_id: str,
         subscription_id: str,
-        graph: CannulaAPI,
+        graph: "CannulaAPI",
         query: str,
         variables: Optional[Dict[str, Any]] = None,
         operation_name: Optional[str] = None,
@@ -170,7 +171,7 @@ class SubscriptionManager:
 class GraphQLHandler:
     def __init__(
         self,
-        graph: CannulaAPI,
+        graph: "CannulaAPI",
         path: str = "/graphql",
         graphiql: bool = True,
         graphiql_path: Optional[str] = None,
@@ -196,7 +197,15 @@ class GraphQLHandler:
             and self.graphiql
             and request.headers.get("accept", "").find("text/html") != -1
         ):
-            return HTMLResponse(GRAPHIQL_TEMPLATE)
+            default = "# Welcome to Cannula write your queries here"
+            operations = (
+                print_ast(self.graph.operations) if self.graph.operations else None
+            )
+            raw_query = operations or default
+            default_query = raw_query.replace("\n", "\\n")
+            return HTMLResponse(
+                GRAPHIQL_TEMPLATE.substitute(default_query=default_query)
+            )
 
         if request.method not in ("POST", "GET"):
             return JSONResponse(
@@ -332,7 +341,7 @@ class GraphQLHandler:
             except Exception:  # pragma: no cover
                 pass
 
-    def routes(self) -> list:
+    def routes(self) -> list[BaseRoute]:
         """Return the list of routes to be added to a Starlette application."""
         routes = [
             Route(

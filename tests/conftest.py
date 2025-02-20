@@ -32,6 +32,7 @@ def valid_schema() -> DocumentNode:
         type Query {
             me: User
             you: User
+            all(limit: Int = 10): [User]
         }
         type Mutation {
             createMe(name: String!): User

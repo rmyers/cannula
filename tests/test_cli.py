@@ -33,6 +33,9 @@ def test_codegen(mocker: MockerFixture):
         type_defs=mock_schema,
         dest=mocker.ANY,
         dry_run=False,
+        force=False,
+        operations="operations.graphql",
+        operations_dir=pathlib.PosixPath("app/_operations"),
         scalars=[],
         use_pydantic=False,
     )
@@ -58,6 +61,9 @@ def test_codegen_dry_run(mocker: MockerFixture):
         scalars=[],
         dry_run=True,
         use_pydantic=False,
+        force=False,
+        operations="operations.graphql",
+        operations_dir=pathlib.PosixPath("app/_operations"),
     )
 
 
@@ -82,6 +88,9 @@ def test_codegen_scalars(mocker: MockerFixture):
         scalars=expected_scalars,
         dry_run=False,
         use_pydantic=False,
+        force=False,
+        operations="operations.graphql",
+        operations_dir=pathlib.PosixPath("app/_operations"),
     )
 
 
