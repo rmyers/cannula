@@ -27,20 +27,16 @@ from graphql import (
     validate_schema,
     validate,
 )
-from starlette.applications import Starlette
-from starlette.routing import Route
 
 from .context import Context
 from .errors import SchemaValidationError
-from .handlers.app_router import AppRouter
-from .handlers.operations import HTMXHandler
-from .handlers.asgi import GraphQLHandler
 from .scalars import ScalarInterface
 from .schema import (
     build_and_extend_schema,
     load_schema,
     maybe_parse,
 )
+
 
 LOG = logging.getLogger(__name__)
 
@@ -52,7 +48,7 @@ class ParseResults(typing.NamedTuple):
     errors: typing.List[GraphQLError] = []
 
 
-class CannulaAPI(typing.Generic[RootType], Starlette):
+class CannulaAPI(typing.Generic[RootType]):
     """
     Your entry point into the fun filled world of graphql. Just dive right in::
 
@@ -92,16 +88,10 @@ class CannulaAPI(typing.Generic[RootType], Starlette):
             subclass of the base :py:class:`cannula.scalars.ScalarType`.
         operations:
             Optional path to an operations document or directory containing operations.
-        app_directory:
-            Optional path to application templates: default `app`
-        opertions_directory:
-            Optional path to operations templates: defaults to `app_directory/_operations`
         logger:
             Optional logger to use for messages that cannula logs. The default will be: `cannula.api`
         level:
             Optional logging level to log as (default: DEBUG)
-        kwargs:
-            Any extra kwargs passed directly to Starlette application.
     """
 
     _schema: typing.Union[str, DocumentNode, pathlib.Path]
@@ -124,8 +114,6 @@ class CannulaAPI(typing.Generic[RootType], Starlette):
         logger: typing.Optional[logging.Logger] = None,
         level: int = logging.DEBUG,
         operations: typing.Optional[pathlib.Path | str] = None,
-        app_directory: pathlib.Path | str = "app",
-        operations_directory: typing.Optional[pathlib.Path | str] = None,
         **kwargs,
     ):
         self._context = context or Context
@@ -137,28 +125,8 @@ class CannulaAPI(typing.Generic[RootType], Starlette):
         self.logger = logger
         self.level = level
 
-        self.app_directory = pathlib.Path(app_directory)
-        if operations_directory is None:
-            operations_directory = self.app_directory / "_operations"
-        self.operations_directory = pathlib.Path(operations_directory)
-
         self.schema = self._build_schema()
         self.operations = self._load_operations(operations)
-
-        routes: typing.List[Route] = []
-
-        # TODO(rmyers): add options here
-        graphql_handler = GraphQLHandler(self)
-        routes = graphql_handler.routes()
-
-        application = AppRouter(self.app_directory)
-        routes.extend(application.discover_routes())
-
-        if self.operations is not None:
-            handler = HTMXHandler(self, self.operations_directory)
-            routes.append(Route("/operation/{name:str}", handler.handle_request))
-
-        super().__init__(routes=routes, debug=True, **kwargs)
 
     def query(self, field_name: typing.Optional[str] = None) -> typing.Any:
         """Query Resolver

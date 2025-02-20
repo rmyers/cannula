@@ -7,7 +7,7 @@ from __future__ import annotations
 import dataclasses
 import logging
 import pathlib
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import Any, Dict, Optional
 from urllib.parse import parse_qs
 
 from graphql import (
@@ -18,12 +18,11 @@ from graphql import (
 from jinja2 import Environment, FileSystemLoader, Undefined
 from starlette.requests import Request
 from starlette.responses import HTMLResponse
+
+from cannula import CannulaAPI
 from cannula.codegen.parse_variables import parse_variable, Variable
 
 logger = logging.getLogger(__name__)
-
-if TYPE_CHECKING:
-    from cannula import CannulaAPI
 
 
 @dataclasses.dataclass
@@ -40,12 +39,14 @@ class Operation:
         return f"{self.name}.html"
 
 
+# TODO(rmyers): make this used by default and add tests
 class SilentUndefined(Undefined):
-    def _fail_with_undefined_error(self, *args, **kwargs):
+    def _fail_with_undefined_error(self, *args, **kwargs):  # pragma: no cover
         return ""
 
 
-class HTMXHandler:
+# TODO(rmyers): refactor and add tests
+class HTMXHandler:  # pragma: no cover
     """Handles HTMX requests with type coercion"""
 
     def __init__(

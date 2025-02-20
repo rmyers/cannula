@@ -83,3 +83,71 @@ def test_gql():
 def test_context_attr_pluralization(name: str, expected_plural: str):
     actual = utils.pluralize(name)
     assert actual == expected_plural
+
+
+def test_find_package_root_basic(tmp_path):
+    # Create pyproject.toml in tmp directory
+    (tmp_path / "pyproject.toml").touch()
+
+    # Test finding from a nested directory
+    nested_dir = tmp_path / "src" / "package" / "submodule"
+    nested_dir.mkdir(parents=True)
+
+    result = utils.find_package_root(nested_dir)
+    assert result == tmp_path
+
+
+def test_find_package_root_max_depth(tmp_path):
+    # Create deep nested structure without markers
+    deep_path = tmp_path
+    for i in range(6):
+        deep_path = deep_path / f"level_{i}"
+        deep_path.mkdir()
+
+    # Create marker file beyond max_depth
+    (tmp_path / "pyproject.toml").touch()
+
+    with pytest.raises(utils.ProjectRootError) as exc_info:
+        utils.find_package_root(deep_path, max_depth=3)
+
+    assert "Could not find project root" in str(exc_info.value)
+    assert "within 3 levels" in str(exc_info.value)
+
+
+def test_find_package_root_no_markers(tmp_path):
+    nested_dir = tmp_path / "src" / "package"
+    nested_dir.mkdir(parents=True)
+
+    with pytest.raises(utils.ProjectRootError) as exc_info:
+        utils.find_package_root(nested_dir)
+
+    assert "Could not find project root" in str(exc_info.value)
+
+
+def test_find_package_root_none_start_path(tmp_path):
+    # Create project structure
+    (tmp_path / "pyproject.toml").touch()
+
+    # Create a module that will use find_package_root
+    test_dir = tmp_path / "src" / "package"
+    test_dir.mkdir(parents=True)
+    test_file = test_dir / "test_module.py"
+
+    # Write a Python file that imports and calls find_package_root
+    test_file.write_text(
+        """
+from cannula.utils import find_package_root
+
+print(find_package_root())
+"""
+    )
+
+    # Execute the file and capture output
+    import subprocess
+
+    result = subprocess.run(
+        ["python", str(test_file)], capture_output=True, text=True, cwd=str(test_dir)
+    )
+
+    # Check that the output matches our tmp_path
+    assert result.stdout.strip() == str(tmp_path)

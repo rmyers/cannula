@@ -1,5 +1,4 @@
 import argparse
-import importlib
 import logging
 import pathlib
 import sys
@@ -8,7 +7,7 @@ import tomli
 
 import cannula
 from cannula.codegen import render_file
-from cannula.scalars import ScalarInterface
+from cannula.utils import resolve_scalars
 
 # create the top-level parser for global options
 parser = argparse.ArgumentParser(
@@ -58,14 +57,14 @@ codegen_parser.add_argument(
     default="operations.graphql",
 )
 codegen_parser.add_argument(
-    "--app-dir",
-    "--app_dir",
+    "--app-directory",
+    "--app_directory",
     help="Change the default location of the application folder.",
     default="app",
 )
 codegen_parser.add_argument(
-    "--operations-dir",
-    "--operations_dir",
+    "--operations-directory",
+    "--operations_directory",
     help="Change the default location of the operations folder.",
     default=None,
 )
@@ -98,21 +97,6 @@ def load_config(config) -> dict:
     with open(source, "rb") as conf_file:
         options = tomli.load(conf_file)
         return options.get("tool", {}).get("cannula", {})
-
-
-def resolve_scalars(scalars: list[str]) -> list[ScalarInterface]:
-    _scalars: list[ScalarInterface] = []
-    for scalar in scalars or []:
-        _mod, _, _klass = scalar.rpartition(".")
-        if not _mod:
-            raise AttributeError(
-                f"Scalar: {scalar} invalid must be a module path for import like 'my.module.Klass'"
-            )
-        _parent = importlib.import_module(_mod)
-        _klass_obj = getattr(_parent, _klass)
-        _scalars.append(_klass_obj)
-
-    return _scalars
 
 
 def run_codegen(
@@ -160,9 +144,9 @@ def main():
             scalars = codegen_config.get("scalars", options.scalars)
             use_pydantic = codegen_config.get("use_pydantic", options.use_pydantic)
             operations = codegen_config.get("operations", options.operations)
-            app_dir = codegen_config.get("app_dir", options.app_dir)
+            app_dir = codegen_config.get("app_directory", options.app_directory)
             operations_dir = codegen_config.get(
-                "operations_dir", options.operations_dir
+                "operations_directory", options.operations_directory
             )
             if operations_dir is None:
                 operations_dir = pathlib.Path(app_dir) / "_operations"

@@ -3,20 +3,18 @@ import json
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional, Dict, Any, Set, TYPE_CHECKING
+from typing import Optional, Dict, Any, Set
 import uuid
 
 from graphql import ExecutionResult, print_ast
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse, Response
-from starlette.routing import Route, WebSocketRoute
+from starlette.routing import BaseRoute, Route, WebSocketRoute
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
+from cannula import CannulaAPI
 from cannula.errors import format_errors
 from cannula.handlers.const import GRAPHIQL_TEMPLATE
-
-if TYPE_CHECKING:
-    from cannula import CannulaAPI
 
 logger = logging.getLogger(__name__)
 
@@ -343,7 +341,7 @@ class GraphQLHandler:
             except Exception:  # pragma: no cover
                 pass
 
-    def routes(self) -> list:
+    def routes(self) -> list[BaseRoute]:
         """Return the list of routes to be added to a Starlette application."""
         routes = [
             Route(

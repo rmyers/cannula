@@ -1,8 +1,15 @@
 import ast
+import dataclasses
+import importlib
+import inspect
+import logging
 import pathlib
 import typing
 
 from graphql import parse, DocumentNode
+from cannula.scalars import ScalarInterface
+
+LOG = logging.getLogger(__name__)
 
 # AST contants for common values
 NONE = ast.Constant(value=None)
@@ -10,19 +17,41 @@ ELLIPSIS = ast.Expr(value=ast.Constant(value=Ellipsis))
 PASS = ast.Pass()
 
 
+@dataclasses.dataclass
+class CannulaConfig:
+    root_path: pathlib.Path
+    dest: pathlib.Path
+    schema: pathlib.Path
+    operations: pathlib.Path
+    app_directory: pathlib.Path
+    operations_directory: pathlib.Path
+    static_directory: pathlib.Path
+    use_pydantic: bool = False
+    scalars: list[str] = dataclasses.field(default_factory=list)
+
+
 class ProjectRootError(Exception):
     pass
 
 
-# TODO(rmyers): use this / test it / delete it
 def find_package_root(
     start_path: typing.Optional[pathlib.Path] = None,
     max_depth: int = 5,
-    required_markers: set[str] = {"pyproject.toml"},
-) -> pathlib.Path:  # pragma: no cover
-    if start_path is None:
-        start_path = pathlib.Path(__file__).resolve()
+) -> pathlib.Path:
+    required_markers: set[str] = {"pyproject.toml"}
+    skip_paths: set[str] = {"cannula/utils.py", "cannula/api.py"}
 
+    if start_path is None:
+        for frame in inspect.stack():
+            should_skip = any(p in frame.filename for p in skip_paths)
+            if should_skip:
+                continue
+
+            # grab the first from the stack that is not internal
+            start_path = pathlib.Path(frame.filename).resolve()
+            break
+
+    assert start_path is not None
     current = start_path
     depth = 0
 
@@ -38,6 +67,49 @@ def find_package_root(
         f"Could not find project root with markers {required_markers} "
         f"within {max_depth} levels up from {start_path}"
     )
+
+
+def get_config(start_path: typing.Optional[pathlib.Path] = None) -> CannulaConfig:
+    """Searchs the current path for `pyproject.toml` and return options."""
+    import tomli
+
+    root = find_package_root(start_path)
+    contents = (root / "pyproject.toml").read_text()
+    options = tomli.loads(contents)
+    config = options.get("tool", {}).get("cannula", {})
+    codegen = config.get("codegen", {})
+    found = codegen or config
+    app_directory = root / found.get("app_directory", "app")
+    operations_directory = root / found.get(
+        "operations_directory", (app_directory / "_operations")
+    )
+    static_directory = root / found.get("static_directory", (app_directory / "_static"))
+    return CannulaConfig(
+        root_path=root,
+        dest=(root / found.get("dest", "gql")),
+        schema=(root / found.get("schema", "schema.graphql")),
+        operations=(root / found.get("operations", "operations.graphql")),
+        app_directory=app_directory,
+        operations_directory=operations_directory,
+        static_directory=static_directory,
+        scalars=found.get("scalars", []),
+        use_pydantic=found.get("use_pydantic"),
+    )
+
+
+def resolve_scalars(scalars: list[str]) -> list[ScalarInterface]:
+    _scalars: list[ScalarInterface] = []
+    for scalar in scalars or []:
+        _mod, _, _klass = scalar.rpartition(".")
+        if not _mod:
+            raise AttributeError(
+                f"Scalar: {scalar} invalid must be a module path for import like 'my.module.Klass'"
+            )
+        _parent = importlib.import_module(_mod)
+        _klass_obj = getattr(_parent, _klass)
+        _scalars.append(_klass_obj)
+
+    return _scalars
 
 
 def gql(schema: str) -> DocumentNode:
