@@ -1,7 +1,6 @@
 import ast
 import dataclasses
 import importlib
-import inspect
 import logging
 import pathlib
 import typing
@@ -39,20 +38,10 @@ def find_package_root(
     max_depth: int = 5,
 ) -> pathlib.Path:
     required_markers: set[str] = {"pyproject.toml"}
-    skip_paths: set[str] = {"cannula/utils.py", "cannula/api.py"}
 
     if start_path is None:
-        for frame in inspect.stack():
-            print(frame.filename)
-            should_skip = any(p in frame.filename for p in skip_paths)
-            if should_skip:
-                continue
+        start_path = pathlib.Path.cwd()
 
-            # grab the first from the stack that is not internal
-            start_path = pathlib.Path(frame.filename).resolve()
-            break
-
-    assert start_path is not None
     current = start_path
     depth = 0
 
