@@ -39,7 +39,11 @@ def find_package_root(
     max_depth: int = 5,
 ) -> pathlib.Path:
     required_markers: set[str] = {"pyproject.toml"}
-    skip_paths = {"cannula/utils.py", "cannula/api.py"}
+    skip_paths = {
+        "cannula/utils.py",
+        "cannula/api.py",
+        "cannula/handlers/application.py",
+    }
 
     if start_path is None:
         caller_frame = inspect.stack()
