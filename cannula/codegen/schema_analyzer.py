@@ -49,6 +49,13 @@ from cannula.utils import ast_for_import_from
 
 LOG = logging.getLogger(__name__)
 
+# These inputs are defined by the directives and do not need to be generated.
+SKIP_TYPES = {
+    "SourceHTTP",
+    "HTTPHeaderMapping",
+    "ConnectHTTP",
+}
+
 
 class SchemaExtension:
     """Container for schema-wide extensions and metadata"""
@@ -98,8 +105,9 @@ class SchemaAnalyzer:
 
         for name, type_def in self.schema.type_map.items():
             is_private = name.startswith("__")
+            should_skip = name in SKIP_TYPES
 
-            if is_private:
+            if is_private or should_skip:
                 continue
             elif is_object_type(type_def):
                 type_def = cast(GraphQLObjectType, type_def)
@@ -238,6 +246,7 @@ class SchemaAnalyzer:
     ) -> Field:
         field_type = parse_graphql_type(field_def.type)
         directives = field_def.extensions.get("directives", [])
+        LOG.error(directives)
         fk_field = self.get_fk_field(
             field_type=field_type,
             parent=parent,

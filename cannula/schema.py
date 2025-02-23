@@ -32,7 +32,7 @@ from typing_extensions import TypedDict
 
 from cannula.scalars import ScalarInterface
 from cannula.schema_processor import SchemaProcessor
-from cannula.directives import DB_SQL, FIELD_META
+from cannula.directives import DB_SQL, FIELD_META, CONNECT
 
 LOG = logging.getLogger(__name__)
 QUERY_TYPE = parse("type Query { _empty: String }")
@@ -87,6 +87,7 @@ def ensure_schema_has_directive(ast: DocumentNode) -> DocumentNode:
     ]
     has_db_sql = "db_sql" in directive_definitions
     has_field_meta = "field_meta" in directive_definitions
+    has_connect = "connect" in directive_definitions
 
     if not has_db_sql:
         LOG.debug("Adding db_sql directive")
@@ -95,6 +96,10 @@ def ensure_schema_has_directive(ast: DocumentNode) -> DocumentNode:
     if not has_field_meta:
         LOG.debug("Adding field_meta directive")
         ast = concat_ast([ast, FIELD_META])
+
+    if not has_connect:
+        LOG.debug("Adding connect and source directives")
+        ast = concat_ast([ast, CONNECT])
 
     return ast
 
