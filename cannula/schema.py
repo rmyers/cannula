@@ -166,6 +166,8 @@ def build_and_extend_schema(
         "imports": collections.defaultdict(set[str]),
         "type_metadata": metadata.type_metadata,
         "field_metadata": metadata.field_metadata,
+        "sources": metadata.sources,
+        "connectors": metadata.connectors,
     }
 
     if extensions:

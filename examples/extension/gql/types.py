@@ -2,7 +2,8 @@ from __future__ import annotations
 from abc import ABC
 from cannula import ResolveInfo
 from dataclasses import dataclass
-from typing import Any, Optional, Protocol, Sequence, TYPE_CHECKING
+from datetime import datetime
+from typing import Optional, Protocol, Sequence, TYPE_CHECKING
 from typing_extensions import TypedDict
 
 if TYPE_CHECKING:
@@ -10,7 +11,7 @@ if TYPE_CHECKING:
 
 
 class Generic(Protocol):
-    name: Optional[str] = None
+    name: str
 
 
 @dataclass(kw_only=True)
@@ -18,7 +19,7 @@ class Book(ABC):
     """books are cool"""
 
     __typename = "Book"
-    name: Optional[str] = None
+    name: str
     author: Optional[str] = None
 
     async def movies(
@@ -37,13 +38,13 @@ class Movie(ABC):
     """
 
     __typename = "Movie"
-    name: Optional[str] = None
+    name: str
     director: Optional[str] = None
     views: Optional[int] = None
-    created: Optional[Any] = None
+    created: Optional[datetime] = None
 
     async def book(self, info: ResolveInfo["Context"]) -> Optional[Book]:
-        return await info.context.books.movie_book()
+        return await info.context.books.movie_book(name=self.name)
 
 
 class booksQuery(Protocol):

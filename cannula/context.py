@@ -18,9 +18,11 @@ Context Reference
 
 import typing
 from graphql import GraphQLResolveInfo
+from starlette.requests import Request
+from starlette.datastructures import State
 
 C = typing.TypeVar("C")
-R = typing.TypeVar("R")
+Settings = typing.TypeVar("Settings")
 
 
 class ResolveInfo(typing.Generic[C], GraphQLResolveInfo):
@@ -48,21 +50,31 @@ class ResolveInfo(typing.Generic[C], GraphQLResolveInfo):
     context: C
 
 
-class Context(typing.Generic[R]):
+class Context(typing.Generic[Settings]):
     """Default Context Base
 
     Subclasses should implement a handle_request method to provide any
     extra functionality they need.
     """
 
-    request: R
+    request: Request
+    config: Settings
 
-    def __init__(self, request: R):
+    def __init__(self, request: Request, config: typing.Optional[Settings] = None):
         self.request = self.handle_request(request)
+        if config is not None:
+            self.config = config
+        else:
+            self.config = typing.cast(Settings, State())
+        self.init()
 
-    @classmethod
-    def init(cls, request: R):
-        return cls(request)
+    def init(self):
+        """Hook for subclasses to initialize an instance of Context.
 
-    def handle_request(self, request: R) -> R:
+        This provides a convient way to add attributes to the object such as
+        dataloaders specific to the application.
+        """
+        pass
+
+    def handle_request(self, request: Request) -> Request:
         return request

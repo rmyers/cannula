@@ -36,6 +36,7 @@ from graphql import (
 from cannula.codegen.parse_args import parse_field_arguments, parse_related_args
 from cannula.codegen.parse_type import parse_graphql_type
 from cannula.types import (
+    ConnectDirective,
     Field,
     FieldMetadata,
     FieldType,
@@ -43,6 +44,7 @@ from cannula.types import (
     InterfaceType,
     ObjectType,
     SQLMetadata,
+    SourceDirective,
     UnionType,
 )
 from cannula.utils import ast_for_import_from
@@ -63,15 +65,30 @@ class SchemaExtension:
     def __init__(self, schema: GraphQLSchema) -> None:
         self.schema = schema
         self._type_metadata = schema.extensions.get("type_metadata", {})
+        self._field_metadata = schema.extensions.get("field_metadata", {})
         self._imports = schema.extensions.get("imports", {})
+        self._sources = schema.extensions.get("sources", set())
+        self._connectors = schema.extensions.get("connectors", {})
 
     @property
     def type_metadata(self) -> Dict[str, Dict[str, Any]]:
         return self._type_metadata
 
     @property
+    def field_metadata(self) -> Dict[str, Dict[str, Any]]:
+        return self._field_metadata
+
+    @property
     def imports(self) -> Dict[str, set[str]]:
         return self._imports
+
+    @property
+    def sources(self) -> set[SourceDirective]:
+        return self._sources
+
+    @property
+    def connectors(self) -> dict[str, list[ConnectDirective]]:
+        return self._connectors
 
     def get_type_metadata(self, type_name: str) -> Dict[str, Any]:
         """Get metadata for a specific type"""
@@ -142,6 +159,8 @@ class SchemaAnalyzer:
         self.operation_types.sort(key=lambda o: o.name)
         self.union_types.sort(key=lambda o: o.name)
         self.object_types_by_name = {t.py_type: t for t in self.object_types}
+        self.sources = {s.name: s for s in self.extensions.sources}
+        self.connectors = self.extensions.connectors
 
     def parse_union(self, node: GraphQLUnionType) -> UnionType:
         """Parse a GraphQL Union type into a UnionType object"""
@@ -246,7 +265,6 @@ class SchemaAnalyzer:
     ) -> Field:
         field_type = parse_graphql_type(field_def.type)
         directives = field_def.extensions.get("directives", [])
-        LOG.error(directives)
         fk_field = self.get_fk_field(
             field_type=field_type,
             parent=parent,
@@ -287,6 +305,9 @@ class CodeGenerator(ABC):
             for type_info in self.analyzer.object_types
             if type_info.is_db_type
         ]
+
+    def get_sources(self) -> List[SourceDirective]:
+        return [s for s in self.analyzer.sources.values()]
 
     def create_import_statements(self) -> List[ast.ImportFrom]:
         """Create AST nodes for import statements."""
