@@ -44,7 +44,7 @@ from cannula.context import Context as BaseContext
 from cannula.datasource.orm import DatabaseRepository
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker
-from typing import Optional, Sequence
+from typing import Optional, Protocol, Sequence
 from .sql import DBPost, DBUser
 from .types import Post, User
 
@@ -68,13 +68,22 @@ class UserDatasource(
     pass
 
 
-class Context(BaseContext):
+class Settings(Protocol):
+
+    @property
+    def session(self) -> async_sessionmaker: ...
+
+    @property
+    def readonly_session(self) -> Optional[async_sessionmaker]: ...
+
+
+class Context(BaseContext[Settings]):
     posts: PostDatasource
     users: UserDatasource
 
-    def __init__(self, session_maker: async_sessionmaker):
-        self.posts = PostDatasource(session_maker)
-        self.users = UserDatasource(session_maker)
+    def init(self):
+        self.posts = PostDatasource(self.config.session)
+        self.users = UserDatasource(self.config.session)
 """
 
 

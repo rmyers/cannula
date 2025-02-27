@@ -1,12 +1,14 @@
 from __future__ import annotations
 from cannula.context import Context as BaseContext
+from cannula.datasource.http import ConnectSource
 from cannula.datasource.orm import DatabaseRepository
+from cannula.types import ConnectHTTP, HTTPHeaderMapping, SourceHTTP
 from sqlalchemy import text, true
 from sqlalchemy.ext.asyncio import async_sessionmaker
-from typing import Optional, Sequence
+from typing import Optional, Protocol, Sequence
 from uuid import UUID
 from .sql import DBQuota, DBUser
-from .types import Quota, User
+from .types import Product, Quota, User
 
 
 class QuotaDatasource(
@@ -32,10 +34,57 @@ class UserDatasource(
         return await self.get_models(true())
 
 
-class Context(BaseContext):
+class Frank_ApiHTTPDatasource(
+    ConnectSource,
+    source=SourceHTTP(
+        baseURL="$config.brains",
+        headers=[
+            HTTPHeaderMapping(name="Bad", from_header="Boo", value="$config.meat")
+        ],
+    ),
+):
+
+    async def quota_products(self, **variables) -> Optional[Sequence[Product]]:
+        response = await self.execute_operation(
+            connect_http=ConnectHTTP(
+                GET="/products",
+                POST=None,
+                PUT=None,
+                PATCH=None,
+                DELETE=None,
+                headers=[
+                    HTTPHeaderMapping(
+                        name="Authorization", from_header=None, value="$config.black"
+                    )
+                ],
+                body=None,
+            ),
+            selection="$.products[] { id name price }",
+            variables=variables,
+        )
+        return await self.get_models(model=Product, response=response)
+
+
+class Settings(Protocol):
+    black: str
+    brains: str
+    meat: str
+
+    @property
+    def session(self) -> async_sessionmaker: ...
+
+    @property
+    def readonly_session(self) -> Optional[async_sessionmaker]: ...
+
+
+class Context(BaseContext[Settings]):
     quotas: QuotaDatasource
     users: UserDatasource
+    frank_api: Frank_ApiHTTPDatasource
 
-    def __init__(self, session_maker: async_sessionmaker):
-        self.quotas = QuotaDatasource(session_maker)
-        self.users = UserDatasource(session_maker)
+    def init(self):
+        self.quotas = QuotaDatasource(self.config.session)
+        self.users = UserDatasource(self.config.session)
+        self.frank_api = Frank_ApiHTTPDatasource(
+            config=self.config, request=self.request
+        )

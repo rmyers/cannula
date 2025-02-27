@@ -2,6 +2,7 @@ import datetime
 import logging
 import pathlib
 import pprint
+import typing
 import uuid
 
 import cannula
@@ -32,7 +33,7 @@ async def get_scaled(info: cannula.ResolveInfo) -> Scaled:
     )
 
 
-api = cannula.CannulaAPI[RootType](
+api = cannula.CannulaAPI[RootType, typing.Any](
     root_value={"scaled": get_scaled},
     schema=pathlib.Path(BASE_DIR),
     scalars=[

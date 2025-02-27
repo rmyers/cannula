@@ -22,6 +22,14 @@ class userModify(TypedDict):
 
 
 @dataclass(kw_only=True)
+class Product(ABC):
+    __typename = "Product"
+    id: str
+    name: Optional[str] = None
+    price: Optional[int] = None
+
+
+@dataclass(kw_only=True)
 class Quota(ABC):
     __typename = "Quota"
     user_id: UUID
@@ -31,6 +39,11 @@ class Quota(ABC):
 
     async def user(self, info: ResolveInfo["Context"]) -> Optional[User]:
         return await info.context.users.get_model_by_pk(self.user_id)
+
+    async def products(
+        self, info: ResolveInfo["Context"], id: str
+    ) -> Optional[Sequence[Product]]:
+        return await info.context.frank_api.quota_products(user_id=self.user_id, id=id)
 
 
 @dataclass(kw_only=True)

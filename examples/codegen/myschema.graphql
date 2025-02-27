@@ -1,5 +1,11 @@
 scalar UUID
 
+extend schema
+  @source(
+    name: "frank_api"
+    http: {baseURL: "$config.brains", headers: [{name: "Bad", from: "Boo", value: "$config.meat"}]}
+  )
+
 """
 User Model
 """
@@ -8,8 +14,7 @@ type User @db_sql {
   name: String
   email: String
   quota: [Quota!] @field_meta(args: ["id"])
-  overQuota(resource: String!): Quota
-    @field_meta(where: "user_id = :id AND resource = :resource", args: ["id"])
+  overQuota(resource: String!): Quota @field_meta(where: "user_id = :id AND resource = :resource", args: ["id"])
 }
 
 input userCreate {
@@ -29,6 +34,19 @@ type Quota @db_sql(table_name: "quota") {
   resource: String
   limit: Int
   count: Int
+  products(id: String!): [Product]
+    @connect(
+      source: "frank_api"
+      http: {GET: "/products", headers: [{name: "Authorization", value: "$config.black"}]}
+      selection: "$.products[] { id name price }"
+    )
+    @field_meta(args: ["user_id"])
+}
+
+type Product {
+  id: ID!
+  name: String
+  price: Int
 }
 
 type Query {

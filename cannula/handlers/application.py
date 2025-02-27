@@ -9,7 +9,7 @@ from starlette.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
 
 from cannula.api import CannulaAPI, RootType
-from cannula.context import Context
+from cannula.context import Context, Settings
 from cannula.handlers.asgi import GraphQLHandler
 from cannula.handlers.operations import HTMXHandler
 from cannula.utils import get_config, resolve_scalars
@@ -71,23 +71,26 @@ class AppRouter:
         return routes
 
 
-class CannulaApplication(typing.Generic[RootType], Starlette):
+class CannulaApplication(typing.Generic[RootType, Settings], Starlette):
 
     def __init__(
         self,
+        *,
         start_path: typing.Optional[pathlib.Path] = None,
-        context: typing.Optional[typing.Type[Context]] = None,
+        context: typing.Optional[type[Context[Settings]]] = None,
+        config: typing.Optional[Settings] = None,
         root_value: typing.Optional[RootType] = None,
         **kwargs,
     ):
-        config = get_config(start_path)
+        _py_config = get_config(start_path)
 
-        api = CannulaAPI[RootType](
-            schema=config.schema,
+        api = CannulaAPI[RootType, Settings](
+            schema=_py_config.schema,
             context=context,
+            config=config,
             root_value=root_value,
-            scalars=resolve_scalars(config.scalars),
-            operations=config.operations,
+            scalars=resolve_scalars(_py_config.scalars),
+            operations=_py_config.operations,
         )
 
         # Setup the routes for this application starting with the static directory
@@ -95,7 +98,7 @@ class CannulaApplication(typing.Generic[RootType], Starlette):
             Mount(
                 "/static",
                 app=StaticFiles(
-                    directory=config.static_directory,
+                    directory=_py_config.static_directory,
                     check_dir=False,
                     packages=["cannula"],
                 ),
@@ -107,11 +110,11 @@ class CannulaApplication(typing.Generic[RootType], Starlette):
         graphql_handler = GraphQLHandler(api)
         routes.extend(graphql_handler.routes())
 
-        application = AppRouter(config.app_directory)
+        application = AppRouter(_py_config.app_directory)
         routes.extend(application.discover_routes())
 
         if api.operations is not None:
-            handler = HTMXHandler(api, config.operations_directory)
+            handler = HTMXHandler(api, _py_config.operations_directory)
             routes.append(Route("/operation/{name:str}", handler.handle_request))
 
         super().__init__(routes=routes, debug=True, **kwargs)
