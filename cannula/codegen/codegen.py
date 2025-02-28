@@ -27,7 +27,7 @@ _IMPORTS.update(
         "cannula": {"ResolveInfo"},
         "cannula.context": {"Context as BaseContext"},
         "cannula.datasource.orm": {"DatabaseRepository"},
-        "cannula.datasource.http": {"HTTPDataSource", "ConnectSource"},
+        "cannula.datasource.http": {"HTTPDatasource", "ConnectSource"},
         "cannula.types": {"ConnectHTTP", "SourceHTTP", "HTTPHeaderMapping"},
         "dataclasses": {"dataclass"},
         "pydantic": {"BaseModel"},

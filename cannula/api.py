@@ -250,7 +250,7 @@ class CannulaAPI(typing.Generic[RootType, Settings]):
         return ops
 
     def get_context(self, request) -> typing.Any:
-        return self._context(request, config=self._config)
+        return self._context(request=request, config=self._config)
 
     def validate(self, document: DocumentNode) -> typing.List[GraphQLError]:
         """Validate the document against the schema and store results in lru_cache."""

@@ -75,10 +75,6 @@ class SchemaExtension:
         return self._type_metadata
 
     @property
-    def field_metadata(self) -> Dict[str, Dict[str, Any]]:
-        return self._field_metadata
-
-    @property
     def imports(self) -> Dict[str, set[str]]:
         return self._imports
 

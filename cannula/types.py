@@ -528,11 +528,6 @@ class SourceDirective(pydantic.BaseModel):
         return hash(self.name)
 
     @property
-    def context_attr(self) -> str:
-        """Name used for the attribute on the context object."""
-        return f"{self.name}_http_source"
-
-    @property
     def datasource_name(self) -> str:
         return f"{self.name.title()}HTTPDatasource"
 

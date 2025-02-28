@@ -30,12 +30,7 @@ class MockDB:
         WIDGETS = []
 
 
-class Widget(
-    http.HTTPDataSource[Widgety],
-    graph_model=Widgety,
-    base_url="http://localhost",
-    timeout=15,
-):
+class Widget(http.HTTPDatasource, source=http.SourceHTTP(baseURL="http://localhost")):
 
     async def did_receive_response(
         self, response: httpx.Response, request: httpx.Request
@@ -45,19 +40,19 @@ class Widget(
 
     async def get_widgets(self) -> list[Widgety]:
         response = await self.get("widgets")
-        return self.model_list_from_response(response)
+        return await self.get_models(Widgety, response)
 
     async def post_widget(self, data: Widgety) -> Widgety:
         response = await self.post("/widgets", json=data.model_dump())
-        return self.model_from_response(response)
+        return await self.get_model(Widgety, response)
 
     async def put_widget(self, data: Widgety) -> Widgety:
         response = await self.put("/widgets", json=data.model_dump())
-        return self.model_from_response(response)
+        return await self.get_model(Widgety, response)
 
     async def patch_widget(self, data: Widgety) -> Widgety:
         response = await self.patch("/widgets", json=data.model_dump())
-        return self.model_from_response(response)
+        return await self.get_model(Widgety, response)
 
     async def delete_widget(self) -> None:
         await self.delete("/widgets")
@@ -73,11 +68,11 @@ class Widget(
 
     async def get_model_from_response_invalid(self) -> Widgety:
         # Should raise Attribute error
-        return self.model_from_response([{"some": "thing"}])
+        return await self.get_model(Widgety, [{"some": "thing"}])
 
     async def get_model_list_from_response_invalid(self) -> list[Widgety]:
         # Should raise Attribute error
-        return self.model_list_from_response({"some": "thing"})
+        return await self.get_models(Widgety, {"some": "thing"})
 
 
 mockDB = MockDB()

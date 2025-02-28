@@ -35,7 +35,10 @@ class ResolveInfo(typing.Generic[C], GraphQLResolveInfo):
         import cannula
 
         class CustomContext(cannula.Context):
-            widgets = widget_datasource()
+            widgets: widget_datasource
+
+            def init(self):
+                self.widgets = widget_datasource(args)
 
 
         async def get_widgets(
@@ -60,12 +63,16 @@ class Context(typing.Generic[Settings]):
     request: Request
     config: Settings
 
-    def __init__(self, request: Request, config: typing.Optional[Settings] = None):
+    def __init__(
+        self,
+        *,
+        request: typing.Optional[Request] = None,
+        config: typing.Optional[Settings] = None,
+        **kwargs,
+    ):
         self.request = self.handle_request(request)
-        if config is not None:
-            self.config = config
-        else:
-            self.config = typing.cast(Settings, State())
+        self.config = self.handle_config(config)
+        self.handle_kwargs(**kwargs)
         self.init()
 
     def init(self):
@@ -76,5 +83,15 @@ class Context(typing.Generic[Settings]):
         """
         pass
 
-    def handle_request(self, request: Request) -> Request:
-        return request
+    def handle_kwargs(self, **kwargs) -> None:
+        """Hook for subclasses to setup any extra arguments."""
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+    def handle_config(self, config: typing.Optional[Settings] = None) -> Settings:
+        """Hook for subclasses to handle configuration setup."""
+        return config or typing.cast(Settings, State())
+
+    def handle_request(self, request: typing.Optional[Request] = None) -> Request:
+        """Hook for subsclasses to handle request setup."""
+        return request or Request(scope={"type": "http"})
