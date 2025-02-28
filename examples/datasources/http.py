@@ -26,42 +26,37 @@ class User:
 
     # This resolver uses the widgets repository that is on the context
     async def widgets(self, info: ResolveInfo["MyContext"]) -> list["Widget"]:
-        return await info.context.widgets.get_widgets(self.id)
+        return await info.context.api.get_widgets(self.id)
 
 
 # Our HTTP datasources
-class UserDatasource(
-    http.HTTPDataSource[User],
-    graph_model=User,
-    base_url="http://localhost",
+class CustomDatasource(
+    http.HTTPDatasource, source=http.SourceHTTP(baseURL="http://localhost")
 ):
 
     async def get_user(self, user_id: int) -> User | None:
         response = await self.get(f"/users/{user_id}")
-        return self.model_from_response(response)
-
-
-class WidgetDatasource(
-    http.HTTPDataSource[Widget],
-    graph_model=Widget,
-    base_url="http://localhost",
-):
+        return await self.get_model(User, response)
 
     async def get_widgets(self, user_id: int) -> list[Widget]:
         response = await self.get(f"/users/{user_id}/widgets")
-        return self.model_list_from_response(response)
+        return await self.get_models(Widget, response)
 
 
 # Create a custom context and add the datasource
 class MyContext(Context):
-    def __init__(self, client: httpx.AsyncClient) -> None:
-        self.users = UserDatasource(client=client)
-        self.widgets = WidgetDatasource(client=client)
+    api: CustomDatasource
+    client: httpx.AsyncClient
+
+    def init(self):
+        self.api = CustomDatasource(
+            config=self.config, request=self.request, client=self.client
+        )
 
 
 # Example query that uses the UserRepository on the context object
 async def get_user(info: ResolveInfo[MyContext], id: int) -> User | None:
-    return await info.context.users.get_user(id)
+    return await info.context.api.get_user(id)
 
 
 # Our example graph api
@@ -100,7 +95,7 @@ async def main():
                 }
             }
             """,
-            context=MyContext(client),
+            context=MyContext(client=client),
         )
 
     await drop_tables()

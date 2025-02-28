@@ -3,10 +3,10 @@ Movie Type
 
 Includes a book reference defined in other schema file.
 """
-type Movie implements Generic {
-  name: String
+type Movie implements Generic @db_sql {
+  name: String!
   director: String
-  book: Book
+  book: Book @field_meta(where: "name = :name", args: ["name"])
   views: Int
   created: Datetime
 }
@@ -20,5 +20,5 @@ extend type Book {
 
 extend type Query {
   media(limit: Int = 100): [Generic]
-  movie(name: String!): Movie
+  movie(name: String!): Movie @field_meta(where: "name = :name")
 }

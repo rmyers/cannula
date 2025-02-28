@@ -1,5 +1,5 @@
 scalar Datetime
 
 interface Generic {
-  name: String
+  name: String!
 }
