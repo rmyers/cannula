@@ -213,6 +213,28 @@ def test_apply_selection_array():
     ]
 
 
+def test_apply_selection_array_indexes():
+    """Test applying selection to an array index"""
+    data = {
+        "products": [
+            {"id": 1, "name": "Product 1", "price": 100},
+            {"id": 2, "name": "Product 2", "price": 200},
+        ]
+    }
+    selection = "$.products.1 { id name }"
+
+    result = apply_selection(data, selection)
+
+    assert result == {"id": 2, "name": "Product 2"}
+
+    # Index not found
+    selection = "$.products.2 { id name }"
+
+    result = apply_selection(data, selection)
+
+    assert result == {"id": None, "name": None}
+
+
 def test_apply_selection_no_root():
     """Test applying selection with no root path"""
     data = {"id": 1, "name": "Product 1", "description": "Desc", "price": 100}
@@ -221,6 +243,18 @@ def test_apply_selection_no_root():
     result = apply_selection(data, selection)
 
     assert result == {"id": 1, "name": "Product 1"}
+
+
+def test_apply_selection_no_fields():
+    """Test applying selection with no root path"""
+    data = {
+        "product": {"id": 1, "name": "Product 1", "description": "Desc", "price": 100}
+    }
+    selection = "$.product {}"
+
+    result = apply_selection(data, selection)
+
+    assert result == {"id": 1, "name": "Product 1", "description": "Desc", "price": 100}
 
 
 def test_apply_selection_nested_path():

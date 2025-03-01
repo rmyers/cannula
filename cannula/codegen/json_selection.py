@@ -110,6 +110,10 @@ class JSONResponseMapper:
         # Get the data at the root path
         data = cls.get_value_at_path(response_data, selection.root)
 
+        # If no fields are provided return raw data
+        if not selection.fields:
+            return data
+
         if selection.is_array:
             # If data is None, return an empty array
             if data is None:
