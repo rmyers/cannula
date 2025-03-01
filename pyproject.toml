@@ -31,7 +31,7 @@ httpx = ["httpx", "fastapi"]
 test = [
     "black",
     "coverage==7.6.12",
-    "flake8==7.1.1",
+    "flake8==7.1.2",
     "greenlet",
     "hatch",
     "mypy==1.15.0",
