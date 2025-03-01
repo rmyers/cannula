@@ -43,7 +43,7 @@ test = [
     "pytest-mock",
     "pytest<9",
     "python-dateutil==2.9.0",
-    "Sphinx==8.1.3",
+    "Sphinx==8.2.1",
     "sphinx-autodoc-typehints",
     "sphinx-argparse==0.5.2",
     "sqlalchemy==2.0.38",
