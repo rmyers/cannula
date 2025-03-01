@@ -34,7 +34,7 @@ test = [
     "flake8==7.1.1",
     "greenlet",
     "hatch",
-    "mypy==1.14.1",
+    "mypy==1.15.0",
     "opentelemetry-api~=1.0",
     "opentelemetry-sdk~=1.0",
     "pycodestyle",
