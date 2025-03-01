@@ -207,7 +207,7 @@ class HTTPDatasource(typing.Generic[Settings]):
         # close the client if this instance opened it
         self._should_close_client = client is None
         self._app_config = config or typing.cast(Settings, State())
-        self._request = request or Request(scope={"type": "http"})
+        self._request = request or Request(scope={"type": "http", "headers": []})
         self._base_url = self._resolve_value(self._source_http.baseURL)
         self._headers = self._source_http.headers
 
@@ -223,7 +223,7 @@ class HTTPDatasource(typing.Generic[Settings]):
         # Simple template rendering - replace :varName with values
         path = template
         for name, value in variables.items():
-            path = path.replace(f"{{$arg.{name}}}", str(value))
+            path = path.replace(f"{{$args.{name}}}", str(value))
         return path
 
     def _resolve_value(self, value: str) -> str:
@@ -420,7 +420,7 @@ class HTTPDatasource(typing.Generic[Settings]):
 
         # Add body for mutations if configured
         kwargs = {}
-        if body_template := connect_http.body:
+        if body_template := connect_http.body:  # pragma: no cover
             LOG.error(body_template)
             # TODO: Implement body template rendering
             kwargs["json"] = variables

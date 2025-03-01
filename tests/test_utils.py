@@ -142,3 +142,16 @@ def test_find_package_root_skips_internal(tmp_path, monkeypatch):
 
     result = utils.find_package_root()
     assert result == tmp_path
+
+
+@pytest.mark.parametrize(
+    "config, expected",
+    [
+        pytest.param("$config.bar", "bar", id="defualt"),
+        pytest.param(None, None, id="none"),
+        pytest.param("$config.", None, id="missing"),
+    ],
+)
+def test_get_config_var(config, expected):
+    actual = utils.get_config_var(config)
+    assert actual == expected

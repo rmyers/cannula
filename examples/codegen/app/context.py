@@ -1,6 +1,6 @@
 from __future__ import annotations
 from cannula.context import Context as BaseContext
-from cannula.datasource.http import ConnectSource
+from cannula.datasource.http import HTTPDatasource
 from cannula.datasource.orm import DatabaseRepository
 from cannula.types import ConnectHTTP, HTTPHeaderMapping, SourceHTTP
 from sqlalchemy import text, true
@@ -35,7 +35,7 @@ class UserDatasource(
 
 
 class Frank_ApiHTTPDatasource(
-    ConnectSource,
+    HTTPDatasource,
     source=SourceHTTP(
         baseURL="$config.brains",
         headers=[

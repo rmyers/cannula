@@ -259,7 +259,7 @@ class ContextGenerator(CodeGenerator):
 
         return ast.ClassDef(
             name=source.datasource_name,
-            bases=[ast_for_name("ConnectSource")],
+            bases=[ast_for_name("HTTPDatasource")],
             keywords=[
                 ast.keyword(arg="source", value=source_http.body),
             ],
@@ -324,7 +324,7 @@ class ContextGenerator(CodeGenerator):
         if db_types:
             body.extend(self.generate_settings_properties())
 
-        if not body:
+        if not body:  # pragma: no cover
             body.append(ast.Pass())
 
         return ast.ClassDef(
@@ -441,7 +441,8 @@ class ContextGenerator(CodeGenerator):
     def generate(self) -> str:
         """Generate the complete context.py file"""
         db_types = self.get_db_types()
-        sources = self.get_sources()
+        sources = sorted(self.get_sources(), key=lambda s: s.name)
+
         if not db_types and not sources:
             return ""
 

@@ -154,7 +154,9 @@ class SchemaAnalyzer:
         self.operation_fields.sort(key=lambda o: o.name)
         self.operation_types.sort(key=lambda o: o.name)
         self.union_types.sort(key=lambda o: o.name)
-        self.object_types_by_name = {t.py_type: t for t in self.object_types}
+        self.object_types_by_name = {
+            t.py_type: t for t in self.object_types + self.operation_types
+        }
         self.sources = {s.name: s for s in self.extensions.sources}
         self.connectors = self.extensions.connectors
 

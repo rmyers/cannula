@@ -21,6 +21,7 @@ from cannula.utils import (
     ast_for_name,
     ast_for_union_subscript,
     pluralize,
+    get_config_var,
 )
 from cannula.errors import SchemaValidationError
 
@@ -417,20 +418,14 @@ class OperationField:
     required: bool = False
 
 
-def get_config_var(value: typing.Optional[str]) -> typing.Optional[str]:
-    if value is None:
-        return None
-
-    var = value.partition("$config.")[-1]
-    if not var:
-        return None
-    return var
-
-
 class HTTPHeaderMapping(pydantic.BaseModel):
     name: str
     from_header: typing.Optional[str] = pydantic.Field(
-        None, validation_alias="from", serialization_alias="from_header"
+        default=None,
+        # This allows us to have schema set 'from' and still allow us to set
+        # 'from_header' in Python since 'from' would be a syntax error
+        validation_alias=pydantic.AliasChoices("from_header", "from"),
+        serialization_alias="from_header",
     )
     value: typing.Optional[str] = None
 

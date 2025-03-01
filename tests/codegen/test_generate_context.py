@@ -1,11 +1,27 @@
 from cannula import gql
 from cannula.codegen import render_code
 from cannula.errors import SchemaValidationError
+from pydantic import ValidationError
 import pytest
 
 # Similar schema but with focus on relations and where clauses
 SCHEMA = gql(
     '''
+
+extend schema
+    @source(
+        name: "remote",
+        http: {
+            baseURL: "$config.remote_url",
+            headers: [{name: "Authorization", value: "$config.api_key"}]}
+    )
+    @source(
+        name: "not_used",
+        http: {
+            baseURL: "$config.remote_url",
+        }
+    )
+
 """
 User model
 Here
@@ -35,18 +51,28 @@ type RemoteType {
     id: ID!
     name: String!
 }
+
+type Query {
+    remote: RemoteType @connect(
+      source: "remote"
+      http: {GET: "/products"}
+      selection: "$.products[] { id name }"
+    )
+}
 '''
 )
 
 EXPECTED = """\
 from __future__ import annotations
 from cannula.context import Context as BaseContext
+from cannula.datasource.http import HTTPDatasource
 from cannula.datasource.orm import DatabaseRepository
+from cannula.types import ConnectHTTP, HTTPHeaderMapping, SourceHTTP
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker
 from typing import Optional, Protocol, Sequence
 from .sql import DBPost, DBUser
-from .types import Post, User
+from .types import Post, RemoteType, User
 
 
 class PostDatasource(
@@ -68,7 +94,44 @@ class UserDatasource(
     pass
 
 
+class Not_UsedHTTPDatasource(
+    HTTPDatasource, source=SourceHTTP(baseURL="$config.remote_url", headers=[])
+):
+    pass
+
+
+class RemoteHTTPDatasource(
+    HTTPDatasource,
+    source=SourceHTTP(
+        baseURL="$config.remote_url",
+        headers=[
+            HTTPHeaderMapping(
+                name="Authorization", from_header=None, value="$config.api_key"
+            )
+        ],
+    ),
+):
+
+    async def query_remote(self, **variables) -> Optional[RemoteType]:
+        response = await self.execute_operation(
+            connect_http=ConnectHTTP(
+                GET="/products",
+                POST=None,
+                PUT=None,
+                PATCH=None,
+                DELETE=None,
+                headers=None,
+                body=None,
+            ),
+            selection="$.products[] { id name }",
+            variables=variables,
+        )
+        return await self.get_model(model=RemoteType, response=response)
+
+
 class Settings(Protocol):
+    api_key: str
+    remote_url: str
 
     @property
     def session(self) -> async_sessionmaker: ...
@@ -80,10 +143,14 @@ class Settings(Protocol):
 class Context(BaseContext[Settings]):
     posts: PostDatasource
     users: UserDatasource
+    not_used: Not_UsedHTTPDatasource
+    remote: RemoteHTTPDatasource
 
     def init(self):
         self.posts = PostDatasource(self.config.session)
         self.users = UserDatasource(self.config.session)
+        self.not_used = Not_UsedHTTPDatasource(config=self.config, request=self.request)
+        self.remote = RemoteHTTPDatasource(config=self.config, request=self.request)
 """
 
 
@@ -142,4 +209,49 @@ type Post {
 )
 def test_generate_context_errors(schema, expected):
     with pytest.raises(SchemaValidationError, match=expected):
+        render_code(schema, [])
+
+
+INVALID_CONNECT_MULTIPLE = gql(
+    """
+    type Query {
+    remote: RemoteType @connect(
+      source: "remote"
+      http: {GET: "/products", POST: "/foo"}
+      selection: "$.products[] { id name }"
+    )
+}
+"""
+)
+
+INVALID_CONNECT_METHOD = gql(
+    """
+    type Query {
+    remote: RemoteType @connect(
+      source: "remote"
+      http: {}
+      selection: "$.products[] { id name }"
+    )
+}
+"""
+)
+
+
+@pytest.mark.parametrize(
+    "schema,expected",
+    [
+        pytest.param(
+            [INVALID_CONNECT_MULTIPLE],
+            r"Value error, @connect directive can only use one method you set \['GET', 'POST'\]",
+            id="invalid-connect-multiple-methods",
+        ),
+        pytest.param(
+            [INVALID_CONNECT_METHOD],
+            r"@connect directive must provide one of 'GET,POST,PUT,PATCH,DELETE'",
+            id="invalid-connect-multiple-methods",
+        ),
+    ],
+)
+def test_connect_parsing_errors(schema, expected):
+    with pytest.raises(ValidationError, match=expected):
         render_code(schema, [])
