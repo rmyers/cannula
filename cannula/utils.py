@@ -100,6 +100,16 @@ def get_config(start_path: typing.Optional[pathlib.Path] = None) -> CannulaConfi
     )
 
 
+def get_config_var(value: typing.Optional[str]) -> typing.Optional[str]:
+    if value is None:
+        return None
+
+    var = value.partition("$config.")[-1]
+    if not var:
+        return None
+    return var
+
+
 def resolve_scalars(scalars: list[str]) -> list[ScalarInterface]:
     _scalars: list[ScalarInterface] = []
     for scalar in scalars or []:

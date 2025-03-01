@@ -1,7 +1,7 @@
 import logging
 import pathlib
 import pprint
-from typing import Sequence
+from typing import Any, Sequence
 
 import cannula
 import cannula.middleware
@@ -41,7 +41,7 @@ async def get_media(
 
 root_value: RootType = {"books": get_books, "media": get_media}
 
-api = cannula.CannulaAPI[RootType](
+api = cannula.CannulaAPI[RootType, Any](
     root_value=root_value,
     schema=pathlib.Path(BASE_DIR / "schema"),
     middleware=[

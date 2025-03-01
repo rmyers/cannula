@@ -1,7 +1,9 @@
 import ast
 import dataclasses
+import logging
 import typing
 
+import pydantic
 from graphql import (
     GraphQLField,
     GraphQLInputObjectType,
@@ -9,6 +11,7 @@ from graphql import (
     GraphQLObjectType,
     GraphQLUnionType,
 )
+from typing_extensions import Self
 
 from cannula.utils import (
     ast_for_annotation_assignment,
@@ -18,26 +21,27 @@ from cannula.utils import (
     ast_for_name,
     ast_for_union_subscript,
     pluralize,
+    get_config_var,
 )
 from cannula.errors import SchemaValidationError
 
+LOG = logging.getLogger(__name__)
 
-@dataclasses.dataclass
-class SQLMetadata:
+
+class SQLMetadata(pydantic.BaseModel):
     table_name: str
     composite_primary_key: bool = False
-    constraints: typing.List[str] = dataclasses.field(default_factory=list)
+    constraints: typing.List[str] = pydantic.Field(default_factory=list)
 
 
-@dataclasses.dataclass
-class FieldMetadata:
+class FieldMetadata(pydantic.BaseModel):
     primary_key: bool = False
     foreign_key: typing.Optional[str] = None
     nullable: typing.Optional[bool] = None
     index: bool = False
     unique: typing.Optional[bool] = None
     db_column: typing.Optional[str] = None
-    args: typing.List[str] = dataclasses.field(default_factory=list)
+    args: typing.List[str] = pydantic.Field(default_factory=list)
     where: typing.Optional[str] = None
     raw_sql: typing.Optional[str] = None
     function: typing.Optional[str] = None
@@ -163,6 +167,10 @@ class Field:
         return self.field.extensions.get("field_meta", FieldMetadata())
 
     @property
+    def connector(self) -> typing.Optional["ConnectDirective"]:
+        return self.field.extensions.get("connector")
+
+    @property
     def operation_name(self) -> str:
         return f"{self.name}{self.parent}"
 
@@ -191,7 +199,10 @@ class Field:
     @property
     def relation_context_attr(self) -> str:
         """Gets the context var for the related datasource"""
-        target = pluralize(self.field_type.of_type)
+        if self.connector:
+            target = self.connector.source
+        else:
+            target = pluralize(self.field_type.of_type)
         return f"info.context.{target}"
 
     @property
@@ -405,3 +416,117 @@ class OperationField:
     args: typing.List[Argument]
     default: typing.Any = None
     required: bool = False
+
+
+class HTTPHeaderMapping(pydantic.BaseModel):
+    name: str
+    from_header: typing.Optional[str] = pydantic.Field(
+        default=None,
+        # This allows us to have schema set 'from' and still allow us to set
+        # 'from_header' in Python since 'from' would be a syntax error
+        validation_alias=pydantic.AliasChoices("from_header", "from"),
+        serialization_alias="from_header",
+    )
+    value: typing.Optional[str] = None
+
+    @property
+    def config_vars(self) -> typing.Optional[str]:
+        """Return a list of variable names used '$config.my_url' -> 'my_url'"""
+        return get_config_var(self.value)
+
+
+class ConnectHTTP(pydantic.BaseModel):
+    GET: typing.Optional[str] = None
+    POST: typing.Optional[str] = None
+    PUT: typing.Optional[str] = None
+    PATCH: typing.Optional[str] = None
+    DELETE: typing.Optional[str] = None
+    headers: typing.Optional[typing.List[HTTPHeaderMapping]] = None
+    body: typing.Optional[str] = None
+
+    _method: str = ""
+    _path: str = ""
+
+    @pydantic.model_validator(mode="after")
+    def check_method(self) -> Self:
+        attrs = ["GET", "POST", "PUT", "PATCH", "DELETE"]
+        found = list(filter(None, [v for v in attrs if getattr(self, v)]))
+        _count = len(found)
+        if _count > 1:
+            raise ValueError(
+                f"@connect directive can only use one method you set {found}"
+            )
+        if not _count:
+            raise ValueError(
+                "@connect directive must provide one of 'GET,POST,PUT,PATCH,DELETE'"
+            )
+        self._method = found[0]
+        self._path = getattr(self, found[0])
+        return self
+
+    @property
+    def method(self) -> str:
+        return self._method
+
+    @property
+    def path(self) -> str:
+        return self._path
+
+    @property
+    def config_vars(self) -> typing.Set[str]:
+        """Return a list of variable names used '$config.my_url' -> 'my_url'"""
+        return set(filter(None, [header.config_vars for header in self.headers or []]))
+
+
+class SourceHTTP(pydantic.BaseModel):
+    baseURL: str
+    headers: typing.List[HTTPHeaderMapping] = pydantic.Field(default_factory=list)
+
+    @property
+    def config_vars(self) -> typing.Set[str]:
+        """Return a list of variable names used '$config.my_url' -> 'my_url'"""
+        vars = set(filter(None, [header.config_vars for header in self.headers]))
+        base_url_var = get_config_var(self.baseURL)
+        if base_url_var:
+            vars.add(base_url_var)
+        return vars
+
+
+class ConnectDirective(pydantic.BaseModel):
+    field: str
+    parent: str
+    source: typing.Optional[str] = None
+    http: ConnectHTTP
+    selection: str
+    entity: bool = False
+
+    @property
+    def datasource_name(self) -> str:
+        prefix = (
+            self.source.title()
+            if self.source
+            else f"{self.parent.title()}{self.field.title()}"
+        )
+        return f"{prefix}HTTPDatasource"
+
+    @property
+    def config_vars(self) -> typing.Set[str]:
+        """Return a list of variable names used '$config.my_url' -> 'my_url'"""
+        return self.http.config_vars
+
+
+class SourceDirective(pydantic.BaseModel):
+    name: str
+    http: SourceHTTP
+
+    def __hash__(self):
+        return hash(self.name)
+
+    @property
+    def datasource_name(self) -> str:
+        return f"{self.name.title()}HTTPDatasource"
+
+    @property
+    def config_vars(self) -> typing.Set[str]:
+        """Return a list of variable names used '$config.my_url' -> 'my_url'"""
+        return self.http.config_vars

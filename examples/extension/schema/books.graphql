@@ -1,6 +1,6 @@
 "books are cool"
-type Book implements Generic {
-  name: String
+type Book implements Generic @db_sql {
+  name: String!
   author: String
 }
 

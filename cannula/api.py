@@ -28,7 +28,7 @@ from graphql import (
     validate,
 )
 
-from .context import Context
+from .context import Context, Settings
 from .errors import SchemaValidationError
 from .scalars import ScalarInterface
 from .schema import (
@@ -48,7 +48,7 @@ class ParseResults(typing.NamedTuple):
     errors: typing.List[GraphQLError] = []
 
 
-class CannulaAPI(typing.Generic[RootType]):
+class CannulaAPI(typing.Generic[RootType, Settings]):
     """
     Your entry point into the fun filled world of graphql. Just dive right in::
 
@@ -96,7 +96,8 @@ class CannulaAPI(typing.Generic[RootType]):
 
     _schema: typing.Union[str, DocumentNode, pathlib.Path]
     _root_value: typing.Optional[RootType]
-    _context: typing.Type[Context]
+    _context: typing.Type[Context[Settings]]
+    _config: typing.Optional[Settings]
     _scalars: typing.List[ScalarInterface]
     _kwargs: typing.Dict[str, typing.Any]
     schema: GraphQLSchema
@@ -107,9 +108,10 @@ class CannulaAPI(typing.Generic[RootType]):
     def __init__(
         self,
         schema: typing.Union[str, DocumentNode, pathlib.Path],
-        context: typing.Optional[typing.Type[Context]] = None,
+        context: typing.Optional[type[Context]] = None,
         middleware: typing.List[typing.Any] = [],
         root_value: typing.Optional[RootType] = None,
+        config: typing.Optional[Settings] = None,
         scalars: typing.List[ScalarInterface] = [],
         logger: typing.Optional[logging.Logger] = None,
         level: int = logging.DEBUG,
@@ -118,6 +120,7 @@ class CannulaAPI(typing.Generic[RootType]):
     ):
         self._context = context or Context
         self._schema = schema
+        self._config = config
         self.graph_middleware = middleware
         self._root_value = root_value
         self._scalars = scalars
@@ -247,7 +250,7 @@ class CannulaAPI(typing.Generic[RootType]):
         return ops
 
     def get_context(self, request) -> typing.Any:
-        return self._context.init(request)
+        return self._context(request=request, config=self._config)
 
     def validate(self, document: DocumentNode) -> typing.List[GraphQLError]:
         """Validate the document against the schema and store results in lru_cache."""

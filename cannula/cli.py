@@ -91,7 +91,7 @@ codegen_parser.add_argument(
 
 def load_config(config) -> dict:
     source = pathlib.Path(config)
-    if not source.is_file():
+    if not source.is_file():  # pragma: no cover
         return {}
 
     with open(source, "rb") as conf_file:

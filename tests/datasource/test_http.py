@@ -11,6 +11,15 @@ class Widgety(pydantic.BaseModel):
     some: str
 
 
+class Nested(pydantic.BaseModel):
+    data: list[Widgety]
+
+
+class Configuation:
+    base_url: str = "http://localhost"
+    api_key: str = "fake_api_key"
+
+
 WIDGETS: list[Widgety] = [Widgety(some="thing")]
 
 
@@ -31,10 +40,8 @@ class MockDB:
 
 
 class Widget(
-    http.HTTPDataSource[Widgety],
-    graph_model=Widgety,
-    base_url="http://localhost",
-    timeout=15,
+    http.HTTPDatasource[Configuation],
+    source=http.SourceHTTP(baseURL="$config.base_url"),
 ):
 
     async def did_receive_response(
@@ -45,19 +52,19 @@ class Widget(
 
     async def get_widgets(self) -> list[Widgety]:
         response = await self.get("widgets")
-        return self.model_list_from_response(response)
+        return await self.get_models(Widgety, response)
 
     async def post_widget(self, data: Widgety) -> Widgety:
         response = await self.post("/widgets", json=data.model_dump())
-        return self.model_from_response(response)
+        return await self.get_model(Widgety, response)
 
     async def put_widget(self, data: Widgety) -> Widgety:
         response = await self.put("/widgets", json=data.model_dump())
-        return self.model_from_response(response)
+        return await self.get_model(Widgety, response)
 
     async def patch_widget(self, data: Widgety) -> Widgety:
         response = await self.patch("/widgets", json=data.model_dump())
-        return self.model_from_response(response)
+        return await self.get_model(Widgety, response)
 
     async def delete_widget(self) -> None:
         await self.delete("/widgets")
@@ -73,11 +80,46 @@ class Widget(
 
     async def get_model_from_response_invalid(self) -> Widgety:
         # Should raise Attribute error
-        return self.model_from_response([{"some": "thing"}])
+        return await self.get_model(Widgety, [{"some": "thing"}])
 
     async def get_model_list_from_response_invalid(self) -> list[Widgety]:
         # Should raise Attribute error
-        return self.model_list_from_response({"some": "thing"})
+        return await self.get_models(Widgety, {"some": "thing"})
+
+    async def get_connected_widgets(self) -> list[Widgety]:
+        results = await self.execute_operation(
+            connect_http=http.ConnectHTTP(
+                GET="/nested",
+                headers=[
+                    http.HTTPHeaderMapping(
+                        name="X-API-Key",
+                        value="$config.api_key",
+                    )
+                ],
+            ),
+            selection="$.data[] { }",
+        )
+        return await self.get_models(Widgety, results)
+
+    async def get_connected_widget(self, **variables) -> Widgety:
+        results = await self.execute_operation(
+            connect_http=http.ConnectHTTP(
+                GET="/nested/{$args.index}",
+                headers=[
+                    http.HTTPHeaderMapping(
+                        name="X-API-Key",
+                        value="$config.api_key",
+                    ),
+                    http.HTTPHeaderMapping(
+                        name="Authorization",
+                        from_header="Authorization",
+                    ),
+                ],
+            ),
+            selection="",
+            variables=variables,
+        )
+        return await self.get_model(Widgety, results)
 
 
 mockDB = MockDB()
@@ -87,6 +129,18 @@ fake_app = fastapi.FastAPI()
 @fake_app.get("/widgets")
 async def get_widgets():
     return mockDB.get_widgets()
+
+
+@fake_app.get("/nested")
+async def get_nested_widgets():
+    widgets = mockDB.get_widgets()
+    return Nested(data=widgets)
+
+
+@fake_app.get("/nested/{index}")
+async def get_nested_widget(index: int):
+    widgets = mockDB.get_widgets()
+    return widgets[index]
 
 
 @fake_app.head("/widgets")
@@ -129,7 +183,20 @@ def mocked_client():
 
 @pytest.fixture
 def widget(mocked_client) -> Widget:
-    return Widget(client=mocked_client)
+    mockDB.delete_all()
+    mockDB.add_widget(Widgety(some="thing"))
+    return Widget(
+        client=mocked_client,
+        # Add a fake request for the datasource to use for request headers
+        request=fastapi.Request(
+            scope={
+                "type": "http",
+                # raw headers format is all lowercased values
+                "headers": [[b"authorization", b"fake-authorize"]],
+            }
+        ),
+        config=Configuation(),
+    )
 
 
 async def test_http_datasource_caches_get(mocker, widget: Widget):
@@ -229,6 +296,39 @@ async def test_http_datasource_did_receive_error(mocker, widget: Widget, mocked_
 
     with pytest.raises(Exception, match="boo"):
         await widget.get_widgets()
+
+
+async def test_http_datasource_connect(widget: Widget, mocker):
+    build_request_spy = mocker.spy(widget.client, "build_request")
+    mockDB.delete_all()
+    mockDB.add_widget(Widgety(some="new thing"))
+    mockDB.add_widget(Widgety(some="old thing"))
+    results = await widget.get_connected_widgets()
+    assert results == [Widgety(some="new thing"), Widgety(some="old thing")]
+    build_request_spy.assert_called_with(
+        headers={
+            "X-API-Key": "fake_api_key",
+        },
+        method="GET",
+        url="http://localhost/nested",
+    )
+
+
+async def test_http_datasource_connect_args(widget: Widget, mocker):
+    build_request_spy = mocker.spy(widget.client, "build_request")
+    mockDB.delete_all()
+    mockDB.add_widget(Widgety(some="new thing"))
+    mockDB.add_widget(Widgety(some="old thing"))
+    results = await widget.get_connected_widget(index=1)
+    assert results == Widgety(some="old thing")
+    build_request_spy.assert_called_with(
+        headers={
+            "X-API-Key": "fake_api_key",
+            "Authorization": "fake-authorize",
+        },
+        method="GET",
+        url="http://localhost/nested/1",
+    )
 
 
 async def test_get_model_from_response_errors(widget: Widget):
