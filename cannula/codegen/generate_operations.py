@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import logging
 import pathlib
-from typing import Dict, List, Optional, Any, Tuple
-from cannula.types import ObjectType, Field, FieldType
+from typing import Dict, List, Optional, Any
+from cannula.types import ObjectType, Field
 from graphql import (
     DocumentNode,
     FieldNode,
@@ -20,204 +20,366 @@ from cannula.codegen.schema_analyzer import SchemaAnalyzer, CodeGenerator
 logger = logging.getLogger(__name__)
 
 
-def get_flattened_fields(
+def create_field_info(
+    field_name: str, path: str, field_obj: Optional[Field] = None
+) -> Dict[str, Any]:
+    """
+    Create a field info dictionary with standardized attributes.
+
+    Args:
+        field_name: Name of the field
+        path: Access path to the field
+        field_obj: Optional Field object with type information
+
+    Returns:
+        Dictionary with field information
+    """
+    return {
+        "path": path,
+        "name": field_name,
+        "label": field_name.replace("_", " ").title(),
+        "type": field_obj.field_type.of_type if field_obj else "String",
+        "is_list": field_obj.field_type.is_list if field_obj else False,
+        "class_name": path.replace(".", "-"),
+    }
+
+
+def get_field_by_name(object_type: ObjectType, field_name: str) -> Optional[Field]:
+    """
+    Get a field from an object type by name.
+
+    Args:
+        object_type: The object type to search
+        field_name: Name of the field to find
+
+    Returns:
+        Field object if found, None otherwise
+    """
+    return next((f for f in object_type.fields if f.name == field_name), None)
+
+
+def process_fragment(
+    fragment: FragmentDefinitionNode,
+    analyzer: SchemaAnalyzer,
+    prefix: str,
+    parent_type: ObjectType,
+    fragments: Dict[str, FragmentDefinitionNode],
+) -> List[Dict[str, Any]]:
+    """
+    Process a fragment and extract its fields.
+
+    Args:
+        fragment: Fragment definition to process
+        analyzer: Schema analyzer instance
+        prefix: Path prefix for fields
+        parent_type: Parent object type
+        fragments: Dictionary of fragments
+
+    Returns:
+        List of field information dictionaries
+    """
+    if not fragment.type_condition:
+        return []
+
+    # Check if fragment applies to this type
+    if fragment.type_condition.name.value != parent_type.name:
+        return []
+
+    return get_fields_from_selection(
+        fragment.selection_set, analyzer, prefix, parent_type, fragments
+    )
+
+
+def get_fields_from_selection(
     selection_set: SelectionSetNode,
     analyzer: SchemaAnalyzer,
     prefix: str = "",
     parent_type: Optional[ObjectType] = None,
+    fragments: Optional[Dict[str, FragmentDefinitionNode]] = None,
+    flatten_nested_lists: bool = True,
 ) -> List[Dict[str, Any]]:
     """
-    Recursively extract all fields from a selection set, flattening nested objects.
+    Extract all fields from a selection set, flattening nested objects.
 
     Args:
         selection_set: GraphQL selection set to process
-        analyzer: Schema analyzer instance to look up types
-        prefix: Current path prefix for nested fields
-        parent_type: Parent object type containing these fields
+        analyzer: Schema analyzer instance
+        prefix: Path prefix for fields
+        parent_type: Parent object type
+        fragments: Dictionary of fragments
+        flatten_nested_lists: Whether to flatten nested lists or keep them as objects
 
     Returns:
-        List of dictionaries with field information
+        List of field information dictionaries
     """
     fields = []
+    fragments = fragments or {}
 
     for selection in selection_set.selections:
         if isinstance(selection, FieldNode):
             field_name = selection.name.value
             field_path = f"{prefix}.{field_name}" if prefix else field_name
+            field_obj = (
+                get_field_by_name(parent_type, field_name) if parent_type else None
+            )
 
-            # Get field from parent type
-            field_type_info = None
-            field_type_name = None
-            if parent_type:
-                field_obj = next(
-                    (f for f in parent_type.fields if f.name == field_name), None
-                )
-                if field_obj:
-                    field_type_info = field_obj.field_type
-                    field_type_name = field_obj.field_type.of_type
+            # If it has selections, recurse into nested object
+            if selection.selection_set and field_obj:
+                nested_type_name = field_obj.field_type.of_type
+                nested_type = analyzer.object_types_by_name.get(nested_type_name)
 
-            # If it has a selection set, it's a nested object
-            if selection.selection_set:
-                # Get the nested type
-                nested_obj_type = None
-                if field_type_name:
-                    nested_obj_type = analyzer.object_types_by_name.get(field_type_name)
-
-                # Recursively get nested fields
-                if nested_obj_type:
-                    nested_fields = get_flattened_fields(
-                        selection.selection_set, analyzer, field_path, nested_obj_type
-                    )
-                    fields.extend(nested_fields)
+                if nested_type:
+                    # Check if this is a list field - we need special handling
+                    if field_obj.field_type.is_list:
+                        if flatten_nested_lists:
+                            # For lists, we want to generate a nested table, so we need to add the entire field
+                            fields.append(
+                                {
+                                    "path": field_path,
+                                    "name": field_name,
+                                    "label": field_name.replace("_", " ").title(),
+                                    "type": nested_type_name,
+                                    "is_list": True,
+                                    "class_name": field_path.replace(".", "-"),
+                                    "nested_fields": get_fields_from_selection(
+                                        selection.selection_set,
+                                        analyzer,
+                                        "",  # Reset prefix for nested fields
+                                        nested_type,
+                                        fragments,
+                                    ),
+                                }
+                            )
+                        else:
+                            # We're not flattening, so just add the fields
+                            nested_fields = get_fields_from_selection(
+                                selection.selection_set,
+                                analyzer,
+                                field_path,
+                                nested_type,
+                                fragments,
+                            )
+                            fields.extend(nested_fields)
+                    else:
+                        # Regular object, continue flattening
+                        nested_fields = get_fields_from_selection(
+                            selection.selection_set,
+                            analyzer,
+                            field_path,
+                            nested_type,
+                            fragments,
+                        )
+                        fields.extend(nested_fields)
             else:
-                # It's a leaf field
-                fields.append(
-                    {
-                        "path": field_path,
-                        "name": field_name,
-                        "type": (
-                            field_type_info.of_type if field_type_info else "String"
-                        ),
-                        "is_list": (
-                            field_type_info.is_list if field_type_info else False
-                        ),
-                    }
-                )
+                # Add this field
+                fields.append(create_field_info(field_name, field_path, field_obj))
 
-        # Handle fragment spreads
         elif isinstance(selection, FragmentSpreadNode):
-            # This would need to be implemented if fragments are needed
-            pass
+            fragment = fragments.get(selection.name.value)
+            if fragment and parent_type:
+                fragment_fields = process_fragment(
+                    fragment, analyzer, prefix, parent_type, fragments
+                )
+                fields.extend(fragment_fields)
 
     return fields
 
 
-def generate_table_html(
-    fields: List[Dict[str, Any]], collection_path: str
-) -> List[str]:
+def build_table_headers(fields: List[Dict[str, Any]]) -> List[str]:
     """
-    Generate HTML table markup for a collection of objects.
+    Generate table header HTML for a set of fields.
 
     Args:
         fields: List of field information dictionaries
-        collection_path: The path to the collection in the template context
 
     Returns:
-        List of HTML lines for the table
+        List of HTML strings for table headers
     """
+    headers = []
+    for field in fields:
+        headers.append(
+            f'<th class="{field["class_name"]}-header">{field["label"]}</th>'
+        )
+    return headers
+
+
+def build_table_cells(
+    fields: List[Dict[str, Any]], item_var: str = "item"
+) -> List[str]:
+    """
+    Generate table cell HTML for a set of fields.
+
+    Args:
+        fields: List of field information dictionaries
+        item_var: Variable name to use for each item
+
+    Returns:
+        List of HTML strings for table cells
+    """
+    cells = []
+    for field in fields:
+        cells.append(
+            f'<td class="{field["class_name"]}">{{{{{ item_var}.{field["path"]} }}}}</td>'
+        )
+    return cells
+
+
+def build_nested_list_html(field: Dict[str, Any], parent_path: str) -> List[str]:
+    """
+    Build HTML for a nested list within an object.
+
+    Args:
+        field: Field information for the list
+        parent_path: Path to the parent object
+
+    Returns:
+        List of HTML strings for the nested list
+    """
+    nested_fields = field.get("nested_fields", [])
+    collection_path = f"{parent_path}.{field['path']}"
+    field_label = field["label"]
+
+    headers = build_table_headers(nested_fields)
+    cells = build_table_cells(nested_fields)
+
     table_html = [
-        f'<div class="list-container">',
-        f"  <table>",
-        f"    <thead>",
-        f"      <tr>",
+        f'<div class="nested-list {field["class_name"]}">',
+        f"  <h3>{field_label}</h3>",
+        "  <table>",
+        "    <thead>",
+        "      <tr>",
     ]
 
-    # Add table headers
-    for field in fields:
-        path_parts = field["path"].split(".")
-        header_text = path_parts[-1].replace("_", " ").title()
-        class_name = field["path"].replace(".", "-")
-        table_html.append(f'        <th class="{class_name}-header">{header_text}</th>')
+    # Add headers
+    for header in headers:
+        table_html.append(f"        {header}")
 
     table_html.extend(
         [
-            f"      </tr>",
-            f"    </thead>",
-            f"    <tbody>",
+            "      </tr>",
+            "    </thead>",
+            "    <tbody>",
             f"      {{% for item in {collection_path} %}}",
-            f"      <tr>",
+            "      <tr>",
         ]
     )
 
-    # Add table cells for all fields
-    for field in fields:
-        path = field["path"]
-        field_type = field["type"]
-        class_name = path.replace(".", "-")
-
-        # Format cell based on field type
-        if field_type == "datetime":
-            table_html.append(
-                f'        <td class="{class_name}"><time datetime="{{{{ item.{path} }}}}">{{{{ item.{path} }}}}</time></td>'
-            )
-        else:
-            table_html.append(
-                f'        <td class="{class_name}">{{{{ item.{path} }}}}</td>'
-            )
+    # Add cells
+    for cell in cells:
+        table_html.append(f"        {cell}")
 
     table_html.extend(
-        [
-            f"      </tr>",
-            f"      {{% endfor %}}",
-            f"    </tbody>",
-            f"  </table>",
-            f"</div>",
-        ]
+        ["      </tr>", "      {% endfor %}", "    </tbody>", "  </table>", "</div>"]
     )
 
     return table_html
 
 
-def generate_definition_list(
-    fields: List[Dict[str, Any]], context_path: str, is_nested: bool = False
-) -> List[str]:
+def build_table_html(fields: List[Dict[str, Any]], collection_path: str) -> List[str]:
     """
-    Generate HTML definition list markup for object fields.
+    Build complete HTML table for a collection.
 
     Args:
         fields: List of field information dictionaries
-        context_path: The path to the object in the template context
-        is_nested: Whether this is a nested definition list
+        collection_path: Path to the collection
 
     Returns:
-        List of HTML lines for the definition list
+        List of HTML strings for the table
     """
-    dl_html = []
+    headers = build_table_headers(fields)
+    cells = build_table_cells(fields)
 
-    # Start with dl tag if this isn't a nested list (nested ones are wrapped by the caller)
-    if not is_nested:
-        dl_html.append("<dl>")
+    table_html = [
+        '<div class="list-container">',
+        "  <table>",
+        "    <thead>",
+        "      <tr>",
+    ]
+
+    # Add headers
+    for header in headers:
+        table_html.append(f"        {header}")
+
+    table_html.extend(
+        [
+            "      </tr>",
+            "    </thead>",
+            "    <tbody>",
+            f"      {{% for item in {collection_path} %}}",
+            "      <tr>",
+        ]
+    )
+
+    # Add cells
+    for cell in cells:
+        table_html.append(f"        {cell}")
+
+    table_html.extend(
+        ["      </tr>", "      {% endfor %}", "    </tbody>", "  </table>", "</div>"]
+    )
+
+    return table_html
+
+
+def build_object_field_html(field: Dict[str, Any], context_path: str) -> str:
+    """
+    Build HTML for a single object field.
+
+    Args:
+        field: Field information dictionary
+        context_path: Path to the parent object
+
+    Returns:
+        HTML string for the field
+    """
+    full_path = f"{context_path}.{field['path']}"
+    return f'<dt>{field["label"]}</dt>\n' f"<dd>{{{{ {full_path} }}}}</dd>"
+
+
+def build_definition_list(fields: List[Dict[str, Any]], context_path: str) -> List[str]:
+    """
+    Build HTML definition list for object fields.
+
+    Args:
+        fields: List of field information dictionaries
+        context_path: Path to the parent object
+
+    Returns:
+        List of HTML strings for the definition list
+    """
+    dl_html = ["<dl>"]
 
     for field in fields:
-        field_name = field["name"]
-        field_path = field["path"]
-        field_type = field["type"]
-        field_label = field_name.replace("_", " ").title()
-        full_path = f"{context_path}.{field_path}"
-
-        # Format based on field type
-        if field_type == "datetime":
-            dl_html.append(
-                f"<dt>{field_label}</dt>\n"
-                f'<dd><time datetime="{{{{ {full_path} }}}}">{{{{ {full_path} }}}}</time></dd>'
-            )
+        # Check if this is a nested list
+        if field.get("is_list") and field.get("nested_fields"):
+            # Add a nested list
+            dl_html.extend(build_nested_list_html(field, context_path))
         else:
-            dl_html.append(
-                f"<dt>{field_label}</dt>\n" f"<dd>{{{{ {full_path} }}}}</dd>"
-            )
+            # Add a regular field
+            dl_html.append(build_object_field_html(field, context_path))
 
-    # Close the dl tag if this isn't a nested list
-    if not is_nested:
-        dl_html.append("</dl>")
-
+    dl_html.append("</dl>")
     return dl_html
 
 
-def format_field_value(field_path: str, field_type: str) -> str:
+def build_error_section() -> List[str]:
     """
-    Format a field value based on its type.
-
-    Args:
-        field_path: Full path to the field in the template context
-        field_type: The type of the field
+    Build HTML for error handling section.
 
     Returns:
-        Formatted HTML for the field value
+        List of HTML strings for the error section
     """
-    if field_type == "datetime":
-        return f'<time datetime="{{{{ {field_path} }}}}">{{{{ {field_path} }}}}</time>'
-    else:
-        return f"{{{{ {field_path} }}}}"
+    return [
+        '<div class="errors-section" hx-swap-oob="true" id="errors-container">',
+        "  {% if errors %}",
+        '  <div class="error-list">',
+        "    {% for error in errors %}",
+        '    <div class="error-item">{{ error.message }}</div>',
+        "    {% endfor %}",
+        "  </div>",
+        "  {% endif %}",
+        "</div>",
+    ]
 
 
 class TemplateGenerator(CodeGenerator):
@@ -239,166 +401,130 @@ class TemplateGenerator(CodeGenerator):
         )
         self.fragments: Dict[str, FragmentDefinitionNode] = {}
 
-    def _process_field_node(
-        self, selection: FieldNode, object_type: ObjectType, path: List[str]
-    ) -> str:
-        """
-        Process a field node and generate appropriate HTML based on its type.
-
-        Args:
-            selection: The field node to process
-            object_type: The parent object type
-            path: Current path to this field
-
-        Returns:
-            HTML string for this field
-        """
-        selection_name = selection.name.value
-        field_path = path + [selection_name]
-        field_access = ".".join(field_path)
-        field_label = selection_name.replace("_", " ").title()
-
-        # Find field in the object type
-        field = next((f for f in object_type.fields if f.name == selection_name), None)
-
-        # If this field has selections, it's an object or list
-        if selection.selection_set:
-            # Get the field type information
-            field_type_name = field.field_type.of_type if field else None
-            nested_type = None
-
-            if field_type_name:
-                nested_type = self.analyzer.object_types_by_name.get(field_type_name)
-
-            # If it's a list of objects, generate a table
-            if field and field.field_type.is_list and nested_type:
-                flattened_fields = get_flattened_fields(
-                    selection.selection_set, self.analyzer, "", nested_type
-                )
-
-                table_html = generate_table_html(flattened_fields, field_access)
-                return (
-                    f'<div class="field-group {field_access}">\n'
-                    + f"  <h3>{field_label}</h3>\n"
-                    + f'  {"".join(table_html)}\n'
-                    + f"</div>"
-                )
-
-            # If it's a single object, generate a definition list
-            elif nested_type:
-                flattened_fields = get_flattened_fields(
-                    selection.selection_set, self.analyzer, "", nested_type
-                )
-
-                dl_html = generate_definition_list(flattened_fields, field_access)
-                return (
-                    f'<div class="field-group {field_access}">\n'
-                    + f"  <h3>{field_label}</h3>\n"
-                    + f'  {"".join(dl_html)}\n'
-                    + f"</div>"
-                )
-
-            # Fallback for unknown object types
-            else:
-                return (
-                    f'<div class="field {field_access}">\n'
-                    + f"  <label>{field_label}</label>\n"
-                    + f'  <span class="value">{{{{ {field_access} }}}}</span>\n'
-                    + f"</div>"
-                )
-
-        # Simple scalar field
-        else:
-            field_type = "String"
-            if field:
-                field_type = field.field_type.of_type
-
-            formatted_value = format_field_value(field_access, field_type)
-            return (
-                f'<div class="field {field_access}">\n'
-                + f"  <label>{field_label}</label>\n"
-                + f'  <span class="value">{formatted_value}</span>\n'
-                + f"</div>"
-            )
-
-    def _get_field_template(
+    def _generate_object_template(
         self,
         selection_set: SelectionSetNode,
         object_type: ObjectType,
-        path: Optional[List[str]] = None,
-        is_root: bool = False,
+        context_path: str,
     ) -> str:
         """
-        Generate template HTML for a selection set.
+        Generate template HTML for a single object.
 
         Args:
-            selection_set: GraphQL selection set to process
-            object_type: Parent object type
-            path: Current path for nested fields
-            is_root: Whether this is a root level object
+            selection_set: GraphQL selection set
+            object_type: Object type
+            context_path: Path to this object in the context
 
         Returns:
-            HTML string for the entire selection set
+            HTML string for the object
         """
-        if path is None:
-            path = []
+        fields = get_fields_from_selection(
+            selection_set, self.analyzer, "", object_type, self.fragments
+        )
 
-        template_parts = []
+        dl_html = build_definition_list(fields, context_path)
+        return "\n".join(dl_html)
 
-        for selection in selection_set.selections:
-            if isinstance(selection, FieldNode):
-                html = self._process_field_node(selection, object_type, path)
-                template_parts.append(html)
+    def _generate_list_template(
+        self,
+        selection_set: SelectionSetNode,
+        object_type: ObjectType,
+        context_path: str,
+    ) -> str:
+        """
+        Generate template HTML for a list of objects.
 
-            # Handle fragment spreads
-            elif isinstance(selection, FragmentSpreadNode):
-                fragment = self.fragments.get(selection.name.value)
-                if fragment:
-                    fragment_template = self._get_field_template(
-                        fragment.selection_set, object_type, path, is_root=is_root
-                    )
-                    template_parts.append(fragment_template)
+        Args:
+            selection_set: GraphQL selection set
+            object_type: Object type of list items
+            context_path: Path to the list in the context
 
-        return "\n".join(template_parts)
+        Returns:
+            HTML string for the list
+        """
+        fields = get_fields_from_selection(
+            selection_set, self.analyzer, "", object_type, self.fragments
+        )
+
+        table_html = build_table_html(fields, context_path)
+        return "\n".join(table_html)
+
+    def _generate_field_section(
+        self, selection: FieldNode, operation_field: Field, object_type: ObjectType
+    ) -> str:
+        """
+        Generate a section for a top-level field in an operation.
+
+        Args:
+            selection: Field node
+            operation_field: Field information
+            object_type: Object type for this field
+
+        Returns:
+            HTML string for the field section
+        """
+        selection_name = selection.name.value
+        context_path = f"data.{selection_name}"
+        field_label = selection_name.replace("_", " ").title()
+
+        # Check if selection set exists
+        if not selection.selection_set:
+            # Return an empty placeholder for fields without selections
+            return (
+                f'<section class="{selection_name}-section">\n'
+                f"  <h2>{field_label}</h2>\n"
+                f'  <div class="empty-field">No fields selected</div>\n'
+                f"</section>"
+            )
+
+        # Generate appropriate template based on field type
+        if operation_field.field_type.is_list:
+            content = self._generate_list_template(
+                selection.selection_set, object_type, context_path
+            )
+        else:
+            content = self._generate_object_template(
+                selection.selection_set, object_type, context_path
+            )
+
+        # Wrap in section
+        section_html = [
+            f'<section class="{selection_name}-section">',
+            f"  <h2>{field_label}</h2>",
+            f"  {content}",
+            "</section>",
+        ]
+
+        return "\n".join(section_html)
 
     def _generate_operation_template(self, operation: OperationDefinitionNode) -> str:
         """
         Generate a complete template for an operation.
 
         Args:
-            operation: The operation definition to process
+            operation: The operation definition
 
         Returns:
             Complete HTML template for the operation
         """
         operation_name = operation.name.value if operation.name else "anonymous"
-
         template_parts = []
 
         # Add error handling section
-        error_section = [
-            '<div class="errors-section" hx-swap-oob="true" id="errors-container">',
-            "  {% if errors %}",
-            '  <div class="error-list">',
-            "    {% for error in errors %}",
-            '    <div class="error-item">{{ error.message }}</div>',
-            "    {% endfor %}",
-            "  </div>",
-            "  {% endif %}",
-            "</div>",
-        ]
+        error_section = build_error_section()
         template_parts.append("\n".join(error_section))
 
+        # Process each top-level field
         for selection in operation.selection_set.selections:
             if isinstance(selection, FieldNode):
                 selection_name = selection.name.value
 
-                # Get operation field
+                # Get field and type information
                 operation_field = next(
                     (
                         f
                         for f in self.analyzer.operation_fields
-                        if f.name == selection.name.value
+                        if f.name == selection_name
                     ),
                     None,
                 )
@@ -409,48 +535,16 @@ class TemplateGenerator(CodeGenerator):
                         object_type_name
                     )
 
-                    if object_type and selection.selection_set:
-                        # Check if the operation field is a list type (top-level collection)
-                        if operation_field.field_type.is_list:
-                            # Generate table for list of objects
-                            flattened_fields = get_flattened_fields(
-                                selection.selection_set, self.analyzer, "", object_type
-                            )
+                    if object_type:
+                        # Generate section for this field
+                        section_html = self._generate_field_section(
+                            selection, operation_field, object_type
+                        )
+                        template_parts.append(section_html)
 
-                            table_html = generate_table_html(
-                                flattened_fields, f"data.{selection_name}"
-                            )
-                            section_html = [
-                                f'<section class="{selection_name}-section">',
-                                f'  <h2>{selection_name.replace("_", " ").title()}</h2>',
-                                f'  {"".join(table_html)}',
-                                f"</section>",
-                            ]
-
-                            template_parts.append("\n".join(section_html))
-                        else:
-                            # Generate template for single object
-                            field_template = self._get_field_template(
-                                selection.selection_set,
-                                object_type,
-                                ["data", selection_name],
-                                is_root=True,
-                            )
-
-                            section_html = [
-                                f'<section class="{selection_name}-section">',
-                                f'  <h2>{selection_name.replace("_", " ").title()}</h2>',
-                                f"  {field_template}",
-                                f"</section>",
-                            ]
-
-                            template_parts.append("\n".join(section_html))
-
-        # Join the template parts first
-        joined_parts = "\n".join(template_parts)
-
-        # Then create the container div
-        return f'<div class="{operation_name}">\n{joined_parts}\n</div>'
+        # Join all parts and wrap in container
+        joined_content = "\n".join(template_parts)
+        return f'<div class="{operation_name}">\n{joined_content}\n</div>'
 
     def generate(self, document: DocumentNode) -> None:
         """
@@ -464,32 +558,31 @@ class TemplateGenerator(CodeGenerator):
             if isinstance(definition, FragmentDefinitionNode):
                 self.fragments[definition.name.value] = definition
 
-        # Generate templates for each operation
+        # Process all operations
         for definition in document.definitions:
-            if not isinstance(definition, OperationDefinitionNode):
-                continue
+            if isinstance(definition, OperationDefinitionNode):
+                if not definition.name:
+                    logger.warning("Skipping anonymous operation")
+                    continue
 
-            if not definition.name:
-                continue
+                name = definition.name.value
+                template_content = self._generate_operation_template(definition)
 
-            name = definition.name.value
-            template_content = self._generate_operation_template(definition)
+                # Prepare template path
+                template_path = self.template_dir / f"{name}.html"
+                template_path.parent.mkdir(parents=True, exist_ok=True)
 
-            # Prepare template path
-            template_path = self.template_dir / f"{name}.html"
-            template_path.parent.mkdir(parents=True, exist_ok=True)
+                # Check if file exists
+                if template_path.exists() and not self.force:
+                    logger.warning(
+                        f"Template '{name}.html' already exists. Use force=True to overwrite. Skipping..."
+                    )
+                    continue
 
-            # Check if file exists
-            if template_path.exists() and not self.force:
-                logger.warning(
-                    f"Template '{name}.html' already exists. Use force=True to overwrite. Skipping..."
-                )
-                continue
-
-            # Write template to file
-            try:
-                with open(template_path, "w") as f:
-                    f.write(template_content)
-                logger.info(f"Generated template: {template_path}")
-            except IOError as e:  # pragma: no cover
-                logger.error(f"Failed to write template '{name}.html': {str(e)}")
+                # Write template to file
+                try:
+                    with open(template_path, "w") as f:
+                        f.write(template_content)
+                    logger.info(f"Generated template: {template_path}")
+                except IOError as e:  # pragma: no cover
+                    logger.error(f"Failed to write template '{name}.html': {str(e)}")
