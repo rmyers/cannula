@@ -21,4 +21,4 @@ __all__ = [
     "load_schema",
 ]
 
-__VERSION__ = "0.23.0"
+__VERSION__ = "0.24.0"
