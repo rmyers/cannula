@@ -150,14 +150,13 @@ class HTMXHandler:  # pragma: no cover
             request=request,
         )
 
-        if result.errors:
-            return HTMLResponse(f"GraphQL Error: {result.errors[0]}", status_code=500)
-
         # Render template with result data
         template = self.jinja_env.get_template(operation.template_path)
 
         html = template.render(
             data=result.data,
+            errors=result.errors,
+            extensions=result.extensions,
             variables=variables,
             operation=operation,
             request=request,

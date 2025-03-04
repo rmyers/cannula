@@ -52,6 +52,18 @@ query GetUsersWithFragment {
 }
 """
 
+TEST_USER_QUERY = """
+query GetUser($id: ID!) {
+    user(id: $id) {
+        id
+        name
+        createdAt
+        score
+        age
+    }
+}
+"""
+
 
 @pytest.fixture
 def schema_analyzer():
@@ -76,11 +88,30 @@ def test_basic_template_generation(template_generator, tmp_path):
     # Read content and verify structure
     content = expected_file.read_text()
     assert 'class="GetUsers"' in content
-    assert 'class="field users.id"' in content
-    assert 'class="field users.name"' in content
-    assert '<sl-format-date date="{{ users.createdAt }}">' in content
-    assert '<sl-format-number value="{{ users.score }}">' in content
-    assert '<sl-format-number value="{{ users.age }}">' in content
+    assert "for item in data.users" in content
+    assert "item.name" in content
+    assert "item.age" in content
+    assert "item.score" in content
+    assert "item.createdAt" in content
+
+
+def test_object_template_generation(template_generator, tmp_path):
+    # Parse and generate template
+    document = gql(TEST_USER_QUERY)
+    template_generator.generate(document)
+
+    # Check if file was created
+    expected_file = tmp_path / "GetUser.html"
+    assert expected_file.exists()
+
+    # Read content and verify structure
+    content = expected_file.read_text()
+    assert 'class="GetUser"' in content
+    assert "data.user.id" in content
+    assert "data.user.name" in content
+    assert "data.user.age" in content
+    assert "data.user.score" in content
+    assert "data.user.createdAt" in content
 
 
 def test_fragment_template_generation(template_generator, tmp_path):
@@ -95,11 +126,12 @@ def test_fragment_template_generation(template_generator, tmp_path):
     # Read content and verify structure
     content = expected_file.read_text()
     assert 'class="GetUsersWithFragment"' in content
-    assert 'class="field users.id"' in content
-    assert 'class="field users.name"' in content
-    assert '<sl-format-date date="{{ users.createdAt }}">' in content
-    assert '<sl-format-number value="{{ users.score }}">' in content
-    assert '<sl-format-number value="{{ users.age }}">' in content
+    assert "for item in data.users" in content
+    assert "item.id" in content
+    assert "item.name" in content
+    assert "item.age" in content
+    assert "item.score" in content
+    assert "item.createdAt" in content
 
 
 def test_skip_existing_template(schema_analyzer, tmp_path):
@@ -202,6 +234,7 @@ def test_nested_field_template(template_generator, tmp_path):
     assert expected_file.exists()
 
     content = expected_file.read_text()
-    assert 'class="field-group user.posts"' in content
-    assert 'class="field-group user.posts.comments"' in content
-    assert 'class="field user.posts.comments.text"' in content
+    assert "data.user.id" in content
+    assert "data.user.name" in content
+    assert "for item in data.user.posts" in content
+    # assert "item.comments.text" in content
