@@ -82,7 +82,6 @@ API Reference
 -------------
 """
 
-import asyncio
 import functools
 import logging
 import time
@@ -90,10 +89,10 @@ import typing
 from urllib.parse import urljoin
 
 import httpx
-from starlette.datastructures import State
+from starlette.datastructures import State, Headers
 from starlette.requests import Request
 
-from cannula.context import Settings
+from cannula.context import Settings, make_request
 from cannula.codegen.json_selection import apply_selection
 from cannula.datasource import GraphModel, cacheable, expected_fields
 from cannula.tracking import (
@@ -188,6 +187,10 @@ class HTTPDatasource(typing.Generic[Settings]):
     client: httpx.AsyncClient
     _base_url: str
     _headers: typing.List[HTTPHeaderMapping]
+    _app_config: Settings
+    _request: Request
+    _request_headers: Headers
+    _request_state: State
 
     def __init_subclass__(
         cls,
@@ -207,20 +210,22 @@ class HTTPDatasource(typing.Generic[Settings]):
         Args:
             client: Optional httpx client to use
         """
-        self.client = client or httpx.AsyncClient()
         self.memoized_requests = {}
-        # close the client if this instance opened it
-        self._should_close_client = client is None
         self._app_config = config or typing.cast(Settings, State())
-        self._request = request or Request(scope={"type": "http", "headers": []})
         self._base_url = self._resolve_value(self._source_http.baseURL)
         self._headers = self._source_http.headers
-        self._track_requests = getattr(self._app_config, "debug", False)
+        self._request = request or make_request()
+        self._request_headers = self._request.headers
+        self._request_state = self._request.state
 
-    def __del__(self):  # pragma: no cover
-        if self._should_close_client:
-            LOG.debug(f"Closing httpx session for {self.__class__.__name__}")
-            asyncio.run(self.client.aclose())
+        if client:
+            self.client = client
+        elif hasattr(self._request_state, "http_client"):
+            self.client = self._request_state.http_client
+        else:
+            raise AttributeError(
+                "Must provide a client or an application with 'http_client' in state"
+            )
 
     def _render_path_template(
         self, template: str, variables: typing.Dict[str, typing.Any]
@@ -251,7 +256,7 @@ class HTTPDatasource(typing.Generic[Settings]):
                 headers[mapping.name] = self._resolve_value(mapping.value)
             elif mapping.from_header:
                 # Propagate header from original request
-                if value := self._request.headers.get(mapping.from_header):
+                if value := self._request_headers.get(mapping.from_header):
                     headers[mapping.name] = value
 
         return headers
