@@ -85,6 +85,7 @@ API Reference
 import asyncio
 import functools
 import logging
+import time
 import typing
 from urllib.parse import urljoin
 
@@ -95,6 +96,10 @@ from starlette.requests import Request
 from cannula.context import Settings
 from cannula.codegen.json_selection import apply_selection
 from cannula.datasource import GraphModel, cacheable, expected_fields
+from cannula.tracking import (
+    HttpTransaction,
+    record_transaction,
+)
 from cannula.types import ConnectHTTP, SourceHTTP, HTTPHeaderMapping
 
 
@@ -210,6 +215,7 @@ class HTTPDatasource(typing.Generic[Settings]):
         self._request = request or Request(scope={"type": "http", "headers": []})
         self._base_url = self._resolve_value(self._source_http.baseURL)
         self._headers = self._source_http.headers
+        self._track_requests = getattr(self._app_config, "debug", False)
 
     def __del__(self):  # pragma: no cover
         if self._should_close_client:
@@ -367,9 +373,20 @@ class HTTPDatasource(typing.Generic[Settings]):
             path: path of the request
             kwargs: these args are passed directly to httpx
         """
+        # Get start time - we'll need this for the duration calculation
+        start_time = time.time()
+
         headers = self._build_headers(header_mappings or [])
         url = self._build_url(path)
 
+        # Determine request body for tracking
+        request_body = None
+        if "json" in kwargs:
+            request_body = kwargs["json"]
+        elif "data" in kwargs:
+            request_body = kwargs["data"]
+
+        # Build the request
         request = self.client.build_request(
             method=method, url=url, headers=headers, **kwargs
         )
@@ -380,11 +397,46 @@ class HTTPDatasource(typing.Generic[Settings]):
         async def process_request() -> Response:
             try:
                 response = await self.client.send(request)
-            except Exception as exc:
-                return self.did_receive_error(exc, request)
-            else:
-                return await self.did_receive_response(response, request)
+                end_time = time.time()
 
+                body = await self.did_receive_response(response, request)
+
+                # Record the complete transaction in one go
+                transaction = HttpTransaction(
+                    method=method,
+                    url=str(url),
+                    request_headers=dict(request.headers),
+                    request_body=request_body,
+                    response_status=response.status_code,
+                    response_headers=dict(response.headers),
+                    response_body=body,
+                    start_time=start_time,
+                    end_time=end_time,
+                )
+                record_transaction(transaction)
+
+                # Process the response
+                return body
+
+            except Exception as exc:
+                end_time = time.time()
+
+                # Record the error transaction in one go
+                transaction = HttpTransaction(
+                    method=method,
+                    url=str(url),
+                    request_headers=dict(request.headers),
+                    request_body=request_body,
+                    start_time=start_time,
+                    end_time=end_time,
+                    error=str(exc),
+                )
+                record_transaction(transaction)
+
+                # Handle the error
+                return self.did_receive_error(exc, request)
+
+        # Use cache for GET/HEAD/OPTIONS
         if request.method in ["GET", "HEAD", "OPTIONS"]:
             promise = self.memoized_requests.get(cache_key)
             if promise is not None:
@@ -396,6 +448,7 @@ class HTTPDatasource(typing.Generic[Settings]):
 
             return await self.memoized_requests[cache_key]
         else:
+            # For mutations, invalidate cache and process
             self.memoized_requests.pop(cache_key, None)
             return await process_request()
 
