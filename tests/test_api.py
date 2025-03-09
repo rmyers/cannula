@@ -202,3 +202,11 @@ def test_invalid_operations(valid_schema, tmp_path):
         CannulaAPI(schema=valid_schema, operations=operation_file)
 
     assert "Cannot query field 'does_not_exist' on type 'Query'" in str(exc_info.value)
+
+
+async def test_tracking(valid_schema, valid_query, mocker):
+    api = CannulaAPI(schema=valid_schema, debug=True)
+    result = await api.call(valid_query)
+    assert result.extensions == {
+        "debug": {"executionTimeMs": mocker.ANY, "httpRequests": []}
+    }

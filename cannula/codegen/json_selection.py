@@ -12,7 +12,7 @@ from dataclasses import dataclass
 import httpx
 
 AnyDict = Dict[Any, Any]
-Response = Union[List[AnyDict], AnyDict, httpx.Response]
+Response = Union[List[AnyDict], AnyDict, httpx.Response, str]
 
 
 @dataclass

@@ -60,7 +60,7 @@ async def get_user(info: ResolveInfo[MyContext], id: int) -> User | None:
 
 
 # Our example graph api
-api = CannulaAPI(ROOT / "schema.graphql", root_value={"user": get_user})
+api = CannulaAPI(ROOT / "schema.graphql", root_value={"user": get_user}, debug=True)
 
 
 async def main():
