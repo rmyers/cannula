@@ -105,7 +105,7 @@ from cannula.types import ConnectHTTP, SourceHTTP, HTTPHeaderMapping
 LOG = logging.getLogger("cannula.datasource.http")
 
 AnyDict = typing.Dict[typing.Any, typing.Any]
-Response = typing.Union[typing.List[AnyDict], AnyDict, httpx.Response]
+Response = typing.Union[typing.List[AnyDict], AnyDict, httpx.Response, str]
 
 
 def model_from_response(
@@ -274,6 +274,22 @@ class HTTPDatasource(typing.Generic[Settings]):
 
     def did_receive_error(self, error: Exception, request: httpx.Request):
         """Handle errors from the remote resource"""
+        headers = request.headers
+        start_time = float(headers.get("x-request-start-time", time.time()))
+        end_time = time.time()
+
+        # Record the error transaction in one go
+        transaction = HttpTransaction(
+            method=request.method,
+            url=str(request.url),
+            request_headers=dict(request.headers),
+            request_body=request.content,
+            start_time=start_time,
+            end_time=end_time,
+            error=str(error),
+        )
+        record_transaction(transaction)
+
         raise error
 
     async def did_receive_response(
@@ -291,10 +307,39 @@ class HTTPDatasource(typing.Generic[Settings]):
                 response.raise_for_status()
                 return Widget(**response.json())
         """
+        request_headers = request.headers
+        start_time = float(request_headers.get("x-request-start-time", time.time()))
+        end_time = time.time()
+        response_headers = response.headers
+        content_type = response_headers.get("content-type")
+
+        if content_type and content_type.startswith("application/json"):
+            body = response.json()
+        else:
+            body = (
+                response.text
+                if len(response.text) < 1000
+                else f"{response.text[:1000]} ... [trucated]"
+            )
+
+        # Record the complete transaction in one go
+        transaction = HttpTransaction(
+            method=request.method,
+            url=str(request.url),
+            request_headers=dict(request_headers),
+            request_body=request.content,
+            response_status=response.status_code,
+            response_headers=dict(response.headers),
+            response_body=body,
+            start_time=start_time,
+            end_time=end_time,
+        )
+        record_transaction(transaction)
+
         response.raise_for_status()
         if request.method == "HEAD":
             return response
-        return response.json()
+        return body
 
     async def get(self, path: str, **kwargs) -> Response:
         """Convience method to perform a GET :meth:`fetch`
@@ -382,14 +427,8 @@ class HTTPDatasource(typing.Generic[Settings]):
         start_time = time.time()
 
         headers = self._build_headers(header_mappings or [])
+        headers["X-Request-Start-Time"] = str(start_time)
         url = self._build_url(path)
-
-        # Determine request body for tracking
-        request_body = None
-        if "json" in kwargs:
-            request_body = kwargs["json"]
-        elif "data" in kwargs:
-            request_body = kwargs["data"]
 
         # Build the request
         request = self.client.build_request(
@@ -402,44 +441,11 @@ class HTTPDatasource(typing.Generic[Settings]):
         async def process_request() -> Response:
             try:
                 response = await self.client.send(request)
-                end_time = time.time()
-
-                body = await self.did_receive_response(response, request)
-
-                # Record the complete transaction in one go
-                transaction = HttpTransaction(
-                    method=method,
-                    url=str(url),
-                    request_headers=dict(request.headers),
-                    request_body=request_body,
-                    response_status=response.status_code,
-                    response_headers=dict(response.headers),
-                    response_body=body,
-                    start_time=start_time,
-                    end_time=end_time,
-                )
-                record_transaction(transaction)
-
-                # Process the response
-                return body
-
             except Exception as exc:
-                end_time = time.time()
-
-                # Record the error transaction in one go
-                transaction = HttpTransaction(
-                    method=method,
-                    url=str(url),
-                    request_headers=dict(request.headers),
-                    request_body=request_body,
-                    start_time=start_time,
-                    end_time=end_time,
-                    error=str(exc),
-                )
-                record_transaction(transaction)
-
                 # Handle the error
                 return self.did_receive_error(exc, request)
+            else:
+                return await self.did_receive_response(response, request)
 
         # Use cache for GET/HEAD/OPTIONS
         if request.method in ["GET", "HEAD", "OPTIONS"]:

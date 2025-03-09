@@ -116,6 +116,7 @@ class CannulaAPI(typing.Generic[RootType, Settings]):
         scalars: typing.List[ScalarInterface] = [],
         logger: typing.Optional[logging.Logger] = None,
         level: int = logging.DEBUG,
+        debug: bool = False,
         operations: typing.Optional[pathlib.Path | str] = None,
         **kwargs,
     ):
@@ -128,6 +129,7 @@ class CannulaAPI(typing.Generic[RootType, Settings]):
         self._kwargs = kwargs
         self.logger = logger
         self.level = level
+        self.debug = debug
 
         self.schema = self._build_schema()
         self.operations = self._load_operations(operations)
@@ -249,10 +251,6 @@ class CannulaAPI(typing.Generic[RootType, Settings]):
         for err in validate(self.schema, ops):
             raise err
         return ops
-
-    @property
-    def debug(self) -> bool:
-        return getattr(self._config, "debug", False)
 
     def get_context(self, request) -> typing.Any:
         return self._context(request=request, config=self._config)

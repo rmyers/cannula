@@ -92,6 +92,7 @@ class CannulaApplication(typing.Generic[RootType, Settings], Starlette):
         context: typing.Optional[type[Context[Settings]]] = None,
         config: typing.Optional[Settings] = None,
         root_value: typing.Optional[RootType] = None,
+        debug: bool = False,
         **kwargs,
     ):
         _py_config = get_config(start_path)
@@ -103,6 +104,7 @@ class CannulaApplication(typing.Generic[RootType, Settings], Starlette):
             root_value=root_value,
             scalars=resolve_scalars(_py_config.scalars),
             operations=_py_config.operations,
+            debug=debug,
         )
 
         # Setup the routes for this application starting with the static directory
@@ -129,4 +131,4 @@ class CannulaApplication(typing.Generic[RootType, Settings], Starlette):
             handler = HTMXHandler(api, _py_config.operations_directory)
             routes.append(Route("/operation/{name:str}", handler.handle_request))
 
-        super().__init__(routes=routes, debug=True, lifespan=lifespan, **kwargs)
+        super().__init__(routes=routes, debug=debug, lifespan=lifespan, **kwargs)

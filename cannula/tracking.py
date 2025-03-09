@@ -69,25 +69,40 @@ class HttpTransaction:
         return result
 
 
-# Contextvar for storing HTTP transactions
-http_transactions = contextvars.ContextVar("http_transactions", default=[])
+# Create a Token class for the context var to ensure proper scoping
+class TransactionContextToken:
+    """Token class for managing transaction context"""
+
+    def __init__(self, transactions: typing.List[HttpTransaction]):
+        self.transactions = transactions
+
+
+# Contextvar for storing HTTP transactions with an empty default
+# The default is None, so we know when to initialize a new context
+http_transaction_ctx: contextvars.ContextVar[
+    typing.Optional[TransactionContextToken]
+] = contextvars.ContextVar("http_transaction_ctx", default=None)
 
 
 def record_transaction(transaction: HttpTransaction) -> None:
-    """Record a complete HTTP transaction"""
-    current = http_transactions.get()
-    current.append(transaction)
-    http_transactions.set(current)
+    """
+    Record a complete HTTP transaction in the current context.
+    This is a no-op if no tracking session is active.
+    """
+    ctx_token: typing.Optional[TransactionContextToken] = http_transaction_ctx.get()
+
+    # Skip recording if no context exists
+    if ctx_token is None:
+        return
+
+    # Add transaction to the current context
+    ctx_token.transactions.append(transaction)
 
 
 def get_transactions() -> typing.List[HttpTransaction]:
-    """Get all recorded HTTP transactions"""
-    return http_transactions.get()
-
-
-def reset_transactions() -> None:
-    """Reset the transaction list"""
-    http_transactions.set([])
+    """Get all recorded HTTP transactions from the current context"""
+    ctx_token: typing.Optional[TransactionContextToken] = http_transaction_ctx.get()
+    return ctx_token.transactions if ctx_token is not None else []
 
 
 def collect_transaction_data() -> typing.List[typing.Dict[str, typing.Any]]:
@@ -101,11 +116,16 @@ class TrackingSession:
     """
 
     def __init__(self, debug: bool = False):
-        """Initialize a tracking session"""
-        self.debug = debug
-        self.start_time = time.time()
-        # Always reset tracking for this context
-        reset_transactions()
+        """Initialize a tracking session with a fresh context"""
+        self.debug: bool = debug
+        self.start_time: float = time.time()
+        # Create a new context for this session
+        self.token: TransactionContextToken = TransactionContextToken([])
+        self.context_token: contextvars.Token = http_transaction_ctx.set(self.token)
+
+    def __exit__(self, *args, **kwargs) -> None:
+        """Reset context on exit"""
+        http_transaction_ctx.reset(self.context_token)
 
     def enhance_result(self, result: ExecutionResult) -> ExecutionResult:
         """
@@ -131,10 +151,14 @@ class TrackingSession:
 
 
 @contextlib.asynccontextmanager
-async def tracking_session(debug: bool = False):
-    """Context manager that provides a tracking session"""
+async def tracking_session(
+    debug: bool = False,
+) -> typing.AsyncGenerator[TrackingSession, None]:
+    """Context manager that provides a tracking session with automatic cleanup"""
     session = TrackingSession(debug=debug)
+    token: contextvars.Token = session.context_token
     try:
         yield session
     finally:
-        pass
+        # Ensure the context is reset even if there's an exception
+        http_transaction_ctx.reset(token)
