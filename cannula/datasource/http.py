@@ -82,26 +82,30 @@ API Reference
 -------------
 """
 
-import asyncio
 import functools
 import logging
+import time
 import typing
 from urllib.parse import urljoin
 
 import httpx
-from starlette.datastructures import State
+from starlette.datastructures import State, Headers
 from starlette.requests import Request
 
-from cannula.context import Settings
+from cannula.context import Settings, make_request
 from cannula.codegen.json_selection import apply_selection
 from cannula.datasource import GraphModel, cacheable, expected_fields
+from cannula.tracking import (
+    HttpTransaction,
+    record_transaction,
+)
 from cannula.types import ConnectHTTP, SourceHTTP, HTTPHeaderMapping
 
 
 LOG = logging.getLogger("cannula.datasource.http")
 
 AnyDict = typing.Dict[typing.Any, typing.Any]
-Response = typing.Union[typing.List[AnyDict], AnyDict, httpx.Response]
+Response = typing.Union[typing.List[AnyDict], AnyDict, httpx.Response, str]
 
 
 def model_from_response(
@@ -183,6 +187,10 @@ class HTTPDatasource(typing.Generic[Settings]):
     client: httpx.AsyncClient
     _base_url: str
     _headers: typing.List[HTTPHeaderMapping]
+    _app_config: Settings
+    _request: Request
+    _request_headers: Headers
+    _request_state: State
 
     def __init_subclass__(
         cls,
@@ -202,19 +210,22 @@ class HTTPDatasource(typing.Generic[Settings]):
         Args:
             client: Optional httpx client to use
         """
-        self.client = client or httpx.AsyncClient()
         self.memoized_requests = {}
-        # close the client if this instance opened it
-        self._should_close_client = client is None
         self._app_config = config or typing.cast(Settings, State())
-        self._request = request or Request(scope={"type": "http", "headers": []})
         self._base_url = self._resolve_value(self._source_http.baseURL)
         self._headers = self._source_http.headers
+        self._request = request or make_request()
+        self._request_headers = self._request.headers
+        self._request_state = self._request.state
 
-    def __del__(self):  # pragma: no cover
-        if self._should_close_client:
-            LOG.debug(f"Closing httpx session for {self.__class__.__name__}")
-            asyncio.run(self.client.aclose())
+        if client:
+            self.client = client
+        elif hasattr(self._request_state, "http_client"):
+            self.client = self._request_state.http_client
+        else:
+            raise AttributeError(
+                "Must provide a client or an application with 'http_client' in state"
+            )
 
     def _render_path_template(
         self, template: str, variables: typing.Dict[str, typing.Any]
@@ -245,7 +256,7 @@ class HTTPDatasource(typing.Generic[Settings]):
                 headers[mapping.name] = self._resolve_value(mapping.value)
             elif mapping.from_header:
                 # Propagate header from original request
-                if value := self._request.headers.get(mapping.from_header):
+                if value := self._request_headers.get(mapping.from_header):
                     headers[mapping.name] = value
 
         return headers
@@ -263,6 +274,22 @@ class HTTPDatasource(typing.Generic[Settings]):
 
     def did_receive_error(self, error: Exception, request: httpx.Request):
         """Handle errors from the remote resource"""
+        headers = request.headers
+        start_time = float(headers.get("x-request-start-time", time.time()))
+        end_time = time.time()
+
+        # Record the error transaction in one go
+        transaction = HttpTransaction(
+            method=request.method,
+            url=str(request.url),
+            request_headers=dict(request.headers),
+            request_body=request.content,
+            start_time=start_time,
+            end_time=end_time,
+            error=str(error),
+        )
+        record_transaction(transaction)
+
         raise error
 
     async def did_receive_response(
@@ -280,10 +307,39 @@ class HTTPDatasource(typing.Generic[Settings]):
                 response.raise_for_status()
                 return Widget(**response.json())
         """
+        request_headers = request.headers
+        start_time = float(request_headers.get("x-request-start-time", time.time()))
+        end_time = time.time()
+        response_headers = response.headers
+        content_type = response_headers.get("content-type")
+
+        if content_type and content_type.startswith("application/json"):
+            body = response.json()
+        else:
+            body = (
+                response.text
+                if len(response.text) < 1000
+                else f"{response.text[:1000]} ... [trucated]"
+            )
+
+        # Record the complete transaction in one go
+        transaction = HttpTransaction(
+            method=request.method,
+            url=str(request.url),
+            request_headers=dict(request_headers),
+            request_body=request.content,
+            response_status=response.status_code,
+            response_headers=dict(response.headers),
+            response_body=body,
+            start_time=start_time,
+            end_time=end_time,
+        )
+        record_transaction(transaction)
+
         response.raise_for_status()
         if request.method == "HEAD":
             return response
-        return response.json()
+        return body
 
     async def get(self, path: str, **kwargs) -> Response:
         """Convience method to perform a GET :meth:`fetch`
@@ -367,9 +423,14 @@ class HTTPDatasource(typing.Generic[Settings]):
             path: path of the request
             kwargs: these args are passed directly to httpx
         """
+        # Get start time - we'll need this for the duration calculation
+        start_time = time.time()
+
         headers = self._build_headers(header_mappings or [])
+        headers["X-Request-Start-Time"] = str(start_time)
         url = self._build_url(path)
 
+        # Build the request
         request = self.client.build_request(
             method=method, url=url, headers=headers, **kwargs
         )
@@ -381,10 +442,12 @@ class HTTPDatasource(typing.Generic[Settings]):
             try:
                 response = await self.client.send(request)
             except Exception as exc:
+                # Handle the error
                 return self.did_receive_error(exc, request)
             else:
                 return await self.did_receive_response(response, request)
 
+        # Use cache for GET/HEAD/OPTIONS
         if request.method in ["GET", "HEAD", "OPTIONS"]:
             promise = self.memoized_requests.get(cache_key)
             if promise is not None:
@@ -396,6 +459,7 @@ class HTTPDatasource(typing.Generic[Settings]):
 
             return await self.memoized_requests[cache_key]
         else:
+            # For mutations, invalidate cache and process
             self.memoized_requests.pop(cache_key, None)
             return await process_request()
 

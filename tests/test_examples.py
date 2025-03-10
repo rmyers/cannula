@@ -107,3 +107,6 @@ async def test_http_datasource():
             ],
         },
     }
+    assert results.extensions is not None
+    assert results.extensions["debug"]["httpRequests"] is not None
+    assert len(results.extensions["debug"]["httpRequests"]) == 2

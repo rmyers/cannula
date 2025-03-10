@@ -36,6 +36,7 @@ from .schema import (
     load_schema,
     maybe_parse,
 )
+from .tracking import tracking_session
 
 
 LOG = logging.getLogger(__name__)
@@ -115,6 +116,7 @@ class CannulaAPI(typing.Generic[RootType, Settings]):
         scalars: typing.List[ScalarInterface] = [],
         logger: typing.Optional[logging.Logger] = None,
         level: int = logging.DEBUG,
+        debug: bool = False,
         operations: typing.Optional[pathlib.Path | str] = None,
         **kwargs,
     ):
@@ -127,6 +129,7 @@ class CannulaAPI(typing.Generic[RootType, Settings]):
         self._kwargs = kwargs
         self.logger = logger
         self.level = level
+        self.debug = debug
 
         self.schema = self._build_schema()
         self.operations = self._load_operations(operations)
@@ -313,19 +316,21 @@ class CannulaAPI(typing.Generic[RootType, Settings]):
         if context is None:
             context = self.get_context(request)
 
-        result = execute(
-            schema=self.schema,
-            document=document,
-            context_value=context,
-            variable_values=variables,
-            operation_name=operation_name,
-            middleware=self.graph_middleware,
-            root_value=self._root_value,
-            **kwargs,
-        )
-        if inspect.isawaitable(result):
-            return await result
-        return typing.cast(ExecutionResult, result)
+        async with tracking_session(debug=self.debug) as session:
+            result = execute(
+                schema=self.schema,
+                document=document,
+                context_value=context,
+                variable_values=variables,
+                operation_name=operation_name,
+                middleware=self.graph_middleware,
+                root_value=self._root_value,
+                **kwargs,
+            )
+            if inspect.isawaitable(result):
+                processed = await result
+                return session.enhance_result(processed)
+            return session.enhance_result(result)
 
     async def subscribe(
         self,
