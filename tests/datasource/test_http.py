@@ -437,3 +437,11 @@ async def test_get_model_list_from_response_errors(widget: Widget):
         match="Expecting a list in response but got an object.",
     ):
         await widget.get_model_list_from_response_invalid()
+
+
+async def test_http_datasource_requires_client():
+    with pytest.raises(
+        AttributeError,
+        match="Must provide a client or an application with 'http_client' in state",
+    ):
+        Widget(config=Configuation())

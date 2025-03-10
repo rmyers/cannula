@@ -25,6 +25,7 @@ class AppState(typing.TypedDict):
 
 @contextlib.asynccontextmanager
 async def lifespan(app: Starlette) -> typing.AsyncIterator[AppState]:
+    logger.debug("Setting up http_client")
     async with httpx.AsyncClient() as client:
         yield {"http_client": client}
 

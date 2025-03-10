@@ -9,7 +9,7 @@ import contextlib
 import contextvars
 import time
 import typing
-
+from types import TracebackType
 from dataclasses import dataclass, field
 
 from graphql import ExecutionResult
@@ -123,7 +123,16 @@ class TrackingSession:
         self.token: TransactionContextToken = TransactionContextToken([])
         self.context_token: contextvars.Token = http_transaction_ctx.set(self.token)
 
-    def __exit__(self, *args, **kwargs) -> None:
+    def __enter__(self) -> "TrackingSession":
+        """Support context manager protocol"""
+        return self
+
+    def __exit__(
+        self,
+        exc_type: typing.Optional[typing.Type[BaseException]],
+        exc_val: typing.Optional[BaseException],
+        exc_tb: typing.Optional[TracebackType],
+    ) -> None:
         """Reset context on exit"""
         http_transaction_ctx.reset(self.context_token)
 

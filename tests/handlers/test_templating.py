@@ -6,6 +6,7 @@ import pytest
 from starlette.testclient import TestClient
 
 from cannula import CannulaApplication
+from cannula.handlers.application import lifespan
 
 
 @pytest.fixture
@@ -223,3 +224,9 @@ def test_application(application: TestClient):
 
     users = application.get("/app/users/1234")
     assert users.status_code == 200, users.text
+
+
+async def test_lifespan(template_dir):
+    app = CannulaApplication(start_path=template_dir)
+    async with lifespan(app) as state:
+        assert state.get("http_client") is not None
