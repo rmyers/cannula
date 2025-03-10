@@ -53,9 +53,9 @@ class ResolveInfo(typing.Generic[C], GraphQLResolveInfo):
     context: C
 
 
-def make_request() -> Request:
+def make_request(state: typing.Any = None) -> Request:
     """Generate a fake request to statisfy the contract."""
-    return Request(scope={"type": "http", "headers": [], "state": {}})
+    return Request(scope={"type": "http", "headers": [], "state": state or {}})
 
 
 class Context(typing.Generic[Settings]):

@@ -1,11 +1,14 @@
 import typing
-import httpx
-import fastapi
-import pydantic
 
+import fastapi
+import httpx
+import pydantic
+import pytest
+from pytest_mock import MockerFixture
+
+from cannula.context import make_request
 from cannula.datasource import http
 from cannula.tracking import HttpTransaction, get_transactions, tracking_session
-import pytest
 
 
 class Widgety(pydantic.BaseModel):
@@ -445,3 +448,13 @@ async def test_http_datasource_requires_client():
         match="Must provide a client or an application with 'http_client' in state",
     ):
         Widget(config=Configuation())
+
+
+async def test_http_datasource_uses_request_state_for_client(mocker: MockerFixture):
+    mock_client = mocker.MagicMock(spec=httpx.AsyncClient)
+    state = {"http_client": mock_client}
+    datasource = Widget(
+        config=Configuation(),
+        request=make_request(state),
+    )
+    assert datasource.client is mock_client
