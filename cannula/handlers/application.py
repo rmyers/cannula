@@ -1,7 +1,9 @@
+import contextlib
 import logging
 import pathlib
 import typing
 
+import httpx
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.routing import BaseRoute, Route, Mount
@@ -15,6 +17,17 @@ from cannula.handlers.operations import HTMXHandler
 from cannula.utils import get_config, resolve_scalars
 
 logger = logging.getLogger(__name__)
+
+
+class AppState(typing.TypedDict):
+    http_client: httpx.AsyncClient
+
+
+@contextlib.asynccontextmanager
+async def lifespan(app: Starlette) -> typing.AsyncIterator[AppState]:
+    logger.debug("Setting up http_client")
+    async with httpx.AsyncClient() as client:
+        yield {"http_client": client}
 
 
 class AppRouter:
@@ -80,6 +93,7 @@ class CannulaApplication(typing.Generic[RootType, Settings], Starlette):
         context: typing.Optional[type[Context[Settings]]] = None,
         config: typing.Optional[Settings] = None,
         root_value: typing.Optional[RootType] = None,
+        debug: bool = False,
         **kwargs,
     ):
         _py_config = get_config(start_path)
@@ -91,6 +105,7 @@ class CannulaApplication(typing.Generic[RootType, Settings], Starlette):
             root_value=root_value,
             scalars=resolve_scalars(_py_config.scalars),
             operations=_py_config.operations,
+            debug=debug,
         )
 
         # Setup the routes for this application starting with the static directory
@@ -117,4 +132,4 @@ class CannulaApplication(typing.Generic[RootType, Settings], Starlette):
             handler = HTMXHandler(api, _py_config.operations_directory)
             routes.append(Route("/operation/{name:str}", handler.handle_request))
 
-        super().__init__(routes=routes, debug=True, **kwargs)
+        super().__init__(routes=routes, debug=debug, lifespan=lifespan, **kwargs)

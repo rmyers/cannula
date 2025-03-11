@@ -1,10 +1,14 @@
 import typing
-import httpx
-import fastapi
-import pydantic
 
-from cannula.datasource import http
+import fastapi
+import httpx
+import pydantic
 import pytest
+from pytest_mock import MockerFixture
+
+from cannula.context import make_request
+from cannula.datasource import http
+from cannula.tracking import HttpTransaction, get_transactions, tracking_session
 
 
 class Widgety(pydantic.BaseModel):
@@ -77,6 +81,9 @@ class Widget(
 
     async def options_widgets(self) -> typing.Any:
         return await self.options("widgets")
+
+    async def error_widgets(self) -> typing.Any:
+        return await self.get("/non-existent")
 
     async def get_model_from_response_invalid(self) -> Widgety:
         # Should raise Attribute error
@@ -294,8 +301,22 @@ async def test_http_datasource_did_receive_error(mocker, widget: Widget, mocked_
     mock_failer = mocker.patch.object(mocked_client, "send")
     mock_failer.side_effect = Exception("boo")
 
-    with pytest.raises(Exception, match="boo"):
-        await widget.get_widgets()
+    async with tracking_session(debug=True):
+        with pytest.raises(Exception, match="boo"):
+            await widget.get_widgets()
+
+        transactions = get_transactions()
+        assert transactions == [
+            HttpTransaction(
+                method="GET",
+                url="http://localhost/widgets",
+                request_headers=mocker.ANY,
+                request_body=b"",
+                start_time=mocker.ANY,
+                end_time=mocker.ANY,
+                error="boo",
+            )
+        ]
 
 
 async def test_http_datasource_connect(widget: Widget, mocker):
@@ -308,6 +329,7 @@ async def test_http_datasource_connect(widget: Widget, mocker):
     build_request_spy.assert_called_with(
         headers={
             "X-API-Key": "fake_api_key",
+            "X-Request-Start-Time": mocker.ANY,
         },
         method="GET",
         url="http://localhost/nested",
@@ -324,11 +346,84 @@ async def test_http_datasource_connect_args(widget: Widget, mocker):
     build_request_spy.assert_called_with(
         headers={
             "X-API-Key": "fake_api_key",
+            "X-Request-Start-Time": mocker.ANY,
             "Authorization": "fake-authorize",
         },
         method="GET",
         url="http://localhost/nested/1",
     )
+
+
+async def test_http_datasource_tracking(widget: Widget, mocker):
+    mockDB.delete_all()
+    mockDB.add_widget(Widgety(some="new thing"))
+    mockDB.add_widget(Widgety(some="old thing"))
+    async with tracking_session(debug=True):
+        results = await widget.get_connected_widgets()
+        assert results == [Widgety(some="new thing"), Widgety(some="old thing")]
+        transactions = get_transactions()
+        assert transactions == [
+            HttpTransaction(
+                method="GET",
+                url="http://localhost/nested",
+                request_headers={
+                    "accept": "*/*",
+                    "accept-encoding": "gzip, deflate, zstd",
+                    "connection": "keep-alive",
+                    "host": "localhost",
+                    "user-agent": mocker.ANY,
+                    "x-api-key": "fake_api_key",
+                    "x-request-start-time": mocker.ANY,
+                },
+                request_body=b"",
+                response_status=200,
+                response_headers={
+                    "content-length": "52",
+                    "content-type": "application/json",
+                },
+                response_body={
+                    "data": [
+                        {"some": "new thing"},
+                        {"some": "old thing"},
+                    ],
+                },
+                start_time=mocker.ANY,
+                end_time=mocker.ANY,
+                error=None,
+            )
+        ]
+
+
+async def test_http_datasource_tracking_errors(widget: Widget, mocker):
+    async with tracking_session(debug=True):
+        with pytest.raises(httpx.HTTPStatusError):
+            await widget.error_widgets()
+
+        transactions = get_transactions()
+        assert transactions == [
+            HttpTransaction(
+                method="GET",
+                url="http://localhost/non-existent",
+                request_headers={
+                    "accept": "*/*",
+                    "accept-encoding": "gzip, deflate, zstd",
+                    "connection": "keep-alive",
+                    "host": "localhost",
+                    "user-agent": mocker.ANY,
+                    "x-request-start-time": mocker.ANY,
+                },
+                request_body=b"",
+                response_status=404,
+                response_headers={
+                    "content-length": "22",
+                    "content-type": "application/json",
+                },
+                response_body={"detail": "Not Found"},
+                start_time=mocker.ANY,
+                end_time=mocker.ANY,
+                error=None,
+            )
+        ]
 
 
 async def test_get_model_from_response_errors(widget: Widget):
@@ -345,3 +440,21 @@ async def test_get_model_list_from_response_errors(widget: Widget):
         match="Expecting a list in response but got an object.",
     ):
         await widget.get_model_list_from_response_invalid()
+
+
+async def test_http_datasource_requires_client():
+    with pytest.raises(
+        AttributeError,
+        match="Must provide a client or an application with 'http_client' in state",
+    ):
+        Widget(config=Configuation())
+
+
+async def test_http_datasource_uses_request_state_for_client(mocker: MockerFixture):
+    mock_client = mocker.MagicMock(spec=httpx.AsyncClient)
+    state = {"http_client": mock_client}
+    datasource = Widget(
+        config=Configuation(),
+        request=make_request(state),
+    )
+    assert datasource.client is mock_client

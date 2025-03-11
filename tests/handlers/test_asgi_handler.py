@@ -260,7 +260,7 @@ async def test_websocket_subscription_errors(websocket):
 @pytest.mark.parametrize(
     "query,variables,expected_status,expected_response",
     [
-        (
+        pytest.param(
             """
             query MockData {
                 testData {
@@ -276,8 +276,9 @@ async def test_websocket_subscription_errors(websocket):
                 "errors": None,
                 "extensions": None,
             },
+            id="normal",
         ),
-        (
+        pytest.param(
             "invalid query",
             None,
             200,
@@ -291,8 +292,9 @@ async def test_websocket_subscription_errors(websocket):
                 ],
                 "extensions": None,
             },
+            id="invalid-query",
         ),
-        (
+        pytest.param(
             None,
             None,
             400,
@@ -303,6 +305,7 @@ async def test_websocket_subscription_errors(websocket):
                     }
                 ]
             },
+            id="no-query",
         ),
     ],
 )
