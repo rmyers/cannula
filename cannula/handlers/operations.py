@@ -147,7 +147,6 @@ class HTMXHandler:  # pragma: no cover
         result = await self.api.exec_operation(
             operation_name=operation.name,
             variables=variables,
-            context={"request": request},
             request=request,
         )
 
