@@ -17,10 +17,11 @@ from graphql import (
 )
 from jinja2 import Environment, FileSystemLoader, Undefined
 from starlette.requests import Request
-from starlette.responses import HTMLResponse
+from starlette.responses import HTMLResponse, JSONResponse
 
 from cannula import CannulaAPI
 from cannula.codegen.parse_variables import parse_variable, Variable
+from cannula.errors import format_errors
 
 logger = logging.getLogger(__name__)
 
@@ -112,7 +113,7 @@ class HTMXHandler:  # pragma: no cover
 
         return coerced
 
-    async def handle_request(self, request: Request) -> HTMLResponse:
+    async def handle_request(self, request: Request) -> HTMLResponse | JSONResponse:
         """Handle incoming HTMX request"""
         name = request.path_params["name"]
 
@@ -154,11 +155,26 @@ class HTMXHandler:  # pragma: no cover
 
         html = template.render(
             data=result.data,
-            errors=result.errors,
-            extensions=result.extensions,
             variables=variables,
             operation=operation,
             request=request,
         )
+
+        # Return json if the accept header is JSON. The cannula htmx
+        # plugin will set this if it is enabled. For this case we send
+        # the html in the 'extensions' key allowing us to enrich the response
+        # with toast messages and debug information.
+        if "application/json" in request.headers.get("accept", ""):
+            extensions = result.extensions or {}
+            extensions["html"] = html
+            return JSONResponse(
+                {
+                    "data": result.data,
+                    "errors": format_errors(
+                        result.errors, self.api.logger, self.api.level
+                    ),
+                    "extensions": extensions,
+                }
+            )
 
         return HTMLResponse(html)
