@@ -530,3 +530,32 @@ class SourceDirective(pydantic.BaseModel):
     def config_vars(self) -> typing.Set[str]:
         """Return a list of variable names used '$config.my_url' -> 'my_url'"""
         return self.http.config_vars
+
+
+@dataclasses.dataclass
+class TemplateField:
+    """Represents a field in a GraphQL selection set for template rendering."""
+
+    name: str
+    path: str
+    label: str
+    type_name: str
+    is_list: bool = False
+    class_name: str = ""
+    nested_fields: list["TemplateField"] = dataclasses.field(default_factory=list)
+    original_field: typing.Optional[Field] = None
+
+    @classmethod
+    def from_schema_field(
+        cls, field_name: str, path: str, schema_field: typing.Optional[Field] = None
+    ) -> "TemplateField":
+        """Create a TemplateField from a schema field."""
+        return cls(
+            name=field_name,
+            path=path,
+            label=field_name.replace("_", " ").title(),
+            type_name=schema_field.field_type.of_type if schema_field else "String",
+            is_list=schema_field.field_type.is_list if schema_field else False,
+            class_name=path.replace(".", "-"),
+            original_field=schema_field,
+        )

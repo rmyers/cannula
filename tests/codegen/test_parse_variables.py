@@ -89,6 +89,14 @@ def test_parse_variable(variable_def, expected):
             Variable(name="scores", value="Float", required=False, is_list=True),
             id="list_of_floats",
         ),
+        pytest.param(
+            "input",
+            NamedTypeNode(name=NameNode(value="SpecialInput")),
+            False,
+            False,
+            Variable(name="input", value="SpecialInput", required=False, is_list=False),
+            id="input_type",
+        ),
     ],
 )
 def test_parse_variable_type(name, type_node, required, is_list, expected):

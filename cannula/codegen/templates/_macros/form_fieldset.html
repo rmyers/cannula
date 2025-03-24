@@ -1,0 +1,6 @@
+{% macro form_fieldset(label, content) %}
+<fieldset>
+    <legend>{{ label|replace('_', ' ')|title }}</legend>
+    {{ content|safe }}
+</fieldset>
+{% endmacro %}

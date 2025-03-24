@@ -1,0 +1,11 @@
+{% macro form_number(field_id, field_name, label_text, help_text, is_required, min=None, max=None, step=None) %}
+<div class="field border label">
+    <input type="number" id="{{ field_id }}" name="{{ field_name }}" class="form-control" {% if is_required %}required{%
+        endif %} {% if min is not none %}min="{{ min }}" {% endif %} {% if max is not none %}max="{{ max }}" {% endif %}
+        {% if step is not none %}step="{{ step }}" {% endif %}>
+    <label for="{{ field_id }}">{{ label_text }}</label>
+    {% if help_text %}
+    <span class="helper">{{ help_text }}</span>
+    {% endif %}
+</div>
+{% endmacro %}

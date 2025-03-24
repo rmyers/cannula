@@ -1,0 +1,13 @@
+{% macro form_select(field_id, field_name, label_text, help_text, options, is_required) %}
+<div class="field suffix border label">
+    <label for="{{ field_id }}">{{ label_text }}</label>
+    <select id="{{ field_id }}" name="{{ field_name }}" {% if is_required %}required{% endif %}>
+        {% for option in options %}
+        <option value="{{ option.value }}">{{ option.label }}</option>
+        {% endfor %}
+    </select>
+    {% if help_text %}
+    <span class="helper">{{ help_text }}</span>
+    {% endif %}
+</div>
+{% endmacro %}
