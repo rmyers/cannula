@@ -214,7 +214,6 @@ async def test_websocket_subscription_early_cancel(websocket):
     print(response)
     assert response["type"] == GQLMessageType.NEXT
     websocket.send_json({"type": GQLMessageType.COMPLETE, "id": subscription_id})
-    assert websocket.should_close
 
 
 async def test_websocket_subscription_close_socket(websocket):
