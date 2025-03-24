@@ -1,0 +1,12 @@
+{% macro result_container(operation_name, result_content) %}
+<div id="{{ operation_name }}-result">
+    <h2>Result</h2>
+    <div class="data-section">
+        {{ result_content|safe }}
+    </div>
+    <button class="btn btn-secondary" hx-get="/operations/{{ operation_name }}"
+        hx-target="#{{ operation_name }}-form-container" hx-swap="outerHTML">
+        Try Again
+    </button>
+</div>
+{% endmacro %}

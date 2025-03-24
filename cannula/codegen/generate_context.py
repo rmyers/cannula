@@ -224,8 +224,8 @@ class ContextGenerator(CodeGenerator):
             args=ast.arguments(
                 posonlyargs=[],
                 args=[ast.arg(arg="self")],
-                kwonlyargs=[*related_field.kwonlyargs],
-                kw_defaults=related_field.kwdefaults,
+                kwonlyargs=[],
+                kw_defaults=[],
                 defaults=[],
                 vararg=None,
                 kwarg=ast.arg(arg="variables"),

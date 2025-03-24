@@ -1,0 +1,4 @@
+{% macro result_object_item(label, field, data_path) %}
+<dt>{{ field.label }}</dt>
+<dd>{% raw %}{{{% endraw %} {{ data_path }}.{{ field.path }} {% raw %}}}{% endraw %}</dd>
+{% endmacro %}

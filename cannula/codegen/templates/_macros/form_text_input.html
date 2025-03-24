@@ -1,0 +1,9 @@
+{% macro form_text_input(field_id, field_name, label_text, input_type, help_text, is_required) %}
+<div class="field border label">
+    <input type="{{ input_type }}" id="{{ field_id }}" name="{{ field_name }}" {% if is_required %}required{% endif%} />
+    <label for="{{ field_id }}">{{ label_text }}</label>
+    {% if help_text %}
+    <span class="helper">{{ help_text }}</span>
+    {% endif -%}
+</div>
+{% endmacro %}

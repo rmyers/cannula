@@ -1,0 +1,8 @@
+{% macro result_object(label, content, data_path) %}
+<section class="result-object">
+    <h3>{{ label }}</h3>
+    <dl>
+        {{ content | safe }}
+    </dl>
+</section>
+{% endmacro %}

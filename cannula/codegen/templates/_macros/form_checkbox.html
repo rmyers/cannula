@@ -1,0 +1,13 @@
+{% macro form_checkbox(field_id, field_name, label_text, help_text, is_required) %}
+<div class="field middle-align">
+    <nav>
+        <label class="checkbox">
+            <input type="checkbox" name="{{ field_name }}" {% if is_required %}required{% endif %}>
+            <span>{{ label_text }}</span>
+            {% if help_text %}
+            {% endif %}
+        </label>
+    </nav>
+    <span class="helper">{{ help_text }}</span>
+</div>
+{% endmacro %}

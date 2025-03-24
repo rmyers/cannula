@@ -98,7 +98,7 @@ class CannulaApplication(typing.Generic[RootType, Settings], Starlette):
     ):
         _py_config = get_config(start_path)
 
-        api = CannulaAPI[RootType, Settings](
+        self.api = CannulaAPI[RootType, Settings](
             schema=_py_config.schema,
             context=context,
             config=config,
@@ -122,14 +122,19 @@ class CannulaApplication(typing.Generic[RootType, Settings], Starlette):
         ]
 
         # TODO(rmyers): add options here
-        graphql_handler = GraphQLHandler(api)
+        graphql_handler = GraphQLHandler(self.api)
         routes.extend(graphql_handler.routes())
 
         application = AppRouter(_py_config.app_directory)
         routes.extend(application.discover_routes())
 
-        if api.operations is not None:
-            handler = HTMXHandler(api, _py_config.operations_directory)
+        if self.api.operations is not None:
+            handler = HTMXHandler(self.api, _py_config.operations_directory)
             routes.append(Route("/operation/{name:str}", handler.handle_request))
+            routes.append(
+                Route(
+                    "/operation/{name:str}", handler.handle_mutation, methods=["POST"]
+                )
+            )
 
         super().__init__(routes=routes, debug=debug, lifespan=lifespan, **kwargs)

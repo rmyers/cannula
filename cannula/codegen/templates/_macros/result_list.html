@@ -1,0 +1,24 @@
+{% macro result_list(label, content, collection_path) %}
+<table class="stripped {{ label }}--results">
+    <thead>
+        <tr>
+            {% for field in fields %}
+            <th>{{ field.label }}</th>
+            {% endfor %}
+        </tr>
+    </thead>
+    <tbody>
+        {#
+        We need to generate a for loop template with the fields provided as template vars.
+        which means we have to use the variables passed in but preserve the for loop template
+        syntax like:
+        {% for thing in data.object_list %}<td>{{ thing.key }}</td>{% endfor %}
+        -#}
+        {{ "{%" }} for {{ label }} in {{ collection_path }} {{ "%}" }}
+        <tr>
+            {{ content | safe }}
+        </tr>
+        {% raw %}{% endfor %}{% endraw %}
+    </tbody>
+</table>
+{% endmacro %}

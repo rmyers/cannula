@@ -1,0 +1,13 @@
+{% macro form_container(operation_name, form_content) %}
+<form id="{{ operation_name }}-form" hx-post="/operation/{{ operation_name }}" hx-target="#{{ operation_name }}-result"
+    hx-swap="outerHTML">
+
+    {{ form_content|safe }}
+
+    <div class="form-group">
+        <button type="submit" class="btn btn-primary">{{ operation_name|replace('_', ' ')|title }}</button>
+    </div>
+</form>
+
+<div id="{{ operation_name }}-result"></div>
+{% endmacro %}

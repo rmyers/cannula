@@ -10,17 +10,20 @@ import pathlib
 from typing import Any, Dict, Optional
 from urllib.parse import parse_qs
 
+from cannula.handlers.forms import parse_nested_form
 from graphql import (
     DocumentNode,
+    ExecutionResult,
     FragmentDefinitionNode,
     OperationDefinitionNode,
 )
-from jinja2 import Environment, FileSystemLoader, Undefined
+from jinja2 import Environment, FileSystemLoader, Template, Undefined
 from starlette.requests import Request
-from starlette.responses import HTMLResponse
+from starlette.responses import HTMLResponse, JSONResponse
 
 from cannula import CannulaAPI
 from cannula.codegen.parse_variables import parse_variable, Variable
+from cannula.errors import format_errors, parse_graphql_error_message
 
 logger = logging.getLogger(__name__)
 
@@ -35,8 +38,17 @@ class Operation:
     node: OperationDefinitionNode
 
     @property
+    def is_mutation(self) -> bool:
+        return self.operation_type == "mutation"
+
+    @property
     def template_path(self) -> str:
-        return f"{self.name}.html"
+        template_type = "_form" if self.is_mutation else ""
+        return f"{self.name}{template_type}.html"
+
+    @property
+    def mutation_result_template(self) -> str:
+        return f"{self.name}_result.html"
 
 
 # TODO(rmyers): make this used by default and add tests
@@ -63,12 +75,15 @@ class HTMXHandler:  # pragma: no cover
             undefined=SilentUndefined,
         )
         self.operations: Dict[str, Operation] = {}
+        self.mutations: Dict[str, Operation] = {}
         self.fragments: Dict[str, FragmentDefinitionNode] = {}
-        if api.operations is not None:
-            self.operations = self.parse_operations(api.operations)
+        self.parse_operations(api.operations)
 
-    def parse_operations(self, document: DocumentNode) -> Dict[str, Operation]:
+    def parse_operations(self, document: DocumentNode | None) -> None:
         """Parse operations and their variable types"""
+
+        if document is None:
+            return
 
         # First pass: collect all fragments
         for definition in document.definitions:
@@ -90,14 +105,15 @@ class HTMXHandler:  # pragma: no cover
                 var_name = var_def.variable.name.value
                 variables[var_name] = parse_variable(var_def)
 
-            self.operations[name] = Operation(
+            operation = Operation(
                 name=name,
                 operation_type=definition.operation.value,
                 variable_types=variables,
                 node=definition,
             )
-
-        return self.operations
+            self.operations[name] = operation
+            if operation.operation_type == "mutation":
+                self.mutations[name] = operation
 
     def coerce_variables(
         self, operation: Operation, raw_variables: Dict[str, str]
@@ -112,13 +128,48 @@ class HTMXHandler:  # pragma: no cover
 
         return coerced
 
-    async def handle_request(self, request: Request) -> HTMLResponse:
+    async def handle_mutation(self, request: Request) -> HTMLResponse | JSONResponse:
+        name = request.path_params["name"]
+
+        operation = self.mutations.get(name)
+        if not operation:
+            return HTMLResponse(f"Mutation '{name}' not found", status_code=404)
+
+        variables = await parse_nested_form(request)
+        logger.info(variables)
+        # Render template with result data
+        template = self.jinja_env.get_template(operation.mutation_result_template)
+
+        result = await self.api.exec_operation(
+            operation_name=operation.name,
+            variables=variables,
+            request=request,
+        )
+
+        formatted_errors = {}
+        if result.errors:
+            errors = [
+                parse_graphql_error_message(err.message).to_dict()
+                for err in result.errors
+            ]
+            formatted_errors[f"{name}-form"] = errors
+
+        return self.render_template(
+            request, operation, template, result, formatted_errors
+        )
+
+    async def handle_request(self, request: Request) -> HTMLResponse | JSONResponse:
         """Handle incoming HTMX request"""
         name = request.path_params["name"]
 
         operation = self.operations.get(name)
         if not operation:
             return HTMLResponse(f"Operation '{name}' not found", status_code=404)
+
+        template = self.jinja_env.get_template(operation.template_path)
+
+        if operation.is_mutation:
+            return HTMLResponse(template.render(request=request))
 
         # Parse query parameters and coerce types
         query_params = parse_qs(request.url.query)
@@ -148,17 +199,45 @@ class HTMXHandler:  # pragma: no cover
             variables=variables,
             request=request,
         )
+        return self.render_template(request, operation, template, result)
 
+    def render_template(
+        self,
+        request: Request,
+        operation: Operation,
+        template: Template,
+        result: ExecutionResult,
+        formatted_errors: dict[str, Any] | None = None,
+    ) -> HTMLResponse | JSONResponse:
+        status_code = 200 if result.errors is None else 400
         # Render template with result data
-        template = self.jinja_env.get_template(operation.template_path)
+        try:
+            html = template.render(
+                data=result.data,
+                operation=operation,
+                request=request,
+            )
+        except Exception:
+            # TODO(rmyers) use a template here
+            html = '<article class="error">Unable to process request</article>'
 
-        html = template.render(
-            data=result.data,
-            errors=result.errors,
-            extensions=result.extensions,
-            variables=variables,
-            operation=operation,
-            request=request,
-        )
+        # Return json if the accept header is JSON. The cannula htmx
+        # plugin will set this if it is enabled. For this case we send
+        # the html in the 'extensions' key allowing us to enrich the response
+        # with toast messages and debug information.
+        if "application/json" in request.headers.get("accept", ""):
+            extensions = result.extensions or {}
+            extensions["html"] = html
+            extensions["errors"] = formatted_errors
+            return JSONResponse(
+                {
+                    "data": result.data,
+                    "errors": format_errors(
+                        result.errors, self.api.logger, self.api.level
+                    ),
+                    "extensions": extensions,
+                },
+                status_code=status_code,
+            )
 
-        return HTMLResponse(html)
+        return HTMLResponse(html, status_code=status_code)
