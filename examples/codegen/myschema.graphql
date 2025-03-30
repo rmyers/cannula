@@ -14,7 +14,7 @@ type User @db_sql {
   name: String
   email: String
   quota: [Quota!] @field_meta(args: ["id"])
-  overQuota(resource: String!): Quota @field_meta(where: "user_id = :id AND resource = :resource", args: ["id"])
+  overQuota(resource: String!): Quota @field_meta(where: "user_id = :self.id AND resource = :resource", args: ["id"])
 }
 
 input userCreate {

@@ -18,10 +18,10 @@ class QuotaDatasource(
     async def user_quota(self, id: UUID) -> Optional[Sequence[Quota]]:
         return await self.get_models(true())
 
-    async def user_overQuota(self, id: UUID, resource: str) -> Optional[Quota]:
+    async def user_overQuota(self, parent: User, **variables) -> Optional[Quota]:
         return await self.get_model(
-            text("user_id = :id AND resource = :resource").bindparams(
-                id=id, resource=resource
+            text("user_id = :self.id AND resource = :resource").bindparams(
+                this=parent, **variables
             )
         )
 

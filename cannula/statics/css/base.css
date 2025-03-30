@@ -499,12 +499,16 @@ textarea {
 }
 
 /* Validation - this will highlight the input after a user interacts with it */
-input:user-valid,
-select:user-valid,
-textarea:user-valid {
+/* input:user-valid:not([aria-invalid="true"]),
+select:user-valid:not([aria-invalid="true"]),
+textarea:user-valid:not([aria-invalid="true"]) {
   outline: 1px solid var(--success);
-}
-input:user-invalid {
+} */
+
+input:user-invalid,
+input[aria-invalid="true"],
+select[aria-invalid="true"],
+textarea[aria-invalid="true"] {
   outline: 1px solid var(--danger);
 }
 
