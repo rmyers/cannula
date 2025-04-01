@@ -95,6 +95,6 @@ def parse_graphql_error(error: GraphQLError) -> GraphQLError:
     elif "Enum" in error.message and "does not have a value" in error.message:
         message = f"Please select a valid option for {field}"
 
-    error.extensions = {"field": field, "original_error": error.message}
+    error.extensions = {"field": field_path, "original_error": error.message}
     error.message = message
     return error
