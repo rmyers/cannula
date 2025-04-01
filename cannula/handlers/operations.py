@@ -23,7 +23,7 @@ from starlette.responses import HTMLResponse, JSONResponse
 
 from cannula import CannulaAPI
 from cannula.codegen.parse_variables import parse_variable, Variable
-from cannula.errors import format_errors, parse_graphql_error_message
+from cannula.errors import format_errors
 
 logger = logging.getLogger(__name__)
 
@@ -146,17 +146,7 @@ class HTMXHandler:  # pragma: no cover
             request=request,
         )
 
-        formatted_errors = {}
-        if result.errors:
-            errors = [
-                parse_graphql_error_message(err.message).to_dict()
-                for err in result.errors
-            ]
-            formatted_errors[f"{name}-form"] = errors
-
-        return self.render_template(
-            request, operation, template, result, formatted_errors
-        )
+        return self.render_template(request, operation, template, result)
 
     async def handle_request(self, request: Request) -> HTMLResponse | JSONResponse:
         """Handle incoming HTMX request"""
@@ -228,7 +218,6 @@ class HTMXHandler:  # pragma: no cover
         if "application/json" in request.headers.get("accept", ""):
             extensions = result.extensions or {}
             extensions["html"] = html
-            extensions["errors"] = formatted_errors
             return JSONResponse(
                 {
                     "data": result.data,
