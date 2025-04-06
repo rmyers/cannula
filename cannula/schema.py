@@ -236,7 +236,7 @@ def build_and_extend_schema(
 
 
 def load_schema(
-    directory: typing.Union[str, pathlib.Path]
+    directory: typing.Union[str, pathlib.Path],
 ) -> typing.List[DocumentNode]:
     """
     Load Schema

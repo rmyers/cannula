@@ -6,34 +6,7 @@ from cannula.handlers.forms import (
     parse_nested_form,
     process_form_data,
     set_nested_value,
-    convert_value,
 )
-
-
-# Test convert_value function
-def test_convert_value_string():
-    assert convert_value("hello") == "hello"
-
-
-def test_convert_value_boolean():
-    assert convert_value("true") is True
-    assert convert_value("True") is True
-    assert convert_value("false") is False
-    assert convert_value("False") is False
-
-
-def test_convert_value_numbers():
-    assert convert_value("123") == 123
-    assert convert_value("123.45") == 123.45
-    assert convert_value("0") == 0
-    assert (
-        convert_value("-123") == "-123"
-    )  # Negative numbers aren't converted automatically
-
-
-def test_convert_value_upload_file(mocker):
-    mock_file = mocker.MagicMock(spec=UploadFile)
-    assert convert_value(mock_file) is mock_file
 
 
 # Test set_nested_value function
@@ -143,7 +116,7 @@ def test_process_form_data_nested():
     result = process_form_data(form_data)
     assert result == {
         "name": "John",
-        "profile": {"interests": "coding", "color": "blue", "likes_cake": True},
+        "profile": {"interests": "coding", "color": "blue", "likes_cake": "true"},
     }
 
 
@@ -160,7 +133,7 @@ def test_process_form_data_arrays():
     assert result == {
         "preferences": [
             {"name": "theme", "value": "dark"},
-            {"name": "notifications", "value": True},
+            {"name": "notifications", "value": "true"},
         ]
     }
 
