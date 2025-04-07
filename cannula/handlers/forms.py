@@ -16,9 +16,8 @@ async def parse_nested_form(request: Request) -> Dict[str, Any]:
     # Use Starlette's built-in parser to get the form data
     form_data = await request.form()
     if not form_data:
-        form_data = request.query_params
+        return process_form_data(request.query_params)
 
-    LOG.info(form_data)
     # Process the form data into a nested structure
     return process_form_data(form_data)
 

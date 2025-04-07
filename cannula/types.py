@@ -440,6 +440,8 @@ class OperationModel:
     Provides validation and type conversion for GraphQL operation inputs.
     """
 
+    _input_models: typing.Dict[str, typing.Any]
+
     def __init__(
         self,
         name: str,
@@ -511,7 +513,7 @@ class OperationModel:
             base_type = schema_type.extensions.get("py_type", str)
 
         if var.is_list:
-            return typing.List[base_type]
+            return typing.List[base_type]  # type: ignore
         return base_type
 
     def _create_input_type_model(
@@ -536,7 +538,7 @@ class OperationModel:
         type_def = typing.cast(GraphQLInputObjectType, type_def)
 
         # Create fields for the model
-        fields = {}
+        fields: dict[str, typing.Any] = {}
         for field_name, field_def in type_def.fields.items():
             input_def = typing.cast(GraphQLInputField, field_def)
             # Create a temporary Variable for this field to reuse _graphql_to_python_type
@@ -553,7 +555,7 @@ class OperationModel:
             if field_var.required:
                 fields[field_name] = (field_type, ...)
             else:
-                fields[field_name] = (typing.Optional[field_type], None)
+                fields[field_name] = (typing.Optional[field_type], None)  # type: ignore
 
         # Create the model
         model = pydantic.create_model(type_name, **fields)

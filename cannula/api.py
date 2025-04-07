@@ -254,9 +254,7 @@ class CannulaAPI(typing.Generic[RootType, Settings]):
 
         return field_definition
 
-    def _load_operations(
-        self, operations: pathlib.Path | str | None
-    ) -> typing.Optional[DocumentNode]:
+    def _load_operations(self, operations: pathlib.Path | str | None) -> None:
         if operations is None:
             return None
 
