@@ -1,8 +1,11 @@
+import logging
 import re
 from typing import Dict, Any, Union
 
 from starlette.requests import Request
-from starlette.datastructures import FormData, UploadFile
+from starlette.datastructures import FormData, UploadFile, QueryParams
+
+LOG = logging.getLogger(__name__)
 
 
 async def parse_nested_form(request: Request) -> Dict[str, Any]:
@@ -12,12 +15,14 @@ async def parse_nested_form(request: Request) -> Dict[str, Any]:
     """
     # Use Starlette's built-in parser to get the form data
     form_data = await request.form()
+    if not form_data:
+        return process_form_data(request.query_params)
 
     # Process the form data into a nested structure
     return process_form_data(form_data)
 
 
-def process_form_data(form_data: FormData) -> Dict[str, Any]:
+def process_form_data(form_data: FormData | QueryParams) -> Dict[str, Any]:
     """Convert flat FormData with dot notation to nested structure"""
     result: Dict[str, Any] = {}
 
@@ -69,7 +74,7 @@ def set_nested_value(
                 set_nested_value(current[array_name][index], remainder, value)
             else:
                 # Set the array item directly
-                current[array_name][index] = convert_value(value)
+                current[array_name][index] = value
         else:
             # Regular array notation without dots in the array name
             if array_name not in data:
@@ -84,7 +89,7 @@ def set_nested_value(
                 set_nested_value(data[array_name][index], remainder, value)
             else:
                 # Set the array item directly
-                data[array_name][index] = convert_value(value)
+                data[array_name][index] = value
         return
 
     # Handle regular dot notation
@@ -99,29 +104,7 @@ def set_nested_value(
             current = current[part]
 
         # Set the value at the deepest level
-        current[parts[-1]] = convert_value(value)
+        current[parts[-1]] = value
     else:
         # Handle regular fields (no dots)
-        data[key] = convert_value(value)
-
-
-def convert_value(value: Union[str, UploadFile]) -> Any:
-    """Convert string values to appropriate types, leave files as is"""
-    if isinstance(value, str):
-        # Convert booleans
-        if value.lower() == "true":
-            return True
-        elif value.lower() == "false":
-            return False
-
-        # Convert numbers
-        try:
-            if "." in value and value.replace(".", "", 1).isdigit():
-                return float(value)
-            elif value.isdigit():
-                return int(value)
-        except ValueError:  # pragma: no cover
-            pass
-
-    # Return UploadFile objects or other values as is
-    return value
+        data[key] = value

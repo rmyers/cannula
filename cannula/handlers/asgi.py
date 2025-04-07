@@ -199,7 +199,7 @@ class GraphQLHandler:
         ):
             default = "# Welcome to Cannula write your queries here"
             operations = (
-                print_ast(self.graph.operations) if self.graph.operations else None
+                print_ast(self.graph._operations) if self.graph._operations else None
             )
             raw_query = operations or default
             default_query = raw_query.replace("\n", "\\n")

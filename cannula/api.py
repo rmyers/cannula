@@ -12,12 +12,17 @@ import inspect
 import pathlib
 import typing
 
+from cannula.codegen.parse_variables import parse_variable
+from cannula.handlers.forms import parse_nested_form
+from cannula.types import Operation
 from graphql import (
     DocumentNode,
+    FragmentDefinitionNode,
     GraphQLError,
     GraphQLField,
     GraphQLFieldMap,
     GraphQLObjectType,
+    OperationDefinitionNode,
     concat_ast,
     execute,
     ExecutionResult,
@@ -27,6 +32,8 @@ from graphql import (
     validate_schema,
     validate,
 )
+
+from starlette.requests import Request
 
 from .context import Context, Settings
 from .errors import SchemaValidationError
@@ -102,9 +109,12 @@ class CannulaAPI(typing.Generic[RootType, Settings]):
     _scalars: typing.List[ScalarInterface]
     _kwargs: typing.Dict[str, typing.Any]
     schema: GraphQLSchema
-    operations: typing.Optional[DocumentNode]
     logger: typing.Optional[logging.Logger]
     level: int
+    _operations: typing.Optional[DocumentNode] = None
+    operations: typing.Dict[str, Operation]
+    mutations: typing.Dict[str, Operation]
+    fragments: typing.Dict[str, FragmentDefinitionNode]
 
     def __init__(
         self,
@@ -132,7 +142,10 @@ class CannulaAPI(typing.Generic[RootType, Settings]):
         self.debug = debug
 
         self.schema = self._build_schema()
-        self.operations = self._load_operations(operations)
+        self.operations: typing.Dict[str, Operation] = {}
+        self.mutations: typing.Dict[str, Operation] = {}
+        self.fragments: typing.Dict[str, FragmentDefinitionNode] = {}
+        self._load_operations(operations)
 
     def query(self, field_name: typing.Optional[str] = None) -> typing.Any:
         """Query Resolver
@@ -197,6 +210,7 @@ class CannulaAPI(typing.Generic[RootType, Settings]):
         """
 
         def decorator(function: typing.Callable[..., typing.Any]) -> None:
+
             _name = field_name or function.__name__
             field_def = self._validate_field(type_name=type_name, field_name=_name)
             field_def.resolve = function
@@ -240,9 +254,7 @@ class CannulaAPI(typing.Generic[RootType, Settings]):
 
         return field_definition
 
-    def _load_operations(
-        self, operations: pathlib.Path | str | None
-    ) -> typing.Optional[DocumentNode]:
+    def _load_operations(self, operations: pathlib.Path | str | None) -> None:
         if operations is None:
             return None
 
@@ -250,7 +262,38 @@ class CannulaAPI(typing.Generic[RootType, Settings]):
         ops = concat_ast(documents)
         for err in validate(self.schema, ops):
             raise err
-        return ops
+        self._operations = ops
+
+        # First pass: collect all fragments
+        for definition in self._operations.definitions:
+            if isinstance(definition, FragmentDefinitionNode):
+                self.fragments[definition.name.value] = definition
+
+        for definition in self._operations.definitions:
+            if not isinstance(definition, OperationDefinitionNode):
+                continue
+
+            if not definition.name:
+                continue
+
+            name = definition.name.value
+            variables = {}
+
+            # Store original TypeNodes for coercion
+            for var_def in definition.variable_definitions or []:
+                var_name = var_def.variable.name.value
+                variables[var_name] = parse_variable(var_def)
+
+            operation = Operation(
+                name=name,
+                operation_type=definition.operation.value,
+                variable_types=variables,
+                node=definition,
+                schema=self.schema,
+            )
+            self.operations[name] = operation
+            if operation.operation_type == "mutation":
+                self.mutations[name] = operation
 
     def get_context(self, request) -> typing.Any:
         return self._context(request=request, config=self._config)
@@ -406,14 +449,26 @@ class CannulaAPI(typing.Generic[RootType, Settings]):
     async def exec_operation(
         self,
         operation_name: str,
-        variables: typing.Optional[typing.Dict[str, typing.Any]] = None,
+        request: Request,
         context: typing.Optional[typing.Any] = None,
-        request: typing.Optional[typing.Any] = None,
         **kwargs: typing.Any,
     ) -> ExecutionResult:
-        document = self.operations or ""
+        if self._operations is None:
+            raise GraphQLError("No operations defined")
+
+        # Get the operation to execute
+        operation = self.operations.get(operation_name)
+        if not operation:
+            raise GraphQLError(f"Operation '{operation_name}' not found")
+
+        try:
+            raw_variables = await parse_nested_form(request)
+            variables = operation.validate_variables(raw_variables)
+        except Exception as e:
+            return ExecutionResult(data=None, errors=[GraphQLError(str(e))])
+
         return await self.call(
-            document=document,
+            document=self._operations,
             variables=variables,
             operation_name=operation_name,
             context=context,

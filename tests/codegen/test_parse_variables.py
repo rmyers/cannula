@@ -10,7 +10,6 @@ from graphql import (
 from cannula.codegen.parse_variables import (
     parse_variable,
     Variable,
-    parse_variable_type,
 )
 
 
@@ -59,48 +58,6 @@ from cannula.codegen.parse_variables import (
 )
 def test_parse_variable(variable_def, expected):
     result = parse_variable(variable_def)
-    assert result == expected
-
-
-@pytest.mark.parametrize(
-    "name,type_node,required,is_list,expected",
-    [
-        pytest.param(
-            "id",
-            NamedTypeNode(name=NameNode(value="ID")),
-            False,
-            False,
-            Variable(name="id", value="ID", required=False, is_list=False),
-            id="basic_named_type",
-        ),
-        pytest.param(
-            "age",
-            NonNullTypeNode(type=NamedTypeNode(name=NameNode(value="Int"))),
-            False,
-            False,
-            Variable(name="age", value="Int", required=True, is_list=False),
-            id="required_integer_type",
-        ),
-        pytest.param(
-            "scores",
-            ListTypeNode(type=NamedTypeNode(name=NameNode(value="Float"))),
-            False,
-            False,
-            Variable(name="scores", value="Float", required=False, is_list=True),
-            id="list_of_floats",
-        ),
-        pytest.param(
-            "input",
-            NamedTypeNode(name=NameNode(value="SpecialInput")),
-            False,
-            False,
-            Variable(name="input", value="SpecialInput", required=False, is_list=False),
-            id="input_type",
-        ),
-    ],
-)
-def test_parse_variable_type(name, type_node, required, is_list, expected):
-    result = parse_variable_type(name, type_node, required, is_list)
     assert result == expected
 
 
@@ -156,12 +113,13 @@ def test_variable_coerce(variable, input_value, expected):
     assert result == expected
 
 
-def test_invalid_type():
+def test_invalid_type(mocker):
     class InvalidTypeNode:
-        pass
+        variable = mocker.Mock()
+        default_value = None
+        type = mocker.Mock()
 
     with pytest.raises(AttributeError, match="unable to parse variable"):
-        parse_variable_type(
-            "test",
+        parse_variable(
             InvalidTypeNode(),  # type: ignore
         )

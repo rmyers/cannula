@@ -6,10 +6,16 @@ import typing
 import pydantic
 from graphql import (
     GraphQLField,
+    GraphQLInputField,
     GraphQLInputObjectType,
     GraphQLInterfaceType,
     GraphQLObjectType,
+    GraphQLSchema,
     GraphQLUnionType,
+    OperationDefinitionNode,
+    is_input_object_type,
+    is_list_type,
+    is_non_null_type,
 )
 from typing_extensions import Self
 
@@ -404,6 +410,248 @@ class InputType:
             decorator_list=[],
             type_params=[],  # type: ignore
         )
+
+
+@dataclasses.dataclass
+class Variable:
+    name: str
+    value: str
+    required: bool
+    is_list: bool
+    default: typing.Any = None
+
+    def coerce_variable(self, variable):
+        if self.value == "Int":
+            return int(variable)
+        elif self.value == "Float":
+            return float(variable)
+        elif self.value == "Boolean":
+            return variable.lower() in ("true", "1", "yes")
+        elif self.value == "ID":
+            return str(variable)
+        else:
+            # Could extend this to handle custom scalars from schema
+            return variable
+
+
+class OperationModel:
+    """
+    A wrapper around a Pydantic model for GraphQL operation variables.
+    Provides validation and type conversion for GraphQL operation inputs.
+    """
+
+    _input_models: typing.Dict[str, typing.Any]
+
+    def __init__(
+        self,
+        name: str,
+        operation_type: str,
+        variables: dict[str, Variable],
+        node: OperationDefinitionNode,
+        schema: GraphQLSchema,
+    ):
+        self.name = name
+        self.operation_type = operation_type
+        self.variable_types = variables
+        self.node = node
+        self.schema = schema
+        self._model = self._create_pydantic_model()
+
+    @property
+    def is_mutation(self) -> bool:
+        return self.operation_type == "mutation"
+
+    @property
+    def template_path(self) -> str:
+        template_type = "_form" if self.is_mutation else ""
+        return f"{self.name}{template_type}.html"
+
+    @property
+    def mutation_result_template(self) -> str:
+        return f"{self.name}_result.html"
+
+    def _create_pydantic_model(self) -> typing.Type[pydantic.BaseModel]:
+        """
+        Create a Pydantic model from the GraphQL variable definitions.
+        """
+        fields: dict[str, typing.Any] = {}
+
+        for var_name, var_type in self.variable_types.items():
+            python_type = self._graphql_to_python_type(var_type)
+
+            # Create field with proper type annotation
+            if var_type.required:
+                fields[var_name] = (python_type, var_type.default)
+            else:
+                fields[var_name] = (typing.Optional[python_type], var_type.default)
+
+        # Create the model class
+        model_name = f"{self.name.title()}Variables"
+        model = pydantic.create_model(model_name, **fields)
+
+        # Add validation methods to the model
+        self._add_validators(model)
+
+        return model
+
+    def _graphql_to_python_type(self, var: Variable) -> typing.Any:
+        """
+        Convert a GraphQL type to a Python type.
+        Recursively handles input types.
+        """
+        schema_type = self.schema.get_type(var.value)
+        if not schema_type:
+            return str
+
+        # Handle input object types
+        if is_input_object_type(schema_type):
+            # Create a nested model for the input type
+            input_model = self._create_input_type_model(var.value)
+            base_type = input_model
+        else:
+            # Use the Python type from extensions for scalars
+            base_type = schema_type.extensions.get("py_type", str)
+
+        if var.is_list:
+            return typing.List[base_type]  # type: ignore
+        return base_type
+
+    def _create_input_type_model(
+        self, type_name: str
+    ) -> typing.Type[pydantic.BaseModel]:
+        """
+        Create a Pydantic model for an input type.
+        """
+        # Check if we've already created this model
+        if hasattr(self, "_input_models") and type_name in self._input_models:
+            return self._input_models[type_name]
+
+        # Initialize input model cache if needed
+        if not hasattr(self, "_input_models"):
+            self._input_models = {}
+
+        # Get the type definition
+        type_def = self.schema.get_type(type_name)
+        if not type_def or not is_input_object_type(type_def):
+            raise AttributeError(f"{type_name} is not a input type")
+
+        type_def = typing.cast(GraphQLInputObjectType, type_def)
+
+        # Create fields for the model
+        fields: dict[str, typing.Any] = {}
+        for field_name, field_def in type_def.fields.items():
+            input_def = typing.cast(GraphQLInputField, field_def)
+            # Create a temporary Variable for this field to reuse _graphql_to_python_type
+            field_var = Variable(
+                name=field_name,
+                value=self._get_named_type_name(input_def.type),
+                required=self._is_required_type(input_def.type),
+                is_list=self._is_list_type(input_def.type),
+            )
+
+            field_type = self._graphql_to_python_type(field_var)
+
+            # Add the field with proper required status
+            if field_var.required:
+                fields[field_name] = (field_type, ...)
+            else:
+                fields[field_name] = (typing.Optional[field_type], None)  # type: ignore
+
+        # Create the model
+        model = pydantic.create_model(type_name, **fields)
+
+        # Cache the model
+        self._input_models[type_name] = model
+
+        return model
+
+    def _get_named_type_name(self, field_type) -> str:
+        """Extract the name of the innermost named type."""
+        if hasattr(field_type, "of_type"):
+            return self._get_named_type_name(field_type.of_type)
+        return field_type.name if hasattr(field_type, "name") else str(field_type)
+
+    def _is_required_type(self, field_type) -> bool:
+        """Check if the field type is non-null (required)."""
+        return is_non_null_type(field_type)
+
+    def _is_list_type(self, field_type) -> bool:
+        """Check if the field type is a list, handling non-null wrappers."""
+        if is_non_null_type(field_type):
+            return self._is_list_type(field_type.of_type)
+        return is_list_type(field_type)
+
+    def _add_validators(self, model: typing.Type[pydantic.BaseModel]) -> None:
+        """
+        Add validation methods to the model.
+        """
+        # This could be expanded to add GraphQL-specific validations
+        pass
+
+    def parse_and_validate(self, data: dict[str, typing.Any]) -> dict[str, typing.Any]:
+        """
+        Parse and validate input data against the model.
+        Returns a dictionary with validated and type-converted values.
+        """
+        try:
+            # Create a model instance with the data
+            model_instance = self._model(**data)
+            # Return the model as a dict
+            return model_instance.model_dump()
+        except Exception as e:
+            LOG.error(f"Validation error for operation {self.name}: {str(e)}")
+            raise ValueError(f"Invalid input data for operation {self.name}: {str(e)}")
+
+    def __repr__(self) -> str:
+        return f"OperationModel(name='{self.name}', type='{self.operation_type}')"
+
+
+@dataclasses.dataclass
+class Operation:
+    """Represents a parsed GraphQL operation with its metadata"""
+
+    name: str
+    operation_type: str  # 'query' or 'mutation'
+    variable_types: typing.Dict[str, Variable]
+    node: OperationDefinitionNode
+    schema: GraphQLSchema
+
+    def __post_init__(self):
+        # Initialize the OperationModel
+        self._model = OperationModel(
+            name=self.name,
+            operation_type=self.operation_type,
+            variables=self.variable_types,
+            node=self.node,
+            schema=self.schema,
+        )
+
+    @property
+    def is_mutation(self) -> bool:
+        return self.operation_type == "mutation"
+
+    @property
+    def template_path(self) -> str:
+        template_type = "_form" if self.is_mutation else ""
+        return f"{self.name}{template_type}.html"
+
+    @property
+    def mutation_result_template(self) -> str:
+        return f"{self.name}_result.html"
+
+    def validate_variables(
+        self, data: typing.Dict[str, typing.Any]
+    ) -> typing.Dict[str, typing.Any]:
+        """
+        Validate and convert input data using the Pydantic model.
+
+        Args:
+            data: Dictionary of input variables from form data or query parameters
+
+        Returns:
+            A dictionary with validated and type-converted values
+        """
+        return self._model.parse_and_validate(data)
 
 
 @dataclasses.dataclass
