@@ -127,7 +127,7 @@ class CannulaAPI(typing.Generic[RootType, Settings]):
         logger: typing.Optional[logging.Logger] = None,
         level: int = logging.DEBUG,
         debug: bool = False,
-        operations: typing.Optional[pathlib.Path | str] = None,
+        operations: typing.Optional[pathlib.Path | str | DocumentNode] = None,
         **kwargs,
     ):
         self._context = context or Context
@@ -254,14 +254,21 @@ class CannulaAPI(typing.Generic[RootType, Settings]):
 
         return field_definition
 
-    def _load_operations(self, operations: pathlib.Path | str | None) -> None:
+    def _load_operations(
+        self, operations: pathlib.Path | str | DocumentNode | None
+    ) -> None:
         if operations is None:
             return None
 
-        documents = load_schema(operations)
-        ops = concat_ast(documents)
+        if isinstance(operations, pathlib.Path):
+            documents = load_schema(operations)
+            ops = concat_ast(documents)
+        else:
+            ops = maybe_parse(operations)
+
         for err in validate(self.schema, ops):
             raise err
+
         self._operations = ops
 
         # First pass: collect all fragments
@@ -454,12 +461,17 @@ class CannulaAPI(typing.Generic[RootType, Settings]):
         **kwargs: typing.Any,
     ) -> ExecutionResult:
         if self._operations is None:
-            raise GraphQLError("No operations defined")
+            return ExecutionResult(
+                data=None, errors=[GraphQLError("No operations defined")]
+            )
 
         # Get the operation to execute
         operation = self.operations.get(operation_name)
         if not operation:
-            raise GraphQLError(f"Operation '{operation_name}' not found")
+            return ExecutionResult(
+                data=None,
+                errors=[GraphQLError(f"Operation '{operation_name}' not found")],
+            )
 
         try:
             raw_variables = await parse_nested_form(request)
