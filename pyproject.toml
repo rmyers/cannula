@@ -24,7 +24,7 @@ codegen = [
     "black<=25.1.0",
     "jinja2<4.0",
     "tomli<=2.2.1",
-    "typing-extensions<=4.12.2",
+    "typing-extensions<=4.14.1",
     "python-dotenv==1.1.0",
 ]
 httpx = ["httpx", "fastapi"]
