@@ -33,6 +33,7 @@ from graphql import (
     validate,
 )
 
+from pydantic import ValidationError
 from starlette.requests import Request
 
 from .context import Context, Settings
@@ -476,8 +477,10 @@ class CannulaAPI(typing.Generic[RootType, Settings]):
         try:
             raw_variables = await parse_nested_form(request)
             variables = operation.validate_variables(raw_variables)
-        except Exception as e:
-            return ExecutionResult(data=None, errors=[GraphQLError(str(e))])
+        except ValidationError as e:
+            return ExecutionResult(
+                data=None, errors=[GraphQLError(str(e), original_error=e)]
+            )
 
         return await self.call(
             document=self._operations,

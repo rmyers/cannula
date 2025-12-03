@@ -172,6 +172,15 @@ async def test_mutation_operation_errors(asgi_client):
     resp = response.json()
     assert resp["data"] is None
     assert len(resp["errors"]) == 1
+    assert resp["errors"] == [
+        {
+            "extensions": {
+                "error_type": "bool_parsing",
+                "field": "value.update_cart",
+            },
+            "message": "Invalid input for 'update_cart'",
+        }
+    ]
 
 
 @pytest.mark.parametrize("operations", [None])
