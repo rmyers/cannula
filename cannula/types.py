@@ -487,12 +487,12 @@ class OperationModel:
 
         # Create the model class
         model_name = f"{self.name.title()}Variables"
-        model = pydantic.create_model(model_name, **fields)
+        _model = pydantic.create_model(model_name, **fields)
 
         # Add validation methods to the model
-        self._add_validators(model)
+        self._add_validators(_model)
 
-        return model
+        return _model
 
     def _graphql_to_python_type(self, var: Variable) -> typing.Any:
         """
@@ -593,14 +593,10 @@ class OperationModel:
         Parse and validate input data against the model.
         Returns a dictionary with validated and type-converted values.
         """
-        try:
-            # Create a model instance with the data
-            model_instance = self._model(**data)
-            # Return the model as a dict
-            return model_instance.model_dump()
-        except Exception as e:
-            LOG.error(f"Validation error for operation {self.name}: {str(e)}")
-            raise ValueError(f"Invalid input data for operation {self.name}: {str(e)}")
+        # Create a model instance with the data
+        model_instance = self._model(**data)
+        # Return the model as a dict
+        return model_instance.model_dump()
 
     def __repr__(self) -> str:
         return f"OperationModel(name='{self.name}', type='{self.operation_type}')"

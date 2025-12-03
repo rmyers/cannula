@@ -1,3 +1,4 @@
+from cannula import gql
 import pytest
 from graphql import ExecutionResult, GraphQLError
 from pytest_mock import MockerFixture
@@ -112,6 +113,37 @@ async def test_api_invalid_field_resolver(valid_schema):
             pass
 
 
+async def test_api_operation_fragments(valid_schema):
+    operation = gql(
+        """
+        fragment userFields on User {
+           name
+        }
+        mutation TestMutation($name: String!) {
+            createMe(name: $name) {
+                ...userFields
+            }
+        }
+        """
+    )
+    api = CannulaAPI(valid_schema, operations=operation)
+    assert api.fragments.get("userFields") is not None
+
+
+async def test_api_handles_anonymous_operations(valid_schema):
+    operation = gql(
+        """
+        query {
+            me {
+                name
+            }
+        }
+        """
+    )
+    api = CannulaAPI(valid_schema, operations=operation)
+    assert api.operations == {}
+
+
 def test_call_sync(valid_query, valid_schema):
     api = CannulaAPI(valid_schema)
     results = api.call_sync(valid_query)
@@ -210,3 +242,18 @@ async def test_tracking(valid_schema, valid_query, mocker):
     assert result.extensions == {
         "debug": {"executionTimeMs": mocker.ANY, "httpRequests": []}
     }
+
+
+async def test_missing_operations(valid_schema, mocker):
+    api = CannulaAPI(schema=valid_schema, debug=True)
+    result = await api.exec_operation("SomeOperation", mocker.Mock())
+    assert result.errors == [GraphQLError("No operations defined")]
+
+
+async def test_invalid_operation_name(valid_schema, mocker):
+    operation = gql(
+        "mutation TestMutation($name: String!) { createMe(name: $name) { name }} "
+    )
+    api = CannulaAPI(schema=valid_schema, debug=True, operations=operation)
+    result = await api.exec_operation("SomeOperation", mocker.Mock())
+    assert result.errors == [GraphQLError("Operation 'SomeOperation' not found")]

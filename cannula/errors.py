@@ -1,9 +1,11 @@
-import dataclasses
 import logging
 import re
 import typing
 
+from pydantic import ValidationError
+
 from graphql import GraphQLError, GraphQLFormattedError
+from pydantic_core import ErrorDetails
 
 DEFAULT_LOGGER = logging.getLogger(__name__)
 
@@ -28,7 +30,11 @@ def format_errors(
 
     for err in errors:
         log_error(err, logger, level)
-        formatted_errors.append(err.formatted)
+
+        # Format the error before adding it to formatted_errors
+        for error in parse_graphql_error(err):
+            formatted_errors.append(error.formatted)
+
     return formatted_errors
 
 
@@ -51,111 +57,100 @@ class SchemaValidationError(Exception):
     pass
 
 
-@dataclasses.dataclass
-class FormattedError:
-    """Represents a user-friendly formatted error"""
-
-    field: str
-    message: str
-
-    def to_dict(self) -> dict[str, str]:
-        """Convert to dictionary representation"""
-        return {"field": self.field, "message": self.message}
-
-
-def format_graphql_errors(error: GraphQLError | Exception) -> FormattedError:
+def enhance_graphql_error(
+    field: str, message: str, error: GraphQLError
+) -> GraphQLError:
     """
-    Format GraphQL errors into human-readable messages
+    Enhance a GraphQLError with user-friendly message and field information.
 
     Args:
-        error: A GraphQL error or Exception
+        error: The original GraphQLError
 
     Returns:
-        A list of formatted errors with field names and user-friendly messages
+        An enhanced GraphQLError with updated message and extensions
     """
-    if isinstance(error, GraphQLError):
-        # Handle GraphQL validation errors
-        if hasattr(error, "original_error") and error.original_error:
-            return parse_validation_error(error.original_error)
+    # Update the error's extensions
+    if not hasattr(error, "extensions") or not error.extensions:
+        error.extensions = {}
 
-        # Handle standard GraphQL errors
-        if error.message:
-            return parse_graphql_error_message(error.message)
+    error.extensions["field"] = field
 
-    # Fallback for other errors
-    return FormattedError(
-        field="general",
-        message=str(error) if error else "An unexpected error occurred",
-    )
+    # Replace the original message with user-friendly one
+    error.message = message
+
+    return error
 
 
-def parse_graphql_error_message(error_message: str) -> FormattedError:
+def parse_graphql_error(error: GraphQLError) -> list[GraphQLError]:
     """
-    Parse GraphQL error messages to extract field and create user-friendly message
+    Parse GraphQL errors to extract field name and create user-friendly message
 
     Args:
-        error_message: The error message from GraphQL
+        error: A GraphQL error
 
     Returns:
-        A list of formatted errors
+        A tuple of (field_path, user_friendly_message)
     """
-    # Extract field path from messages like:
-    # "Variable '$input' got invalid value 'lskdj' at 'input.password'; Int cannot represent non-integer value: 'lskdj'"
-    field_path_match = re.search(r"at ['\"]([^'\"]+)['\"]", error_message)
-    field_path = field_path_match.group(1) if field_path_match else "unknown"
+    field = "general"
+    message = error.message
 
-    # Extract the field name from the path (e.g., 'input.password' -> 'password')
-    field_parts = field_path.split(".")
-    field = field_parts[-1] if len(field_parts) > 0 else "unknown"
-
-    # Create a human-readable message based on error patterns
-    message = f"Invalid input for field: {field}"
-
-    if (
-        "Int cannot represent" in error_message
-        or "not a valid integer" in error_message
-    ):
-        message = f"Please enter a valid number for {field}"
-    elif "String cannot represent" in error_message:
-        message = f"Please enter valid text for {field}"
-    elif "Boolean cannot represent" in error_message:
-        message = f"Please provide a yes/no value for {field}"
-    elif "required" in error_message.lower():
-        message = f"{field} is required"
-    elif "not a valid email" in error_message.lower():
-        message = f"Please enter a valid email address for {field}"
-    elif "Enum" in error_message and "does not have a value" in error_message:
-        message = f"Please select a valid option for {field}"
-
-    return FormattedError(field=field_path, message=message)
-
-
-def parse_validation_error(error: Exception) -> FormattedError:
-    """
-    Parse validation errors from various validation libraries
-
-    Args:
-        error: The validation error
-
-    Returns:
-        A list of formatted errors
-    """
     # Handle Pydantic validation errors
-    if hasattr(error, "errors") and callable(getattr(error, "errors", None)):
-        return [
-            FormattedError(
-                field=".".join(str(loc) for loc in err.get("loc", [])[-1:]),
-                message=humanize_error_message(
-                    err.get("loc", [])[-1] if err.get("loc") else "unknown",
-                    err.get("msg", ""),
-                ),
-            )
-            for err in error.errors()  # type: ignore
-        ]
+    if hasattr(error, "original_error") and error.original_error:
+        original_error = error.original_error
+        if isinstance(original_error, ValidationError):
+            errors = original_error.errors()
+            return [parse_pydantic_error(err) for err in errors]
 
-    # Default error parsing
-    error_str = str(error)
-    return parse_graphql_error_message(error_str)
+    # Handle standard GraphQL errors
+    if error.message:
+        # Extract field path from messages like:
+        # "Variable '$input' got invalid value 'lskdj' at 'input.password';
+        # Int cannot represent non-integer value: 'lskdj'"
+        field_path_match = re.search(r"at ['\"]([^'\"]+)['\"]", error.message)
+        if field_path_match:
+            field = field_path_match.group(1)
+
+            # Extract the field name from the path (e.g., 'input.password' -> 'password')
+            field_parts = field.split(".")
+            field_name = field_parts[-1] if len(field_parts) > 0 else "unknown"
+
+            # Create a human-readable message based on error patterns
+            if (
+                "Int cannot represent" in error.message
+                or "not a valid integer" in error.message
+            ):
+                message = f"Please enter a valid number for {field_name}"
+            elif "String cannot represent" in error.message:
+                message = f"Please enter valid text for {field_name}"
+            elif "Boolean cannot represent" in error.message:
+                message = f"Please provide a yes/no value for {field_name}"
+            elif "required" in error.message.lower():
+                message = f"{field_name} is required"
+            elif "not a valid email" in error.message.lower():
+                message = f"Please enter a valid email address for {field_name}"
+            elif "Enum" in error.message and "does not have a value" in error.message:
+                message = f"Please select a valid option for {field_name}"
+            else:
+                message = f"Invalid input for field: {field_name}"
+
+            return [enhance_graphql_error(field, message, error)]
+
+    return [error]
+
+
+def parse_pydantic_error(error: ErrorDetails) -> GraphQLError:
+    field = ".".join(str(loc) for loc in error.get("loc", [])) or "unknown"
+    field_name = field.split(".")[-1] or "unknown"
+    error_type = error.get("type", "unknown")
+    match error_type:
+        case e if e.startswith("int_"):
+            message = f"Please enter a valid number for '{field_name}'"
+        case _:
+            message = f"Invalid input for '{field_name}'"
+
+    return GraphQLError(
+        message=message, extensions={"field": field, "error_type": error_type}
+    )
 
 
 def humanize_error_message(field: str, message: str) -> str:
