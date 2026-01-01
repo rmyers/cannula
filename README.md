@@ -149,7 +149,7 @@ test_performance.py::test_performance_invalid_query
 performance test results:
 fastapi: 0.3692567819998658
 ariadne results: 2.08707908300039
-cannula results: 0.4372879369993825
+cannula results: 0.437287936999382
 PASSED
 ```
 
