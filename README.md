@@ -59,6 +59,7 @@ import sys
 
 import cannula
 
+
 SCHEMA = """
     type Query {
         hello(who: String!): String
